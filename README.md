@@ -1,2 +1,2 @@
 # SpacePenguin
-Note: make description
+A browser written in Golang.
