@@ -1,2 +1,2 @@
 # SpacePenguin
-A browser written in Golang.
+A secure, lightweight, and usable browser written in Qt.
