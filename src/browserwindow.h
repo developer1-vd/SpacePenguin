@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QList>
 #include <QMainWindow>
 #include <QUrl>
 
@@ -11,6 +12,7 @@ class QLineEdit;
 class QProgressBar;
 class QTabWidget;
 class QToolBar;
+class QToolButton;
 class QWebEngineProfile;
 class QWebEngineView;
 
@@ -21,34 +23,52 @@ class BrowserWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit BrowserWindow(QWebEngineProfile *profile, QWidget *parent = nullptr);
+    explicit BrowserWindow(QWebEngineProfile *profile, bool isPrivate = false,
+                           QWidget *parent = nullptr);
     ~BrowserWindow() override;
 
     void openInNewTab(const QUrl &url);
+
+    bool isPrivate() const { return m_isPrivate; }
 
 protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    struct ClosedTab {
+        int index = 0;
+        QUrl url;
+    };
+
     void createActions();
     void createToolBar();
     void createMenus();
     void createTabWidget();
+    void createFindBar();
+    void createTabShortcuts();
     void restoreSession();
     void saveSession() const;
-    void syncOmnibox(const QUrl &url);
 
     QWebEngineView *currentView() const;
     QWebEngineView *viewAt(int index) const;
 
     void newTab(const QUrl &url = QUrl());
+    void newWindow(bool isPrivate);
     void closeTab(int index);
+    void reopenClosedTab();
+    void selectTabByOffset(int offset);
+    void selectTabByIndex(int index);
     void navigate(const QString &text);
+    void loadAboutPage(const QString &id);
     void goHome();
 
     void setZoom(qreal factor);
     qreal currentZoom() const;
+
+    void showFindBar();
+    void findNext(bool backwards);
+    void findMatchesShown(int matchCount, int activeMatch);
 
     void onCurrentTabChanged(int index);
     void onTabCloseRequested(int index);
@@ -62,9 +82,11 @@ private:
     void updateNavigationState();
     void updateWindowTitle();
     void updateSecurityIndicator(const QUrl &url);
+    void syncOmnibox(const QUrl &url);
     void connectView(QWebEngineView *view);
 
     QWebEngineProfile *m_profile = nullptr;
+    bool m_isPrivate = false;
     UrlResolver m_resolver;
 
     QTabWidget *m_tabs = nullptr;
@@ -73,8 +95,21 @@ private:
     QLabel *m_securityLabel = nullptr;
     bool m_omniboxEdited = false;
 
+    QToolBar *m_findToolBar = nullptr;
+    QLineEdit *m_findInput = nullptr;
+    QLabel *m_findStatus = nullptr;
+    QAction *m_findAction = nullptr;
+
+    QList<ClosedTab> m_closedTabs;
+
     QAction *m_newTabAction = nullptr;
+    QAction *m_newWindowAction = nullptr;
+    QAction *m_newPrivateWindowAction = nullptr;
     QAction *m_closeTabAction = nullptr;
+    QAction *m_closeWindowAction = nullptr;
+    QAction *m_reopenTabAction = nullptr;
+    QAction *m_nextTabAction = nullptr;
+    QAction *m_previousTabAction = nullptr;
     QAction *m_backAction = nullptr;
     QAction *m_forwardAction = nullptr;
     QAction *m_reloadAction = nullptr;
@@ -83,6 +118,7 @@ private:
     QAction *m_zoomInAction = nullptr;
     QAction *m_zoomOutAction = nullptr;
     QAction *m_zoomResetAction = nullptr;
+    QAction *m_shortcutsAction = nullptr;
 };
 
 }

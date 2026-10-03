@@ -2,11 +2,10 @@
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QDir>
-#include <QStandardPaths>
 #include <QWebEngineProfile>
 
 #include "browserwindow.h"
-#include "startpageschemehandler.h"
+#include "profiles.h"
 
 #ifndef SPACEPENGUIN_VERSION
 #    define SPACEPENGUIN_VERSION "0.0.0"
@@ -41,24 +40,17 @@ int main(int argc, char *argv[])
 
     parser.process(app);
 
-    const QString dataDirectory = parser.isSet(userDataOption)
-        ? QDir(parser.value(userDataOption)).absolutePath()
-        : QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QWebEngineProfile *profile =
+        spacepenguin::createProfile(&app, parser.isSet(privateModeOption));
 
-    QWebEngineProfile *profile = nullptr;
-    if (parser.isSet(privateModeOption)) {
-        profile = new QWebEngineProfile(&app);
-    } else {
+    if (parser.isSet(userDataOption)) {
+        const QString dataDirectory = QDir(parser.value(userDataOption)).absolutePath();
         QDir().mkpath(dataDirectory);
-        profile = new QWebEngineProfile(QStringLiteral("default"), &app);
         profile->setPersistentStoragePath(dataDirectory);
         profile->setCachePath(dataDirectory + QStringLiteral("/cache"));
     }
 
-    profile->installUrlSchemeHandler(QByteArrayLiteral("sp"),
-                                    new spacepenguin::StartPageSchemeHandler(profile));
-
-    spacepenguin::BrowserWindow window(profile);
+    spacepenguin::BrowserWindow window(profile, parser.isSet(privateModeOption));
     window.show();
     return app.exec();
 }

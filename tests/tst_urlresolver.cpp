@@ -81,6 +81,12 @@ void TestUrlResolver::resolve_data()
                                << QStringLiteral("https://localhost:3000");
     QTest::newRow("protocol relative") << QStringLiteral("//example.com")
                                        << QStringLiteral("https://example.com");
+    QTest::newRow("about index") << QStringLiteral("about:")
+                                 << QStringLiteral("about:about");
+    QTest::newRow("about version") << QStringLiteral("about:version")
+                                   << QStringLiteral("about:version");
+    QTest::newRow("about penguin") << QStringLiteral("about:penguin")
+                                   << QStringLiteral("about:penguin");
     QTest::newRow("words search") << QStringLiteral("how to bake bread")
                                   << QStringLiteral("https://duckduckgo.com/?q=how%20to%20bake%20bread");
 }

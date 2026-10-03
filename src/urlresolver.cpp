@@ -131,6 +131,9 @@ QUrl UrlResolver::resolve(const QString &input) const
     if (text.isEmpty())
         return QUrl(m_homeUrl);
 
+    if (text.compare(QLatin1String("about:"), Qt::CaseInsensitive) == 0)
+        return QUrl(QStringLiteral("about:about"));
+
     if (!looksLikeUrl(text))
         return searchUrl(text);
 

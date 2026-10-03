@@ -18,10 +18,14 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets WebEngineWidgets)
 
 qt_add_executable(spacepenguin
     src/main.cpp
+    src/aboutpages.cpp
+    src/aboutpages.h
     src/browserwindow.cpp
     src/browserwindow.h
     src/browserpage.cpp
     src/browserpage.h
+    src/profiles.cpp
+    src/profiles.h
     src/startpageschemehandler.cpp
     src/startpageschemehandler.h
     src/urlresolver.cpp
@@ -32,7 +36,8 @@ qt_add_executable(spacepenguin
 
 target_link_libraries(spacepenguin PRIVATE Qt6::Widgets Qt6::WebEngineWidgets)
 target_compile_definitions(spacepenguin PRIVATE
-    SPACEPENGUIN_VERSION="${PROJECT_VERSION}")
+    SPACEPENGUIN_VERSION="${PROJECT_VERSION}"
+    SPACEPENGUIN_BUILD_TYPE="$<CONFIG>")
 
 if(MSVC)
     target_compile_options(spacepenguin PRIVATE /W4 /permissive-)
@@ -46,6 +51,7 @@ if(SPACEPENGUIN_BUILD_TESTS)
     find_package(Qt6 6.8 QUIET COMPONENTS Test)
     if(TARGET Qt6::Test)
         enable_testing()
+
         qt_add_executable(tst_urlresolver
             tests/tst_urlresolver.cpp
             src/urlresolver.cpp
@@ -54,6 +60,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_urlresolver PRIVATE Qt6::Test)
         target_include_directories(tst_urlresolver PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME urlresolver COMMAND tst_urlresolver)
+
+        qt_add_executable(tst_aboutpages
+            tests/tst_aboutpages.cpp
+            src/aboutpages.cpp
+            src/aboutpages.h
+        )
+        target_link_libraries(tst_aboutpages PRIVATE Qt6::Test)
+        target_include_directories(tst_aboutpages PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME aboutpages COMMAND tst_aboutpages)
     endif()
 endif()
 

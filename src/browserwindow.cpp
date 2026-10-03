@@ -1,10 +1,15 @@
 #include "browserwindow.h"
 
+#include "aboutpages.h"
 #include "browserpage.h"
+#include "profiles.h"
 
 #include <QAction>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QHeaderView>
 #include <QIcon>
 #include <QKeySequence>
 #include <QLabel>
@@ -14,12 +19,17 @@
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QSettings>
+#include <QShortcut>
 #include <QStatusBar>
 #include <QStyle>
 #include <QTabWidget>
 #include <QToolBar>
 #include <QToolButton>
+#include <QVBoxLayout>
+#include <QTreeWidget>
+#include <QWebEngineFindTextResult>
 #include <QWebEngineHistory>
+#include <QWebEnginePage>
 #include <QWebEngineView>
 
 namespace spacepenguin {
@@ -29,6 +39,7 @@ constexpr qreal kMinimumZoom = 0.5;
 constexpr qreal kMaximumZoom = 2.0;
 constexpr qreal kZoomStep = 0.1;
 constexpr int kMaximumRestoredTabs = 32;
+constexpr int kMaximumClosedTabs = 16;
 
 QIcon themeIcon(const QString &name, QStyle::StandardPixmap fallback)
 {
@@ -40,9 +51,10 @@ QIcon themeIcon(const QString &name, QStyle::StandardPixmap fallback)
 
 } // namespace
 
-BrowserWindow::BrowserWindow(QWebEngineProfile *profile, QWidget *parent)
+BrowserWindow::BrowserWindow(QWebEngineProfile *profile, bool isPrivate, QWidget *parent)
     : QMainWindow(parent)
     , m_profile(profile)
+    , m_isPrivate(isPrivate)
 {
     setWindowTitle(QStringLiteral("SpacePenguin"));
     resize(1100, 720);
@@ -51,6 +63,8 @@ BrowserWindow::BrowserWindow(QWebEngineProfile *profile, QWidget *parent)
     createToolBar();
     createMenus();
     createTabWidget();
+    createFindBar();
+    createTabShortcuts();
 
     statusBar()->addPermanentWidget(m_securityLabel);
     statusBar()->addPermanentWidget(m_progressBar, 1);
@@ -64,13 +78,38 @@ void BrowserWindow::createActions()
 {
     m_newTabAction = new QAction(themeIcon(QStringLiteral("tab-new"),
                                            QStyle::SP_FileDialogNewFolder), tr("New Tab"), this);
-    m_newTabAction->setShortcut(QKeySequence::New);
+    m_newTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     connect(m_newTabAction, &QAction::triggered, this, [this] { newTab(m_resolver.homeUrl()); });
 
+    m_newWindowAction = new QAction(tr("New Window"), this);
+    m_newWindowAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
+    connect(m_newWindowAction, &QAction::triggered, this, [this] { newWindow(m_isPrivate); });
+
+    m_newPrivateWindowAction = new QAction(tr("New Private Window"), this);
+    m_newPrivateWindowAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+    connect(m_newPrivateWindowAction, &QAction::triggered, this, [this] { newWindow(true); });
+
     m_closeTabAction = new QAction(tr("Close Tab"), this);
-    m_closeTabAction->setShortcut(QKeySequence::Close);
+    m_closeTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_W));
     connect(m_closeTabAction, &QAction::triggered, this,
             [this] { closeTab(m_tabs->currentIndex()); });
+
+    m_closeWindowAction = new QAction(tr("Close Window"), this);
+    m_closeWindowAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
+    connect(m_closeWindowAction, &QAction::triggered, this, &QWidget::close);
+
+    m_reopenTabAction = new QAction(tr("Reopen Closed Tab"), this);
+    m_reopenTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T));
+    m_reopenTabAction->setEnabled(false);
+    connect(m_reopenTabAction, &QAction::triggered, this, &BrowserWindow::reopenClosedTab);
+
+    m_nextTabAction = new QAction(tr("Next Tab"), this);
+    m_nextTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab));
+    connect(m_nextTabAction, &QAction::triggered, this, [this] { selectTabByOffset(1); });
+
+    m_previousTabAction = new QAction(tr("Previous Tab"), this);
+    m_previousTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab));
+    connect(m_previousTabAction, &QAction::triggered, this, [this] { selectTabByOffset(-1); });
 
     m_backAction = new QAction(themeIcon(QStringLiteral("go-previous"),
                                          QStyle::SP_ArrowBack), tr("Back"), this);
@@ -92,12 +131,14 @@ void BrowserWindow::createActions()
 
     m_stopAction = new QAction(themeIcon(QStringLiteral("process-stop"),
                                          QStyle::SP_BrowserStop), tr("Stop"), this);
+    m_stopAction->setShortcut(QKeySequence(Qt::Key_Escape));
     m_stopAction->setEnabled(false);
     connect(m_stopAction, &QAction::triggered, this,
             [this] { if (QWebEngineView *view = currentView()) view->stop(); });
 
     m_homeAction = new QAction(themeIcon(QStringLiteral("go-home"),
                                          QStyle::SP_DirHomeIcon), tr("Home"), this);
+    m_homeAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Home));
     connect(m_homeAction, &QAction::triggered, this, &BrowserWindow::goHome);
 
     m_zoomInAction = new QAction(tr("Zoom In"), this);
@@ -113,6 +154,44 @@ void BrowserWindow::createActions()
     m_zoomResetAction = new QAction(tr("Reset Zoom"), this);
     m_zoomResetAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
     connect(m_zoomResetAction, &QAction::triggered, this, [this] { setZoom(1.0); });
+
+    m_findAction = new QAction(themeIcon(QStringLiteral("edit-find"),
+                                         QStyle::SP_FileDialogContentsView), tr("Find in Page"), this);
+    m_findAction->setShortcut(QKeySequence::Find);
+    connect(m_findAction, &QAction::triggered, this, &BrowserWindow::showFindBar);
+
+    m_shortcutsAction = new QAction(tr("Keyboard Shortcuts"), this);
+    m_shortcutsAction->setShortcut(QKeySequence::HelpContents);
+    connect(m_shortcutsAction, &QAction::triggered, this, [this] {
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Keyboard Shortcuts"));
+        dialog.resize(520, 460);
+
+        auto *layout = new QVBoxLayout(&dialog);
+        auto *tree = new QTreeWidget(&dialog);
+        tree->setColumnCount(2);
+        tree->setHeaderLabels({tr("Shortcut"), tr("Action")});
+        tree->setRootIsDecorated(false);
+        tree->setAlternatingRowColors(true);
+
+        const auto actions = findChildren<QAction *>();
+        for (QAction *action : actions) {
+            if (!action->shortcut().isEmpty() && !action->text().isEmpty()
+                && !action->text().startsWith(QLatin1String("Focus Address"))) {
+                auto *item = new QTreeWidgetItem(tree);
+                item->setText(0, action->shortcut().toString(QKeySequence::PortableText));
+                item->setText(1, action->text());
+            }
+        }
+        tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+        layout->addWidget(tree);
+        layout->addWidget(buttons);
+        dialog.exec();
+    });
 }
 
 void BrowserWindow::createToolBar()
@@ -146,42 +225,93 @@ void BrowserWindow::createToolBar()
     toolBar->addWidget(m_omnibox);
 }
 
+void BrowserWindow::createFindBar()
+{
+    m_findToolBar = addToolBar(tr("Find"));
+    m_findToolBar->setMovable(false);
+    m_findToolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_findToolBar->hide();
+
+    m_findToolBar->addWidget(new QLabel(tr("Find:"), m_findToolBar));
+
+    m_findInput = new QLineEdit;
+    m_findInput->setPlaceholderText(tr("Find in page"));
+    m_findInput->setClearButtonEnabled(true);
+    m_findToolBar->addWidget(m_findInput);
+
+    auto *previousButton = new QToolButton;
+    previousButton->setText(tr("Previous"));
+    previousButton->setToolTip(tr("Previous match"));
+    connect(previousButton, &QToolButton::clicked, this, [this] { findNext(true); });
+    m_findToolBar->addWidget(previousButton);
+
+    auto *nextButton = new QToolButton;
+    nextButton->setText(tr("Next"));
+    nextButton->setToolTip(tr("Next match"));
+    connect(nextButton, &QToolButton::clicked, this, [this] { findNext(false); });
+    m_findToolBar->addWidget(nextButton);
+
+    m_findStatus = new QLabel;
+    m_findToolBar->addWidget(m_findStatus);
+
+    auto *closeButton = new QToolButton;
+    closeButton->setText(tr("Close"));
+    closeButton->setToolTip(tr("Close the find bar"));
+    connect(closeButton, &QToolButton::clicked, this, [this] {
+        m_findInput->clear();
+        m_findToolBar->hide();
+        m_findInput->setFocus();
+    });
+    m_findToolBar->addWidget(closeButton);
+
+    connect(m_findInput, &QLineEdit::returnPressed, this, [this] { findNext(false); });
+    connect(m_findInput, &QLineEdit::textChanged, this, [this] { findNext(false); });
+}
+
+void BrowserWindow::createTabShortcuts()
+{
+    for (int number = 1; number <= 9; ++number) {
+        auto *shortcut = new QShortcut(QKeySequence(Qt::CTRL | (Qt::Key_1 + (number - 1))), this);
+        connect(shortcut, &QShortcut::activated, this, [this, number] { selectTabByIndex(number - 1); });
+    }
+}
+
 void BrowserWindow::createMenus()
 {
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
     fileMenu->addAction(m_newTabAction);
+    fileMenu->addAction(m_newWindowAction);
+    fileMenu->addAction(m_newPrivateWindowAction);
+    fileMenu->addAction(m_reopenTabAction);
+    fileMenu->addSeparator();
     fileMenu->addAction(m_closeTabAction);
+    fileMenu->addAction(m_closeWindowAction);
     fileMenu->addSeparator();
 
-    QAction *newWindowAction = fileMenu->addAction(tr("New Window"));
-    newWindowAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
-    connect(newWindowAction, &QAction::triggered, this, [this] {
-        auto *window = new BrowserWindow(m_profile);
-        window->newTab(m_resolver.homeUrl());
-        window->show();
-    });
-
     QAction *quitAction = fileMenu->addAction(tr("Quit"));
-    quitAction->setShortcut(QKeySequence::Quit);
+    quitAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q));
     quitAction->setMenuRole(QAction::QuitRole);
     connect(quitAction, &QAction::triggered, this, &QWidget::close);
 
     QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
     viewMenu->addAction(m_reloadAction);
     viewMenu->addAction(m_stopAction);
+    viewMenu->addAction(m_homeAction);
+    viewMenu->addSeparator();
+    viewMenu->addAction(m_findAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_zoomInAction);
     viewMenu->addAction(m_zoomOutAction);
     viewMenu->addAction(m_zoomResetAction);
 
     QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
+    helpMenu->addAction(m_shortcutsAction);
+
     QAction *aboutAction = helpMenu->addAction(tr("About SpacePenguin"));
+    aboutAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
     connect(aboutAction, &QAction::triggered, this, [this] {
-        QMessageBox::about(this, tr("About SpacePenguin"),
-                           tr("<h3>SpacePenguin %1</h3>"
-                              "<p>A secure, lightweight, and usable browser written in Qt.</p>"
-                              "<p>Pre-alpha software. Expect breakage.</p>")
-                               .arg(QApplication::applicationVersion()));
+        if (currentView())
+            loadAboutPage(QStringLiteral("about:about"));
     });
 }
 
@@ -232,7 +362,20 @@ void BrowserWindow::newTab(const QUrl &url)
 
     m_tabs->addTab(view, tr("New Tab"));
     m_tabs->setCurrentWidget(view);
-    view->setUrl(url.isEmpty() ? m_resolver.homeUrl() : url);
+
+    const QUrl target = url.isEmpty() ? m_resolver.homeUrl() : url;
+    if (target.scheme() == QLatin1String("about"))
+        loadAboutPage(target.toString());
+    else
+        view->setUrl(target);
+}
+
+void BrowserWindow::newWindow(bool isPrivate)
+{
+    QWebEngineProfile *profile = isPrivate ? createProfile(this, true) : m_profile;
+    auto *window = new BrowserWindow(profile, isPrivate);
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    window->show();
 }
 
 void BrowserWindow::openInNewTab(const QUrl &url)
@@ -246,6 +389,15 @@ void BrowserWindow::closeTab(int index)
         return;
 
     QWidget *page = m_tabs->widget(index);
+    if (const auto *view = qobject_cast<QWebEngineView *>(page)) {
+        if (view->url().isValid() && view->url().scheme() != QLatin1String("about")) {
+            m_closedTabs.prepend(ClosedTab{index, view->url()});
+            while (m_closedTabs.size() > kMaximumClosedTabs)
+                m_closedTabs.removeLast();
+            m_reopenTabAction->setEnabled(true);
+        }
+    }
+
     m_tabs->removeTab(index);
     page->deleteLater();
 
@@ -258,6 +410,33 @@ void BrowserWindow::onTabCloseRequested(int index)
     closeTab(index);
 }
 
+void BrowserWindow::reopenClosedTab()
+{
+    if (m_closedTabs.isEmpty())
+        return;
+
+    const ClosedTab closed = m_closedTabs.takeFirst();
+    m_reopenTabAction->setEnabled(!m_closedTabs.isEmpty());
+
+    newTab(closed.url);
+    const int index = qBound(0, closed.index, m_tabs->count() - 1);
+    m_tabs->setCurrentIndex(index);
+}
+
+void BrowserWindow::selectTabByOffset(int offset)
+{
+    if (m_tabs->count() < 2)
+        return;
+    const int index = (m_tabs->currentIndex() + offset + m_tabs->count()) % m_tabs->count();
+    m_tabs->setCurrentIndex(index);
+}
+
+void BrowserWindow::selectTabByIndex(int index)
+{
+    if (index < m_tabs->count())
+        m_tabs->setCurrentIndex(index);
+}
+
 void BrowserWindow::goHome()
 {
     if (QWebEngineView *view = currentView())
@@ -266,8 +445,28 @@ void BrowserWindow::goHome()
 
 void BrowserWindow::navigate(const QString &text)
 {
-    if (QWebEngineView *view = currentView())
-        view->setUrl(m_resolver.resolve(text));
+    QWebEngineView *view = currentView();
+    if (!view)
+        return;
+
+    const QUrl url = m_resolver.resolve(text);
+    if (url.scheme() == QLatin1String("about"))
+        loadAboutPage(url.toString());
+    else
+        view->setUrl(url);
+}
+
+void BrowserWindow::loadAboutPage(const QString &id)
+{
+    QWebEngineView *view = currentView();
+    if (!view)
+        return;
+
+    const QString html = AboutPages::isKnown(id)
+        ? AboutPages::render(id, QCoreApplication::applicationVersion(), m_isPrivate)
+        : AboutPages::renderUnknown(id);
+
+    view->page()->setContent(html.toUtf8(), QStringLiteral("text/html"), QUrl(id));
 }
 
 void BrowserWindow::onOmniboxReturnPressed()
@@ -275,6 +474,41 @@ void BrowserWindow::onOmniboxReturnPressed()
     navigate(m_omnibox->text());
     m_omniboxEdited = false;
     m_omnibox->setFocus();
+}
+
+void BrowserWindow::showFindBar()
+{
+    m_findToolBar->show();
+    m_findInput->setFocus();
+    m_findInput->selectAll();
+}
+
+void BrowserWindow::findNext(bool backwards)
+{
+    QWebEngineView *view = currentView();
+    if (!view || m_findInput->text().isEmpty()) {
+        m_findStatus->clear();
+        return;
+    }
+
+    QWebEnginePage::FindFlags flags;
+    if (backwards)
+        flags |= QWebEnginePage::FindBackward;
+
+    view->page()->findText(m_findInput->text(), flags,
+                           [this](const QWebEngineFindTextResult &result) {
+                               findMatchesShown(result.numberOfMatches(), result.activeMatch());
+                           });
+}
+
+void BrowserWindow::findMatchesShown(int matchCount, int activeMatch)
+{
+    if (matchCount <= 0) {
+        m_findStatus->setText(tr("No results"));
+        return;
+    }
+
+    m_findStatus->setText(tr("%1 of %2").arg(activeMatch).arg(matchCount));
 }
 
 void BrowserWindow::syncOmnibox(const QUrl &url)
@@ -286,8 +520,20 @@ void BrowserWindow::syncOmnibox(const QUrl &url)
 
 bool BrowserWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == m_omnibox && event->type() == QEvent::FocusOut)
+    if (watched == m_omnibox && event->type() == QEvent::FocusOut) {
         m_omniboxEdited = false;
+        if (m_omnibox->text().isEmpty())
+            m_omnibox->setText(currentView() ? currentView()->url().toDisplayString() : QString());
+    }
+
+    if (watched == m_findInput && event->type() == QEvent::KeyPress) {
+        auto *keyEvent = static_cast<QKeyEvent *>(event);
+        if (keyEvent->key() == Qt::Key_Escape) {
+            m_findToolBar->hide();
+            return true;
+        }
+    }
+
     return QMainWindow::eventFilter(watched, event);
 }
 
@@ -314,7 +560,10 @@ void BrowserWindow::onUrlChanged(const QUrl &url)
 
     syncOmnibox(url);
 
-    m_tabs->setTabText(m_tabs->currentIndex(), url.host().isEmpty() ? tr("New Tab") : url.host());
+    const QString label = url.scheme() == QLatin1String("about")
+        ? AboutPages::pageTitle(url.toString())
+        : (url.host().isEmpty() ? tr("New Tab") : url.host());
+    m_tabs->setTabText(m_tabs->currentIndex(), label);
     m_tabs->setTabToolTip(m_tabs->currentIndex(), url.toDisplayString());
 
     updateSecurityIndicator(url);
@@ -350,7 +599,7 @@ void BrowserWindow::onLoadFinished(bool ok)
     m_stopAction->setEnabled(false);
 
     QWebEngineView *view = currentView();
-    if (!ok && view && view->url().isValid()) {
+    if (!ok && view && view->url().isValid() && view->url().scheme() != QLatin1String("about")) {
         m_securityLabel->setText(tr("Load failed"));
         return;
     }
@@ -365,20 +614,25 @@ void BrowserWindow::updateNavigationState()
     if (!view)
         return;
 
-    const bool canGoBack = view->history()->canGoBack();
-    const bool canGoForward = view->history()->canGoForward();
-    m_backAction->setEnabled(canGoBack);
-    m_forwardAction->setEnabled(canGoForward);
+    m_backAction->setEnabled(view->history()->canGoBack());
+    m_forwardAction->setEnabled(view->history()->canGoForward());
 }
 
 void BrowserWindow::updateWindowTitle()
 {
     QWebEngineView *view = currentView();
     const QString pageTitle = view ? view->title().trimmed() : QString();
+
+    QString title;
     if (pageTitle.isEmpty())
-        setWindowTitle(QStringLiteral("SpacePenguin"));
+        title = QStringLiteral("SpacePenguin");
     else
-        setWindowTitle(pageTitle + QStringLiteral(" - SpacePenguin"));
+        title = pageTitle + QStringLiteral(" - SpacePenguin");
+
+    if (m_isPrivate)
+        title += QStringLiteral(" (Private)");
+
+    setWindowTitle(title);
 }
 
 void BrowserWindow::updateSecurityIndicator(const QUrl &url)
@@ -390,6 +644,12 @@ void BrowserWindow::updateSecurityIndicator(const QUrl &url)
     } else if (scheme == QLatin1String("http")) {
         m_securityLabel->setText(tr("Not secure"));
         m_securityLabel->setToolTip(tr("Connection is not encrypted"));
+    } else if (scheme == QLatin1String("sp")) {
+        m_securityLabel->setText(tr("Bundled page"));
+        m_securityLabel->setToolTip(tr("Served by SpacePenguin itself"));
+    } else if (scheme == QLatin1String("about")) {
+        m_securityLabel->setText(tr("Internal page"));
+        m_securityLabel->setToolTip(tr("Rendered by SpacePenguin"));
     } else {
         m_securityLabel->setText(QString());
         m_securityLabel->setToolTip(QString());
@@ -413,6 +673,11 @@ qreal BrowserWindow::currentZoom() const
 
 void BrowserWindow::restoreSession()
 {
+    if (m_isPrivate) {
+        newTab();
+        return;
+    }
+
     QSettings settings;
 
     const QByteArray geometry = settings.value(QStringLiteral("window/geometry")).toByteArray();
@@ -439,6 +704,9 @@ void BrowserWindow::restoreSession()
 
 void BrowserWindow::saveSession() const
 {
+    if (m_isPrivate)
+        return;
+
     QSettings settings;
 
     QStringList urls;

@@ -8,13 +8,35 @@ checkbox list.
 
 ## What it does
 
-- **Tabs** — new, close, drag to reorder, session restored on restart
-- **Address bar** — takes URLs and plain-language queries; anything that isn't a
-  URL becomes a search on DuckDuckGo
+- **Tabs** — new, close, drag to reorder, reopen closed, session restored on restart
+- **Address bar** — takes URLs, `about:` pages and plain-language queries; anything
+  that isn't a URL becomes a search on DuckDuckGo
 - **Navigation** — back, forward, reload, stop, home
+- **Find in page** — `Ctrl+F`, with match count and next/previous
 - **Zoom** — per-tab, `Ctrl`+`+` / `Ctrl`+`-` / `Ctrl`+`0`
-- **Private mode** — `--private` runs with nothing written to disk
-- **Status line** — load progress and a Secure / Not secure indicator
+- **Windows** — new window, new private window (`Ctrl`+`Shift`+`N`); private
+  windows never write a session, cookies or cache to disk
+- **Status line** — load progress plus Secure / Not secure / Bundled page /
+  Internal page indicator
+
+## Internal pages
+
+Type any of these in the address bar. They are rendered by the browser itself,
+never fetched from the network.
+
+| Page            | What it shows                                              |
+| --------------- | ---------------------------------------------------------- |
+| `about:`        | Index of every internal page                               |
+| `about:about`   | The same index, with descriptions                          |
+| `about:version` | Version, build type, Qt version, renderer, profile mode    |
+| `about:license` | SpacePenguin and Qt licensing                              |
+| `about:blank`   | Handled by the rendering engine                            |
+| `about:penguin` | 🐧                                                        |
+| `about:teapot`  | RFC 2324                                                   |
+| `about:pan`     | You have been panned                                       |
+
+Anything else — `about:nonsense` — gets an internal "no such page" answer
+instead of a network error.
 
 ## Security posture
 
@@ -34,15 +56,30 @@ These are deliberate choices, not defaults we inherited:
 
 ## Keyboard
 
-| Shortcut            | Action            |
-| ------------------- | ----------------- |
-| `Ctrl+T` / `Ctrl+W` | New / close tab   |
-| `Ctrl+N`            | New window        |
-| `Ctrl+L`            | Focus address bar |
-| `F5`                | Reload            |
-| `Alt+Left`/`Right`  | Back / forward    |
-| `Ctrl++` / `Ctrl+-` | Zoom in / out     |
-| `Ctrl+0`            | Reset zoom        |
+Every binding below is implemented and wired to a visible menu entry; `F1`
+opens the same list from inside the app, so it cannot drift from the code.
+
+| Shortcut                | Action                |
+| ----------------------- | --------------------- |
+| `Ctrl+T`                | New tab               |
+| `Ctrl+W`                | Close tab             |
+| `Ctrl+Shift+T`          | Reopen closed tab     |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab  |
+| `Ctrl+1` … `Ctrl+9`     | Go to tab 1–9         |
+| `Ctrl+N`                | New window            |
+| `Ctrl+Shift+N`          | New private window    |
+| `Ctrl+Shift+W`          | Close window          |
+| `Ctrl+Q`                | Quit                  |
+| `Alt+Left` / `Alt+Right`| Back / forward        |
+| `F5`                    | Reload                |
+| `Esc`                   | Stop loading (while a load is in flight) |
+| `Alt+Home`              | Home                  |
+| `Ctrl+L`                | Focus address bar     |
+| `Ctrl+F`                | Find in page          |
+| `Ctrl++` / `Ctrl+-`     | Zoom in / out         |
+| `Ctrl+0`                | Reset zoom            |
+| `Ctrl+J`                | About                 |
+| `F1`                    | Keyboard shortcuts    |
 
 ## Building
 
@@ -81,20 +118,24 @@ ctest --test-dir build --output-on-failure
 
 ## Known limitations
 
-- No bookmarks, history UI, downloads UI, or find-in-page
+- No bookmarks, history UI, or downloads UI
 - No fullscreen (request support is disabled until we handle it correctly)
 - No `file://` support, no popups, no PDF viewer, no extensions
-- No private-window indicator distinct from a normal window
+- Internal `about:` pages do not create a back/forward history entry
 - Session restore saves URLs only — not scroll position or history depth
+- `Ctrl+F` uses the renderer's find pass; clearing the box clears highlighting
+  only for the page that was open when the search started
 
 ## Layout
 
 ```
-src/browserwindow.*   main window: tabs, toolbar, omnibox, status bar
+src/browserwindow.*   main window: tabs, toolbar, find bar, omnibox, status bar
 src/browserpage.*     QWebEnginePage subclass holding the security policy
+src/aboutpages.*      internal about: pages, including the easter eggs
+src/profiles.*        persistent vs. private profile factory
 src/startpageschemehandler.*  serves html/start.html over the sp:// scheme
-src/urlresolver.*     URL-or-search resolution (unit tested)
-src/main.cpp          profile setup, scheme registration, command line
+src/urlresolver.*     URL, about: or search resolution (unit tested)
+src/main.cpp          profile setup, command line, entry point
 html/start.html       built-in start page
 tests/                unit tests
 ```
