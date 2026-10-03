@@ -108,6 +108,11 @@ services, and a security posture you can check in a sitting.
 Non-goals: ad blocking, tracking protection, sync accounts, extensions. Those are
 separate problems with separate solutions.
 
+## Note
+Keyboard shortcuts are currently not supposed to work.
+Currently, it only supports Linux/MacOS right now.
+Use WSL to run on Windows for now.
+
 ## License
 
 BSD 3-Clause. See [LICENSE](LICENSE).
