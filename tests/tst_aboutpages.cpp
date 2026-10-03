@@ -16,6 +16,7 @@ private slots:
     void unknownPagesRender();
     void unknownPageHasNoTitle();
     void pageTitles();
+    void versionPageReportsPlatform();
     void htmlShellEscapesTitles();
 };
 
@@ -103,6 +104,23 @@ void TestAboutPages::pageTitles()
              QStringLiteral("About SpacePenguin"));
     QCOMPARE(AboutPages::pageTitle(QStringLiteral("about:penguin")), QStringLiteral("Penguin"));
     QCOMPARE(AboutPages::pageTitle(QStringLiteral("ABOUT:VERSION")), QStringLiteral("Version"));
+}
+
+void TestAboutPages::versionPageReportsPlatform()
+{
+    const QString withPlatform =
+        AboutPages::render(QStringLiteral("about:version"), QStringLiteral("0.1.0"), false,
+                          QStringLiteral("offscreen"));
+    QVERIFY(withPlatform.contains(QStringLiteral("Platform")));
+    QVERIFY(withPlatform.contains(QStringLiteral("offscreen")));
+
+    const QString withoutPlatform =
+        AboutPages::render(QStringLiteral("about:version"), QStringLiteral("0.1.0"), false);
+    QVERIFY(!withoutPlatform.contains(QStringLiteral("Platform")));
+
+    QVERIFY(withPlatform.contains(QStringLiteral("0.1.0")));
+    QVERIFY(AboutPages::render(QStringLiteral("about:version"), QStringLiteral("0.1.0"), true)
+                .contains(QStringLiteral("Private")));
 }
 
 void TestAboutPages::htmlShellEscapesTitles()

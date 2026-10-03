@@ -9,6 +9,7 @@
 #include <QCloseEvent>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QGuiApplication>
 #include <QHeaderView>
 #include <QIcon>
 #include <QKeySequence>
@@ -309,10 +310,15 @@ void BrowserWindow::createMenus()
 
     QAction *aboutAction = helpMenu->addAction(tr("About SpacePenguin"));
     aboutAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
+    aboutAction->setMenuRole(QAction::AboutRole);
     connect(aboutAction, &QAction::triggered, this, [this] {
         if (currentView())
             loadAboutPage(QStringLiteral("about:about"));
     });
+
+    QAction *aboutQtAction = helpMenu->addAction(tr("About Qt"));
+    aboutQtAction->setMenuRole(QAction::AboutQtRole);
+    connect(aboutQtAction, &QAction::triggered, this, [] { QApplication::aboutQt(); });
 }
 
 void BrowserWindow::createTabWidget()
@@ -463,7 +469,8 @@ void BrowserWindow::loadAboutPage(const QString &id)
         return;
 
     const QString html = AboutPages::isKnown(id)
-        ? AboutPages::render(id, QCoreApplication::applicationVersion(), m_isPrivate)
+        ? AboutPages::render(id, QCoreApplication::applicationVersion(), m_isPrivate,
+                             QGuiApplication::platformName())
         : AboutPages::renderUnknown(id);
 
     view->page()->setContent(html.toUtf8(), QStringLiteral("text/html"), QUrl(id));

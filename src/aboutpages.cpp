@@ -69,20 +69,26 @@ QString aboutAboutBody()
         .arg(rows);
 }
 
-QString versionBody(const QString &appVersion, bool isPrivate)
+QString versionBody(const QString &appVersion, bool isPrivate, const QString &platform)
 {
+    const QString platformRow =
+        platform.isEmpty()
+        ? QString()
+        : QStringLiteral("<tr><th>Platform</th><td>%1</td></tr>").arg(escape(platform));
+
     return QStringLiteral(
                "<h1>SpacePenguin %1</h1>"
                "<table class=\"facts\">"
                "<tr><th>Version</th><td>%1</td></tr>"
                "<tr><th>Build</th><td>%2</td></tr>"
                "<tr><th>Qt</th><td>%3 (built against %4)</td></tr>"
-               "<tr><th>Profile</th><td>%5</td></tr>"
+               "%5"
+               "<tr><th>Profile</th><td>%6</td></tr>"
                "<tr><th>Renderer</th><td>Chromium via QtWebEngine</td></tr>"
                "</table>"
-               "<p class=\"hint\">%6</p>")
+               "<p class=\"hint\">%7</p>")
         .arg(escape(appVersion), escape(QStringLiteral(SPACEPENGUIN_BUILD_TYPE)),
-             QString::fromLatin1(qVersion()), QStringLiteral(QT_VERSION_STR),
+             QString::fromLatin1(qVersion()), QStringLiteral(QT_VERSION_STR), platformRow,
              isPrivate ? QStringLiteral("Private — nothing is written to disk")
                        : QStringLiteral("Persistent"),
              isPrivate ? QStringLiteral("You opened a private window. Session, cookies and cache "
@@ -186,14 +192,15 @@ QString AboutPages::pageTitle(const QString &id)
     return QStringLiteral("Page not found");
 }
 
-QString AboutPages::render(const QString &id, const QString &appVersion, bool isPrivate)
+QString AboutPages::render(const QString &id, const QString &appVersion, bool isPrivate,
+                           const QString &platform)
 {
     const QString normalized = id.trimmed().toLower();
 
     if (normalized == QLatin1String("about:about"))
         return htmlShell(pageTitle(id), aboutAboutBody());
     if (normalized == QLatin1String("about:version"))
-        return htmlShell(pageTitle(id), versionBody(appVersion, isPrivate));
+        return htmlShell(pageTitle(id), versionBody(appVersion, isPrivate, platform));
     if (normalized == QLatin1String("about:license"))
         return htmlShell(pageTitle(id), licenseBody());
     if (normalized == QLatin1String("about:penguin"))

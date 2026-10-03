@@ -20,7 +20,8 @@ public:
     static bool isKnown(const QString &id);
     static QStringList ids();
 
-    static QString render(const QString &id, const QString &appVersion, bool isPrivate);
+    static QString render(const QString &id, const QString &appVersion, bool isPrivate,
+                          const QString &platform = QString());
     static QString renderUnknown(const QString &id);
 
     static QString htmlShell(const QString &pageTitle, const QString &bodyHtml);

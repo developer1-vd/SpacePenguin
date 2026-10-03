@@ -14,6 +14,8 @@ if(COMMAND qt_standard_project_setup)
     qt_standard_project_setup()
 endif()
 
+include(GNUInstallDirs)
+
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets WebEngineWidgets)
 
 qt_add_executable(spacepenguin
@@ -45,6 +47,59 @@ else()
     target_compile_options(spacepenguin PRIVATE -Wall -Wextra)
 endif()
 
+# ---- Platform integration ---------------------------------------------------
+
+if(WIN32)
+    # Launch as a GUI application so no console window appears behind the browser.
+    set_target_properties(spacepenguin PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+    set_target_properties(spacepenguin PROPERTIES
+        MACOSX_BUNDLE TRUE
+        OUTPUT_NAME "SpacePenguin"
+        MACOSX_BUNDLE_BUNDLE_NAME "SpacePenguin"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.spacepenguin.SpacePenguin"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in")
+endif()
+
+if(NOT APPLE)
+    # An installed copy has to find QtWebEngineProcess, plugins and translations.
+    # Derive the Qt layout from the qmake target so this works for any Qt build.
+    get_target_property(SPACEPENGUIN_QMAKE Qt6::qmake IMPORTED_LOCATION)
+    if(SPACEPENGUIN_QMAKE)
+        get_filename_component(SPACEPENGUIN_QT_BIN_DIR "${SPACEPENGUIN_QMAKE}" DIRECTORY)
+        get_filename_component(SPACEPENGUIN_QT_ROOT "${SPACEPENGUIN_QT_BIN_DIR}" DIRECTORY)
+
+        set(SPACEPENGUIN_QT_LIB_DIR "")
+        foreach(candidate IN ITEMS "${SPACEPENGUIN_QT_ROOT}/lib64" "${SPACEPENGUIN_QT_ROOT}/lib")
+            if(EXISTS "${candidate}")
+                set(SPACEPENGUIN_QT_LIB_DIR "${candidate}")
+                break()
+            endif()
+        endforeach()
+        if(NOT SPACEPENGUIN_QT_LIB_DIR)
+            set(SPACEPENGUIN_QT_LIB_DIR "${SPACEPENGUIN_QT_BIN_DIR}")
+        endif()
+
+        set(SPACEPENGUIN_QT_EXEC_DIR "${SPACEPENGUIN_QT_ROOT}/libexec")
+        if(NOT EXISTS "${SPACEPENGUIN_QT_EXEC_DIR}")
+            set(SPACEPENGUIN_QT_EXEC_DIR "${SPACEPENGUIN_QT_BIN_DIR}")
+        endif()
+
+        configure_file(cmake/qt.conf.in "${CMAKE_CURRENT_BINARY_DIR}/qt.conf" @ONLY)
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/qt.conf"
+            DESTINATION ${CMAKE_INSTALL_BINDIR})
+    else()
+        message(WARNING
+            "Qt6::qmake location unknown; skipping qt.conf generation. "
+            "Installed copies will not find QtWebEngineProcess.")
+    endif()
+endif()
+
 option(SPACEPENGUIN_BUILD_TESTS "Build the SpacePenguin unit tests" ON)
 
 if(SPACEPENGUIN_BUILD_TESTS)
@@ -73,4 +128,13 @@ if(SPACEPENGUIN_BUILD_TESTS)
 endif()
 
 include(GNUInstallDirs)
-install(TARGETS spacepenguin RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+include(GNUInstallDirs)
+
+if(APPLE)
+    install(TARGETS spacepenguin
+        BUNDLE DESTINATION .
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+else()
+    install(TARGETS spacepenguin RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()

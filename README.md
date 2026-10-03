@@ -81,6 +81,35 @@ opens the same list from inside the app, so it cannot drift from the code.
 | `Ctrl+J`                | About                 |
 | `F1`                    | Keyboard shortcuts    |
 
+`Ctrl` is `Cmd` on macOS. We keep the bindings identical on every platform
+rather than following each desktop's local convention, with two deliberate
+exceptions: macOS gets standard application menu roles for Quit and About, and
+`Cmd+W` closes the tab rather than the window.
+
+## Platforms
+
+| Platform | Status | Notes |
+| -------- | ------ | ----- |
+| Linux (X11, Wayland) | Built and verified | `cmake --install` ships a generated `qt.conf` |
+| Windows | Builds from the same CMake project | MSVC `/W4`, GUI subsystem so no console window |
+| macOS | Builds as `SpacePenguin.app` | `Info.plist` declares the `http`/`https` handler |
+
+Platform integration handled in the build:
+
+- `cmake/qt.conf.in` is configured from the detected Qt layout, so an installed
+  Linux or Windows copy finds `QtWebEngineProcess`, plugins and translations
+  without environment variables
+- `cmake/Info.plist.in` sets the bundle identifier, high-resolution support and
+  automatic graphics switching, and advertises the app as a web-page handler
+- Windows builds set `WIN32_EXECUTABLE`, so no console window appears behind the
+  browser
+- `about:version` reports the running Qt platform plugin (`xcb`, `wayland`,
+  `windows`, `cocoa`)
+
+Platform data locations come from `QStandardPaths`, so the profile lands in
+`~/.local/share/SpacePenguin` on Linux, `~/Library/Application Support` on
+macOS, and `%LOCALAPPDATA%` on Windows.
+
 ## Building
 
 Requires Qt 6.8 or newer with QtWebEngine, and a C++20 compiler.
@@ -98,10 +127,14 @@ nix-shell -p 'qt6.qtbase' 'qt6.qtdeclarative' 'qt6.qtwebengine' cmake gnumake li
   'cmake -B build && cmake --build build && ./build/spacepenguin'
 ```
 
+On macOS the output is an app bundle, so run
+`open build/SpacePenguin.app`; to ship it, deploy the frameworks with
+`macdeployqt build/SpacePenguin.app` before code signing.
+
 Run the binary from the build tree rather than installing it — QtWebEngine finds
-its helper process and resources relative to the executable. If you do install
-it, add a `qt.conf` that points `Prefix` at the Qt `libexec` and `lib`
-directories.
+its helper process and resources relative to the executable. An install
+(`cmake --install build --prefix <dir>`) brings the generated `qt.conf` along, so
+the helper process is still found from the new location.
 
 ### Options
 
@@ -125,6 +158,10 @@ ctest --test-dir build --output-on-failure
 - Session restore saves URLs only — not scroll position or history depth
 - `Ctrl+F` uses the renderer's find pass; clearing the box clears highlighting
   only for the page that was open when the search started
+- Only Linux is verified end to end; the Windows and macOS build paths are
+  written but untested on real hardware
+- No code signing, notarisation (macOS), MSIX packaging (Windows) or desktop
+  entry / icon assets
 
 ## Layout
 
@@ -137,6 +174,7 @@ src/startpageschemehandler.*  serves html/start.html over the sp:// scheme
 src/urlresolver.*     URL, about: or search resolution (unit tested)
 src/main.cpp          profile setup, command line, entry point
 html/start.html       built-in start page
+cmake/                Info.plist and qt.conf templates for macOS and desktop
 tests/                unit tests
 ```
 
@@ -146,13 +184,8 @@ The mainstream browsers are heavy and increasingly hard to audit. The goal is a
 browser you can read end to end: a small C++/Qt codebase, no bundled runtime
 services, and a security posture you can check in a sitting.
 
-Non-goals: ad blocking, tracking protection, sync accounts, extensions. Those are
+Coming: ad blocking, tracking protection, sync accounts, extensions. Those are
 separate problems with separate solutions.
-
-## Note
-Keyboard shortcuts are currently not supposed to work.
-Currently, it only supports Linux/MacOS right now.
-Use WSL to run on Windows for now.
 
 ## License
 

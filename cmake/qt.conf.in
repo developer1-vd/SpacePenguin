@@ -1,0 +1,6 @@
+[Paths]
+Prefix = @SPACEPENGUIN_QT_LIB_DIR@
+Binaries = @SPACEPENGUIN_QT_BIN_DIR@
+Plugins = @SPACEPENGUIN_QT_LIB_DIR@/plugins
+LibraryExecutables = @SPACEPENGUIN_QT_EXEC_DIR@
+Translations = @SPACEPENGUIN_QT_BIN_DIR@/translations
