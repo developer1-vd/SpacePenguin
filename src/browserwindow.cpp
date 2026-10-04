@@ -3,7 +3,10 @@
 #include "aboutpages.h"
 #include "adblocker.h"
 #include "browserpage.h"
+#include "downloadmanager.h"
 #include "extensionsdialog.h"
+#include "historymanager.h"
+#include "settingsdialog.h"
 #include "userextensions.h"
 
 #include <QAction>
@@ -214,6 +217,13 @@ void BrowserWindow::createToolBar()
     toolBar->addAction(m_stopAction);
     toolBar->addAction(m_homeAction);
 
+    m_downloadsAction = new QAction(themeIcon(QStringLiteral("document-open"),
+                                                QStyle::SP_DialogOpenButton),
+                                    tr("Downloads"), this);
+    m_downloadsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
+    connect(m_downloadsAction, &QAction::triggered, this, &BrowserWindow::showDownloads);
+    toolBar->addAction(m_downloadsAction);
+
     m_omnibox = new QLineEdit;
     m_omnibox->setPlaceholderText(tr("Search or enter address"));
     m_omnibox->setClearButtonEnabled(true);
@@ -282,6 +292,11 @@ void BrowserWindow::createTabShortcuts()
         auto *shortcut = new QShortcut(QKeySequence(Qt::CTRL | (Qt::Key_1 + (number - 1))), this);
         connect(shortcut, &QShortcut::activated, this, [this, number] { selectTabByIndex(number - 1); });
     }
+
+    auto *historyShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_H), this);
+    connect(historyShortcut, &QShortcut::activated, this, [this] {
+        loadAboutPage(QStringLiteral("about:history"));
+    });
 }
 
 void BrowserWindow::createStatusControls()
@@ -386,6 +401,49 @@ void BrowserWindow::showExtensionsDialog()
     dialog.exec();
 }
 
+void BrowserWindow::showSettings()
+{
+    if (!m_services.adBlocker || !m_services.bookmarkManager ||
+        !m_services.cookieManager || !m_services.dataSaverManager ||
+        !m_services.downloadManager || !m_services.historyManager ||
+        !m_services.userScripts) {
+        return;
+    }
+
+    SettingsDialog dialog(
+        m_services.adBlocker,
+        m_services.bookmarkManager,
+        m_services.cookieManager,
+        m_services.dataSaverManager,
+        m_services.downloadManager,
+        m_services.historyManager,
+        m_services.userScripts,
+        this);
+    dialog.exec();
+}
+
+void BrowserWindow::showDownloads()
+{
+    if (!m_services.downloadManager)
+        return;
+
+    const auto downloads = m_services.downloadManager->downloads();
+    if (downloads.isEmpty()) {
+        // Navigate to an about:downloads page or show a dialog
+        loadAboutPage(QStringLiteral("about:downloads"));
+        return;
+    }
+
+    // For now, just show the first download in a message box
+    // TODO: Create a proper downloads dialog
+    const DownloadItem &item = downloads.first();
+    QMessageBox::information(this, tr("Downloads"),
+                             tr("Download: %1\n%2 of %3 bytes")
+                             .arg(item.suggestedFileName)
+                             .arg(item.receivedBytes)
+                             .arg(item.totalBytes));
+}
+
 void BrowserWindow::createMenus()
 {
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
@@ -441,6 +499,11 @@ void BrowserWindow::createMenus()
                                   ? m_blockingButton->mapToGlobal(QPoint(0, m_blockingButton->height()))
                                   : mapToGlobal(QPoint(0, height())));
     });
+
+    toolsMenu->addSeparator();
+    QAction *settingsAction = toolsMenu->addAction(tr("Settings…"));
+    settingsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Comma));
+    connect(settingsAction, &QAction::triggered, this, &BrowserWindow::showSettings);
 
     QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
     helpMenu->addAction(m_shortcutsAction);
@@ -773,6 +836,12 @@ void BrowserWindow::onLoadFinished(bool ok)
     if (!ok && view && view->url().isValid() && view->url().scheme() != QLatin1String("about")) {
         m_securityLabel->setText(tr("Load failed"));
         return;
+    }
+
+    if (ok && view && m_services.historyManager) {
+        const QUrl url = view->url();
+        const QString title = view->title();
+        m_services.historyManager->addVisit(url, title);
     }
 
     updateSecurityIndicator(view ? view->url() : QUrl());

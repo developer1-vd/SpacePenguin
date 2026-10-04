@@ -1,9 +1,12 @@
 #include "theme.h"
 
+#include <QApplication>
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QSettings>
+#include <QStyle>
 #include <QStyleHints>
+#include <QWidget>
 
 namespace spacepenguin {
 
@@ -76,6 +79,15 @@ void Theme::apply(Mode mode)
     case Mode::System:
         hints->unsetColorScheme();
         break;
+    }
+
+    // Force palette refresh on all widgets
+    const auto widgets = QApplication::allWidgets();
+    for (QWidget *widget : widgets) {
+        if (widget->testAttribute(Qt::WA_WState_Polished)) {
+            widget->style()->unpolish(widget);
+            widget->style()->polish(widget);
+        }
     }
 }
 

@@ -5,7 +5,9 @@
 #include <QUrl>
 
 #include "aboutpages.h"
+#include "downloadmanager.h"
 #include "profiles.h"
+#include "settingsdialog.h"
 #include "theme.h"
 #include "urlresolver.h"
 
@@ -51,9 +53,11 @@ private:
     void createFindBar();
     void createTabShortcuts();
     void createStatusControls();
-    void applyTheme(Theme::Mode mode);
-void showExtensionsDialog();
-void populateBlockingMenu();
+void applyTheme(Theme::Mode mode);
+    void showExtensionsDialog();
+    void showDownloads();
+    void showSettings();
+    void populateBlockingMenu();
     void updateBlockingIndicator();
     void restoreSession();
     void saveSession() const;
@@ -131,6 +135,7 @@ void populateBlockingMenu();
     QActionGroup *m_themeGroup = nullptr;
     QToolButton *m_blockingButton = nullptr;
     QMenu *m_blockingMenu = nullptr;
+    QAction *m_downloadsAction = nullptr;
 };
 
 }

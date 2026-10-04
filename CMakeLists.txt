@@ -30,6 +30,24 @@ qt_add_executable(spacepenguin
     src/adblocker.h
     src/cosmeticfilters.cpp
     src/cosmeticfilters.h
+    src/downloadmanager.cpp
+    src/downloadmanager.h
+    src/bookmarkmanager.cpp
+    src/bookmarkmanager.h
+    src/cookiemanager.cpp
+    src/cookiemanager.h
+    src/datasavermanager.cpp
+    src/datasavermanager.h
+    src/historymanager.cpp
+    src/historymanager.h
+    src/settingsdialog.cpp
+    src/settingsdialog.h
+    src/historymanager.cpp
+    src/historymanager.h
+    src/datasavermanager.cpp
+    src/datasavermanager.h
+    src/cookiemanager.cpp
+    src/cookiemanager.h
     src/extensionsdialog.cpp
     src/extensionsdialog.h
     src/theme.cpp

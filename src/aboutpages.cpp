@@ -39,6 +39,18 @@ const PageDefinition kPages[] = {
       "Do. Or do not. There is no try.", true },
     { "about:hyperdrive", "Punch It",
       "Making the jump to lightspeed.", true },
+    { "about:mozilla", "Mozilla Manifesto",
+      "The internet is a global public resource that must remain open and accessible.", true },
+    { "about:firefox", "Phoenix Rising",
+      "From the ashes of Netscape, a browser for everyone.", true },
+    { "about:servo", "Fearless Concurrency",
+      "A browser engine written in Rust, parallel by default.", true },
+    { "about:rust", "Empowering Everyone",
+      "Build reliable and efficient software.", true },
+    { "about:downloads", "Downloads",
+      "View and manage your downloads.", false },
+    { "about:history", "History",
+      "View your browsing history.", false },
 };
 
 QString escape(const QString &text)
@@ -244,6 +256,89 @@ QString hyperdriveBody()
         "The Falcon did it in less than twelve.</p>");
 }
 
+QString mozillaBody()
+{
+    return QStringLiteral(
+        "<h1>Mozilla Manifesto</h1>"
+        "<pre class=\"art\">"
+        "      __    \n"
+        "     /  \\   \n"
+        "    | :: |   \n"
+        "     \\__/    \n"
+        "    /    \\   \n"
+        "   /______\\  \n"
+        "</pre>"
+        "<p>The internet is a global public resource that must remain open and accessible.</p>"
+        "<p>Our commitment: privacy, security, and user choice are not optional.</p>"
+        "<p class=\"hint\">Internet for people, not profit. Since 1998.</p>");
+}
+
+QString firefoxBody()
+{
+    return QStringLiteral(
+        "<h1>Phoenix Rising</h1>"
+        "<pre class=\"art\">"
+        "      /\\      \n"
+        "     /  \\     \n"
+        "    /____\\    \n"
+        "   /      \\   \n"
+        "  /________\\  \n"
+        "   \\  ||  /   \n"
+        "    \\||/     \n"
+        "</pre>"
+        "<p>From the ashes of Netscape, a browser for everyone.</p>"
+        "<p>Built on Gecko, shaped by community, guided by principles.</p>"
+        "<p class=\"hint\">Your browser, your rules. Since 2002.</p>");
+}
+
+QString servoBody()
+{
+    return QStringLiteral(
+        "<h1>Fearless Concurrency</h1>"
+        "<pre class=\"art\">"
+        "  // || \\\\   \n"
+        " //  ||  \\\\  \n"
+        "///  ||  \\\\\\ \n"
+        "      ||      \n"
+        "      ||      \n"
+        "</pre>"
+        "<p>A browser engine written in Rust, parallel by default.</p>"
+        "<p>Memory safety without garbage collection. Fearless parallelism.</p>"
+        "<p class=\"hint\">Racing the future, one thread at a time.</p>");
+}
+
+QString rustBody()
+{
+    return QStringLiteral(
+        "<h1>Empowering Everyone</h1>"
+        "<pre class=\"art\">"
+        "   .--.       \n"
+        "  /  .\\      \n"
+        "  |  | |      \n"
+        "  \\  / /      \n"
+        "   '--'       \n"
+        "</pre>"
+        "<p>A language for building reliable and efficient software.</p>"
+        "<p>Zero-cost abstractions. Move semantics. Fearless concurrency.</p>"
+        "<p class=\"hint\">If it compiles, it probably works. Mostly.</p>");
+}
+
+QString downloadsBody()
+{
+    return QStringLiteral(
+        "<h1>Downloads</h1>"
+        "<p>Downloads will appear here as you download files.</p>"
+        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>J</kbd> to open this page quickly.</p>");
+}
+
+QString historyBody()
+{
+    return QStringLiteral(
+        "<h1>History</h1>"
+        "<p>Your browsing history will appear here.</p>"
+        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>H</kbd> to open this page quickly.</p>");
+}
+
 } // namespace
 
 QList<AboutPage> AboutPages::all()
@@ -311,6 +406,18 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
         return htmlShell(pageTitle(id), yodaBody());
     if (normalized == QLatin1String("about:hyperdrive"))
         return htmlShell(pageTitle(id), hyperdriveBody());
+    if (normalized == QLatin1String("about:mozilla"))
+        return htmlShell(pageTitle(id), mozillaBody());
+    if (normalized == QLatin1String("about:firefox"))
+        return htmlShell(pageTitle(id), firefoxBody());
+    if (normalized == QLatin1String("about:servo"))
+        return htmlShell(pageTitle(id), servoBody());
+    if (normalized == QLatin1String("about:rust"))
+        return htmlShell(pageTitle(id), rustBody());
+    if (normalized == QLatin1String("about:downloads"))
+        return htmlShell(pageTitle(id), downloadsBody());
+    if (normalized == QLatin1String("about:history"))
+        return htmlShell(pageTitle(id), historyBody());
 
     return renderUnknown(id);
 }

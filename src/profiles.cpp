@@ -1,7 +1,12 @@
 #include "profiles.h"
 
 #include "adblocker.h"
+#include "bookmarkmanager.h"
+#include "cookiemanager.h"
 #include "cosmeticfilters.h"
+#include "datasavermanager.h"
+#include "downloadmanager.h"
+#include "historymanager.h"
 #include "startpageschemehandler.h"
 #include "userextensions.h"
 
@@ -106,6 +111,16 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
 
     services.adBlocker = new AdBlocker(parent);
     services.profile->setUrlRequestInterceptor(services.adBlocker);
+
+    services.downloadManager = new DownloadManager(services.profile, parent);
+
+    services.bookmarkManager = new BookmarkManager(parent);
+
+    services.cookieManager = new CookieManager(services.profile, parent);
+
+    services.dataSaverManager = new DataSaverManager(parent);
+
+    services.historyManager = new HistoryManager(parent);
 
     const bool explicitList = !filterListPath.isEmpty();
     const QString listPath = explicitList ? filterListPath : defaultFilterListPath();
