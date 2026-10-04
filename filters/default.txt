@@ -1,0 +1,49 @@
+! SpacePenguin built-in starter list
+!
+! These are host and path rules written for this project. It is deliberately small:
+! it exists so blocking is visible on a fresh install, not to replace a real
+! maintained list. EasyList (GPLv3, https://easylist.to) is far more thorough.
+!
+! SpacePenguin is GPLv3, so EasyList may be redistributed alongside it under the
+! same terms; it is simply not vendored here because a fresh clone should stay
+! small and the list is updated several times a week. Point the browser at a list
+! you trust with --filter-list, or replace this file.
+!
+! Syntax supported: ||host^, plain host rules, wildcards, |anchors|,
+! @@exceptions, and options such as $domain=, $third-party and $script/$image.
+
+! --- Generic ad networks ---------------------------------------------------
+||doubleclick.net^
+||googlesyndication.com^
+||googleadservices.com^
+||pagead2.googlesyndication.com^
+||adservice.google.com^
+||amazon-adsystem.com^
+||criteo.com^
+||criteo.net^
+||adnxs.com^
+||rubiconproject.com^
+||pubmatic.com^
+||openx.net^
+||casalemedia.com^
+||taboola.com^
+||outbrain.com^
+
+! --- YouTube ad endpoints --------------------------------------------------
+! YouTube serves its own ads from the same host as the video, so only the ad
+! endpoints can be blocked without hiding the player itself.
+||youtube.com/pagead/
+||youtube.com/youtubei/v1/player/ad_break
+||youtube.com/get_midroll_
+||youtube.com/get_video_info?*adunit
+||youtube.com/premium_ads
+||youtube.com/api/stats/ads
+||youtube.com/api/stats/ads?
+||youtube.com/ptrack
+||youtube.com/pvptrack
+||youtube.com/pagead/xps/ads
+youtube.com##.ytp-ad-overlay
+youtube.com##.ytp-ad-module
+youtube.com##.ytp-ad-slot
+youtube.com##.ytp-ad-image-overlay
+youtube.com##+js(youtube, ghostOverlay)

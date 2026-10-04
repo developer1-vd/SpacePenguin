@@ -1,10 +1,13 @@
 #include "browserwindow.h"
 
 #include "aboutpages.h"
+#include "adblocker.h"
 #include "browserpage.h"
-#include "profiles.h"
+#include "extensionsdialog.h"
+#include "userextensions.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDialog>
@@ -31,6 +34,7 @@
 #include <QWebEngineFindTextResult>
 #include <QWebEngineHistory>
 #include <QWebEnginePage>
+#include <QWebEngineProfile>
 #include <QWebEngineView>
 
 namespace spacepenguin {
@@ -52,13 +56,15 @@ QIcon themeIcon(const QString &name, QStyle::StandardPixmap fallback)
 
 } // namespace
 
-BrowserWindow::BrowserWindow(QWebEngineProfile *profile, bool isPrivate, QWidget *parent)
+BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
     : QMainWindow(parent)
-    , m_profile(profile)
-    , m_isPrivate(isPrivate)
+    , m_services(std::move(services))
+    , m_isPrivate(m_services.profile && m_services.profile->isOffTheRecord())
 {
     setWindowTitle(QStringLiteral("SpacePenguin"));
     resize(1100, 720);
+
+    applyTheme(Theme::storedMode());
 
     createActions();
     createToolBar();
@@ -66,6 +72,7 @@ BrowserWindow::BrowserWindow(QWebEngineProfile *profile, bool isPrivate, QWidget
     createTabWidget();
     createFindBar();
     createTabShortcuts();
+    createStatusControls();
 
     statusBar()->addPermanentWidget(m_securityLabel);
     statusBar()->addPermanentWidget(m_progressBar, 1);
@@ -277,6 +284,108 @@ void BrowserWindow::createTabShortcuts()
     }
 }
 
+void BrowserWindow::createStatusControls()
+{
+    m_blockingButton = new QToolButton;
+    m_blockingButton->setObjectName(QStringLiteral("blockingButton"));
+    m_blockingButton->setAutoRaise(true);
+    m_blockingButton->setAccessibleName(tr("Ad blocking"));
+    m_blockingButton->setToolTip(tr("Ad blocking"));
+    m_blockingButton->setPopupMode(QToolButton::InstantPopup);
+
+    m_blockingMenu = new QMenu(this);
+    m_blockingButton->setMenu(m_blockingMenu);
+    connect(m_blockingMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateBlockingMenu);
+    m_blockingButton->setIcon(themeIcon(QStringLiteral("edit-delete"),
+                                        QStyle::SP_DialogApplyButton));
+
+    if (m_services.adBlocker) {
+        connect(m_services.adBlocker, &AdBlocker::blockedCountChanged, this,
+                &BrowserWindow::updateBlockingIndicator);
+        connect(m_services.adBlocker, &AdBlocker::enabledChanged, this,
+                [this] { updateBlockingIndicator(); });
+        updateBlockingIndicator();
+    }
+
+    statusBar()->addPermanentWidget(m_blockingButton);
+}
+
+void BrowserWindow::updateBlockingIndicator()
+{
+    if (!m_blockingButton || !m_services.adBlocker)
+        return;
+
+    AdBlocker *blocker = m_services.adBlocker;
+    if (blocker->ruleCount() == 0) {
+        m_blockingButton->setText(tr("No filters"));
+        m_blockingButton->setToolTip(
+            tr("No filter list is loaded. Put rules in %1").arg(blocker->listPath()));
+        return;
+    }
+
+    const QString count = tr("Blocked %1").arg(blocker->blockedCount());
+    m_blockingButton->setText(blocker->isEnabled() ? count : tr("Blocking off"));
+    m_blockingButton->setToolTip(
+        blocker->isEnabled()
+            ? tr("%1 requests blocked with %2 rules. Click for options.")
+                  .arg(blocker->blockedCount())
+                  .arg(blocker->ruleCount())
+            : tr("Ad blocking is paused. %1 rules are loaded.").arg(blocker->ruleCount()));
+}
+
+void BrowserWindow::populateBlockingMenu()
+{
+    if (!m_services.adBlocker || !m_blockingMenu)
+        return;
+
+    m_blockingMenu->clear();
+    AdBlocker *blocker = m_services.adBlocker;
+
+    if (QWebEngineView *view = currentView()) {
+        const QString host = view->url().host();
+        if (!host.isEmpty()) {
+            const bool paused = blocker->isPausedFor(host);
+            QAction *pauseAction = m_blockingMenu->addAction(
+                paused ? tr("Resume blocking on %1").arg(host)
+                       : tr("Pause blocking on %1").arg(host));
+            connect(pauseAction, &QAction::triggered, this, [this, host, paused] {
+                QStringList hosts = m_services.adBlocker->pausedHosts();
+                hosts.removeAll(host);
+                if (!paused)
+                    hosts.append(host);
+                m_services.adBlocker->setPausedHosts(hosts);
+            });
+            m_blockingMenu->addSeparator();
+        }
+    }
+
+    QAction *toggleAction =
+        m_blockingMenu->addAction(blocker->isEnabled() ? tr("Disable ad blocking")
+                                                      : tr("Enable ad blocking"));
+    connect(toggleAction, &QAction::triggered, this,
+            [this] { m_services.adBlocker->setEnabled(!m_services.adBlocker->isEnabled()); });
+
+    if (!blocker->lastListError().isEmpty()) {
+        m_blockingMenu->addSeparator();
+        m_blockingMenu->addAction(blocker->lastListError())->setEnabled(false);
+    }
+}
+
+void BrowserWindow::applyTheme(Theme::Mode mode)
+{
+    Theme::storeMode(mode);
+    Theme::apply(mode);
+}
+
+void BrowserWindow::showExtensionsDialog()
+{
+    if (!m_services.userScripts)
+        return;
+
+    ExtensionsDialog dialog(m_services.userScripts, this);
+    dialog.exec();
+}
+
 void BrowserWindow::createMenus()
 {
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
@@ -304,6 +413,34 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_zoomInAction);
     viewMenu->addAction(m_zoomOutAction);
     viewMenu->addAction(m_zoomResetAction);
+
+    QMenu *themeMenu = viewMenu->addMenu(tr("Theme"));
+    m_themeGroup = new QActionGroup(this);
+    m_themeGroup->setExclusive(true);
+    const Theme::Mode currentMode = Theme::storedMode();
+    for (const Theme::Mode mode : Theme::modes()) {
+        QAction *action = themeMenu->addAction(Theme::modeLabel(mode));
+        action->setCheckable(true);
+        action->setChecked(mode == currentMode);
+        action->setData(static_cast<int>(mode));
+        connect(action, &QAction::triggered, this,
+                [this, mode] { applyTheme(mode); });
+        m_themeGroup->addAction(action);
+    }
+
+    QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
+    QAction *extensionsAction = toolsMenu->addAction(tr("Extensions…"));
+    extensionsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
+    connect(extensionsAction, &QAction::triggered, this, &BrowserWindow::showExtensionsDialog);
+    toolsMenu->addSeparator();
+    QAction *blockingAction = toolsMenu->addAction(tr("Ad blocking…"));
+    connect(blockingAction, &QAction::triggered, this, [this] {
+        if (!m_blockingMenu)
+            return;
+        m_blockingMenu->popup(m_blockingButton
+                                  ? m_blockingButton->mapToGlobal(QPoint(0, m_blockingButton->height()))
+                                  : mapToGlobal(QPoint(0, height())));
+    });
 
     QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
     helpMenu->addAction(m_shortcutsAction);
@@ -362,7 +499,7 @@ void BrowserWindow::connectView(QWebEngineView *view)
 void BrowserWindow::newTab(const QUrl &url)
 {
     auto *view = new QWebEngineView;
-    view->setPage(new BrowserPage(m_profile, view));
+    view->setPage(new BrowserPage(m_services.profile, view));
     view->setZoomFactor(1.0);
     connectView(view);
 
@@ -378,8 +515,14 @@ void BrowserWindow::newTab(const QUrl &url)
 
 void BrowserWindow::newWindow(bool isPrivate)
 {
-    QWebEngineProfile *profile = isPrivate ? createProfile(this, true) : m_profile;
-    auto *window = new BrowserWindow(profile, isPrivate);
+    ProfileServices services;
+    if (isPrivate) {
+        services = createProfileServices(this, true);
+    } else {
+        services = createProfileServices(this, false);
+    }
+
+    auto *window = new BrowserWindow(std::move(services));
     window->setAttribute(Qt::WA_DeleteOnClose);
     window->show();
 }
@@ -462,16 +605,37 @@ void BrowserWindow::navigate(const QString &text)
         view->setUrl(url);
 }
 
+AboutPageContext BrowserWindow::aboutContext() const
+{
+    AboutPageContext context;
+    context.appVersion = QCoreApplication::applicationVersion();
+    context.isPrivate = m_isPrivate;
+    context.platform = QGuiApplication::platformName();
+    context.theme = Theme::modeLabel(Theme::storedMode());
+    context.buildType = QStringLiteral(SPACEPENGUIN_BUILD_TYPE);
+
+    if (m_services.adBlocker) {
+        context.filterRules = m_services.adBlocker->ruleCount();
+        context.cosmeticRules = m_services.adBlocker->cosmeticRuleCount();
+        context.blockingEnabled = m_services.adBlocker->isEnabled();
+        context.blockedRequests = m_services.adBlocker->blockedCount();
+    }
+
+    if (m_services.userScripts)
+        context.extensionCount = m_services.userScripts->scripts().size();
+
+    return context;
+}
+
 void BrowserWindow::loadAboutPage(const QString &id)
 {
     QWebEngineView *view = currentView();
     if (!view)
         return;
 
-    const QString html = AboutPages::isKnown(id)
-        ? AboutPages::render(id, QCoreApplication::applicationVersion(), m_isPrivate,
-                             QGuiApplication::platformName())
-        : AboutPages::renderUnknown(id);
+    const AboutPageContext context = aboutContext();
+    const QString html = AboutPages::isKnown(id) ? AboutPages::render(id, context)
+                                                 : AboutPages::renderUnknown(id);
 
     view->page()->setContent(html.toUtf8(), QStringLiteral("text/html"), QUrl(id));
 }

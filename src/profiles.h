@@ -6,10 +6,21 @@ class QWebEngineProfile;
 
 namespace spacepenguin {
 
+class AdBlocker;
+class UserScripts;
+
+struct ProfileServices {
+    QWebEngineProfile *profile = nullptr;
+    AdBlocker *adBlocker = nullptr;
+    UserScripts *userScripts = nullptr;
+};
+
 QString defaultDataDirectory();
 
-QWebEngineProfile *createProfile(QObject *parent, bool isPrivate);
+ProfileServices createProfileServices(QObject *parent, bool isPrivate,
+                                     const QString &filterListPath = QString());
 
-void installStartPageHandler(QWebEngineProfile *profile);
+QString extensionsDirectory();
+QString defaultFilterListPath();
 
 }

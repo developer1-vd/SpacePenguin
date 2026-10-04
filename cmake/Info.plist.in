@@ -29,7 +29,7 @@
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>BSD 3-Clause</string>
+    <string>Copyright (C) 2026 Viraj Donnipad. GNU General Public License v3.</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

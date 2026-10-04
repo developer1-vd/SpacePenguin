@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpacePenguin — a small, honest browser</title>
+<meta name="description" content="SpacePenguin is a Qt and QtWebEngine browser with a light and dark theme, user script extensions, content blocking, and built-in about pages.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="hero">
+<nav>
+<a class="brand" href="#main"><span aria-hidden="true">🐧</span> SpacePenguin</a>
+<ul>
+<li><a href="#features">Features</a></li>
+<li><a href="#build">Build</a></li>
+<li><a href="#use">Using it</a></li>
+<li><a href="#limits">Limits</a></li>
+</ul>
+</nav>
+<h1>A browser that shows its work.</h1>
+<p class="lede">SpacePenguin is a small Qt and QtWebEngine browser. It keeps the parts you
+actually use — tabs, private windows, find in page, zoom, session restore — and adds a light
+and dark theme, user script extensions, content blocking, and honest <code>about:</code>
+pages. It is pre-alpha software, and it says so.</p>
+<p class="cta"><a class="button" href="#build">Build it yourself</a>
+<a class="button ghost" href="#limits">Read the limits first</a></p>
+</header>
+
+<main id="main">
+
+<section id="features">
+<h2>Features</h2>
+
+<article class="card">
+<h3>Light and dark</h3>
+<p>Pick <strong>Follow system</strong>, <strong>Light</strong> or <strong>Dark</strong> in
+<em>View → Theme</em>. The choice is saved. SpacePenguin sets the application colour scheme,
+and websites that honour <code>prefers-color-scheme</code> follow along. Websites that ignore
+it are still websites, so SpacePenguin does not rewrite their CSS.</p>
+</article>
+
+<article class="card">
+<h3>Extensions, as user scripts</h3>
+<p>QtWebEngine does not support Chrome extensions, and SpacePenguin does not pretend
+otherwise. It runs <strong>JavaScript user scripts</strong> instead. Drop a <code>.js</code> file
+into the extensions folder, or use <em>Tools → Extensions…</em> to add one, then enable,
+disable or remove it.</p>
+<pre><code>// @name Readability helper
+// @match *://example.com/*
+console.log('running on', location.hostname);</code></pre>
+<p>A script with no <code>// @match</code> lines runs on every page. With <code>// @match</code>
+lines it runs only where the pattern matches the hostname.</p>
+</article>
+
+<article class="card">
+<h3>Content blocking</h3>
+<p>SpacePenguin reads an Adblock Plus format filter list and applies it two ways: requests
+are blocked before they leave the browser, and <code>##</code> element-hiding rules are
+compiled into a stylesheet injected at document creation.</p>
+<p>Both halves matter. YouTube serves its ad requests from <code>www.youtube.com</code>
+itself, so a network rule can only reach the ad <em>endpoints</em>. The ad you actually
+see, the overlay and the pop-out player are elements in the page, and only element hiding
+touches those.</p>
+<pre><code>||googlesyndication.com^$third-party
+||youtube.com/pagead/
+/api/stats/ads?
+youtube.com##.ytp-ad-overlay</code></pre>
+<p>A fresh install writes a small starter list so blocking is visible immediately. For real
+coverage point the browser at EasyList or another maintained list: <code>--filter-list
+./easylist.txt</code>. SpacePenguin parses 53,859 network rules and 24,009 cosmetic rules
+from EasyList.</p>
+<p>Click the blocking control in the status bar to turn blocking off, pause it for the site
+you are on, or check how many requests have been stopped.</p>
+</article>
+
+<article class="card">
+<h3><code>about:</code> pages</h3>
+<ul>
+<li><code>about:about</code> — index of the internal pages</li>
+<li><code>about:version</code> — version, Qt build, platform, theme, filter rules, extensions</li>
+<li><code>about:license</code> — SpacePenguin, Qt and Chromium licenses</li>
+<li><code>about:penguin</code>, <code>about:teapot</code>, <code>about:pan</code> — easter eggs</li>
+</ul>
+</article>
+
+<article class="card">
+<h3>Everyday browsing</h3>
+<p>Tabs and tab groups, an omnibox that resolves URLs and searches, back and forward, reload and
+stop, zoom, find in page with match highlighting, a progress bar, a security indicator, private
+windows that write nothing to disk, session restore, and multiple profiles.</p>
+</article>
+</ul>
+</section>
+
+<section id="build">
+<h2>Build</h2>
+<p>SpacePenguin needs Qt 6.4 or newer with QtWebEngine, CMake 3.21+, and a C++20 compiler.</p>
+<pre><code>cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build</code></pre>
+<p>On Nix, the exact set used for development:</p>
+<pre><code>nix-shell -p 'qt6.qtbase' 'qt6.qtdeclarative' 'qt6.qtwebengine' \
+         cmake gnumake libglvnd</code></pre>
+<p>The build produces <code>spacepenguin</code>, a macOS app bundle, and a Windows GUI
+executable, plus four unit test binaries wired into CTest.</p>
+</section>
+
+<section id="use">
+<h2>Using it</h2>
+<h3>Command line</h3>
+<pre><code>spacepenguin                          # normal window
+spacepenguin --private                # nothing is written to disk
+spacepenguin --user-data-dir ./profile # keep data somewhere else
+spacepenguin --filter-list ./filters.txt</code></pre>
+
+<h3>Shortcuts</h3>
+<table>
+<thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>New tab</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Reopen closed tab</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Next and previous tab</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd></td><td>Jump to tab</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Focus the address bar</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>New window, new private window</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Find in page</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Zoom in, out, reset</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd> / <kbd>Esc</kbd></td><td>Reload, stop</td></tr>
+<tr><td><kbd>Alt</kbd>+<kbd>Home</kbd></td><td>Start page</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Extensions</td></tr>
+</tbody>
+</table>
+
+<h3>Where your data lives</h3>
+<p>Profiles, the bundled <code>sp://</code> start page, the extensions folder and the default
+filter list live under the platform application data directory
+(<code>~/.local/share/SpacePenguin</code> on Linux). Private windows keep nothing.</p>
+</section>
+
+<section id="limits">
+<h2>Limits, stated plainly</h2>
+<ul>
+<li><strong>Pre-alpha.</strong> No stability or compatibility promise. Save your work.</li>
+<li><strong>No Chrome extensions.</strong> QtWebEngine cannot load them. User scripts are the
+supported path.</li>
+<li><strong>Blocking is not complete.</strong> No <code>$redirect</code> or
+<code>$removeparam</code> rewrites, no <code>##+js()</code> scriptlets, no per-site exception
+editor. A few sites still show placeholders or count blocked requests.</li>
+<li><strong>Pop-ups.</strong> Real pop-up windows are already refused by the security policy.
+In-page pop-ups and overlays need <code>##</code> rules from your list.</li>
+<li><strong>Some sites will not work.</strong> Google sign-in, DRM playback and other
+services that depend on unsupported Chromium integrations commonly break in QtWebEngine.</li>
+<li><strong>The theme is application chrome.</strong> Page colours follow the site's own
+CSS.</li>
+</ul>
+</section>
+
+</main>
+
+<footer>
+<p>SpacePenguin is free software under the GNU General Public License v3. Qt is used under the
+LGPL v3, the GPL v3, or a commercial license. Chromium is covered by its own BSD-style
+license.</p>
+<p><a href="https://github.com/">Source</a></p>
+</footer>
+
+</body>
+</html>

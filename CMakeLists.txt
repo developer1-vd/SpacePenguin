@@ -26,6 +26,16 @@ qt_add_executable(spacepenguin
     src/browserwindow.h
     src/browserpage.cpp
     src/browserpage.h
+    src/adblocker.cpp
+    src/adblocker.h
+    src/cosmeticfilters.cpp
+    src/cosmeticfilters.h
+    src/extensionsdialog.cpp
+    src/extensionsdialog.h
+    src/theme.cpp
+    src/theme.h
+    src/userextensions.cpp
+    src/userextensions.h
     src/profiles.cpp
     src/profiles.h
     src/startpageschemehandler.cpp
@@ -34,6 +44,7 @@ qt_add_executable(spacepenguin
     src/urlresolver.h
     src/resources.qrc
     html/start.html
+    filters/default.txt
 )
 
 target_link_libraries(spacepenguin PRIVATE Qt6::Widgets Qt6::WebEngineWidgets)
@@ -124,6 +135,28 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_aboutpages PRIVATE Qt6::Test)
         target_include_directories(tst_aboutpages PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME aboutpages COMMAND tst_aboutpages)
+
+        qt_add_executable(tst_adblocker
+            tests/tst_adblocker.cpp
+            src/adblocker.cpp
+            src/adblocker.h
+            src/cosmeticfilters.cpp
+            src/cosmeticfilters.h
+        )
+        target_link_libraries(tst_adblocker PRIVATE Qt6::Test Qt6::WebEngineCore)
+        target_include_directories(tst_adblocker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_definitions(tst_adblocker PRIVATE
+            SPACEPENGUIN_TEST_FILTER_LIST="${CMAKE_CURRENT_SOURCE_DIR}/filters/default.txt")
+        add_test(NAME adblocker COMMAND tst_adblocker)
+
+        qt_add_executable(tst_userextensions
+            tests/tst_userextensions.cpp
+            src/userextensions.cpp
+            src/userextensions.h
+        )
+        target_link_libraries(tst_userextensions PRIVATE Qt6::Test Qt6::WebEngineCore)
+        target_include_directories(tst_userextensions PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME userextensions COMMAND tst_userextensions)
     endif()
 endif()
 

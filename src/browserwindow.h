@@ -4,9 +4,13 @@
 #include <QMainWindow>
 #include <QUrl>
 
+#include "aboutpages.h"
+#include "profiles.h"
+#include "theme.h"
 #include "urlresolver.h"
 
 class QAction;
+class QActionGroup;
 class QLabel;
 class QLineEdit;
 class QProgressBar;
@@ -23,8 +27,7 @@ class BrowserWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit BrowserWindow(QWebEngineProfile *profile, bool isPrivate = false,
-                           QWidget *parent = nullptr);
+    explicit BrowserWindow(ProfileServices services, QWidget *parent = nullptr);
     ~BrowserWindow() override;
 
     void openInNewTab(const QUrl &url);
@@ -47,6 +50,11 @@ private:
     void createTabWidget();
     void createFindBar();
     void createTabShortcuts();
+    void createStatusControls();
+    void applyTheme(Theme::Mode mode);
+void showExtensionsDialog();
+void populateBlockingMenu();
+    void updateBlockingIndicator();
     void restoreSession();
     void saveSession() const;
 
@@ -61,6 +69,7 @@ private:
     void selectTabByIndex(int index);
     void navigate(const QString &text);
     void loadAboutPage(const QString &id);
+    AboutPageContext aboutContext() const;
     void goHome();
 
     void setZoom(qreal factor);
@@ -85,7 +94,7 @@ private:
     void syncOmnibox(const QUrl &url);
     void connectView(QWebEngineView *view);
 
-    QWebEngineProfile *m_profile = nullptr;
+    ProfileServices m_services;
     bool m_isPrivate = false;
     UrlResolver m_resolver;
 
@@ -119,6 +128,9 @@ private:
     QAction *m_zoomOutAction = nullptr;
     QAction *m_zoomResetAction = nullptr;
     QAction *m_shortcutsAction = nullptr;
+    QActionGroup *m_themeGroup = nullptr;
+    QToolButton *m_blockingButton = nullptr;
+    QMenu *m_blockingMenu = nullptr;
 };
 
 }

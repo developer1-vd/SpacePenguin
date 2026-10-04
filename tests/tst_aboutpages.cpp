@@ -4,6 +4,16 @@
 
 using namespace spacepenguin;
 
+static AboutPageContext sampleContext()
+{
+    AboutPageContext context;
+    context.appVersion = QStringLiteral("0.1.0");
+    context.buildType = QStringLiteral("test");
+    context.platform = QStringLiteral("offscreen");
+    context.theme = QStringLiteral("System");
+    return context;
+}
+
 class TestAboutPages : public QObject
 {
     Q_OBJECT
@@ -17,6 +27,8 @@ private slots:
     void unknownPageHasNoTitle();
     void pageTitles();
     void versionPageReportsPlatform();
+    void versionPageReportsFeatures();
+    void versionPageAlwaysReportsPlatform();
     void htmlShellEscapesTitles();
 };
 
@@ -41,8 +53,7 @@ void TestAboutPages::indexListsEveryPage()
 
 void TestAboutPages::indexLinksEveryPage()
 {
-    const QString html = AboutPages::render(QStringLiteral("about:about"), QStringLiteral("0.1.0"),
-                                            false);
+    const QString html = AboutPages::render(QStringLiteral("about:about"), sampleContext());
 
     for (const AboutPage &page : AboutPages::all()) {
         if (page.id == QLatin1String("about:about"))
@@ -62,7 +73,7 @@ void TestAboutPages::knownPagesRender_data()
 
     QTest::newRow("about") << QStringLiteral("about:about") << QStringLiteral("Internal pages");
     QTest::newRow("version") << QStringLiteral("about:version") << QStringLiteral("Renderer");
-    QTest::newRow("license") << QStringLiteral("about:license") << QStringLiteral("BSD 3-Clause");
+    QTest::newRow("license") << QStringLiteral("about:license") << QStringLiteral("GNU General Public License v3");
     QTest::newRow("penguin") << QStringLiteral("about:penguin") << QStringLiteral("127.0.0.1");
     QTest::newRow("teapot") << QStringLiteral("about:teapot") << QStringLiteral("418");
     QTest::newRow("pan") << QStringLiteral("about:pan") << QStringLiteral("panned");
@@ -74,7 +85,7 @@ void TestAboutPages::knownPagesRender()
     QFETCH(QString, needle);
 
     QVERIFY(AboutPages::isKnown(id));
-    const QString html = AboutPages::render(id, QStringLiteral("0.1.0"), false);
+    const QString html = AboutPages::render(id, sampleContext());
     QVERIFY(html.startsWith(QStringLiteral("<!DOCTYPE html>")));
     QVERIFY(html.contains(needle));
     QVERIFY(html.contains(QStringLiteral("</html>")));
@@ -85,7 +96,7 @@ void TestAboutPages::unknownPagesRender()
     QVERIFY(!AboutPages::isKnown(QStringLiteral("about:definitely-not-real")));
 
     const QString html =
-        AboutPages::render(QStringLiteral("about:nope"), QStringLiteral("0.1.0"), false);
+        AboutPages::render(QStringLiteral("about:nope"), sampleContext());
     QVERIFY(html.contains(QStringLiteral("No such page")));
     QVERIFY(html.contains(QStringLiteral("about:nope")));
     QVERIFY(html.contains(QStringLiteral("href=\"about:about\"")));
@@ -108,19 +119,50 @@ void TestAboutPages::pageTitles()
 
 void TestAboutPages::versionPageReportsPlatform()
 {
-    const QString withPlatform =
-        AboutPages::render(QStringLiteral("about:version"), QStringLiteral("0.1.0"), false,
-                          QStringLiteral("offscreen"));
-    QVERIFY(withPlatform.contains(QStringLiteral("Platform")));
-    QVERIFY(withPlatform.contains(QStringLiteral("offscreen")));
+    const QString html =
+        AboutPages::render(QStringLiteral("about:version"), sampleContext());
+    QVERIFY(html.contains(QStringLiteral("Platform")));
+    QVERIFY(html.contains(QStringLiteral("offscreen")));
+    QVERIFY(html.contains(QStringLiteral("0.1.0")));
 
-    const QString withoutPlatform =
-        AboutPages::render(QStringLiteral("about:version"), QStringLiteral("0.1.0"), false);
-    QVERIFY(!withoutPlatform.contains(QStringLiteral("Platform")));
-
-    QVERIFY(withPlatform.contains(QStringLiteral("0.1.0")));
-    QVERIFY(AboutPages::render(QStringLiteral("about:version"), QStringLiteral("0.1.0"), true)
+    AboutPageContext privateContext = sampleContext();
+    privateContext.isPrivate = true;
+    QVERIFY(AboutPages::render(QStringLiteral("about:version"), privateContext)
                 .contains(QStringLiteral("Private")));
+
+    AboutPageContext persistentContext = sampleContext();
+    QVERIFY(AboutPages::render(QStringLiteral("about:version"), persistentContext)
+                .contains(QStringLiteral("Persistent")));
+}
+
+void TestAboutPages::versionPageReportsFeatures()
+{
+    AboutPageContext context = sampleContext();
+    context.filterRules = 42;
+    context.blockingEnabled = true;
+    context.blockedRequests = 7;
+    context.extensionCount = 3;
+    context.theme = QStringLiteral("Dark");
+
+    const QString html = AboutPages::render(QStringLiteral("about:version"), context);
+    QVERIFY(html.contains(QStringLiteral("42")));
+    QVERIFY(html.contains(QStringLiteral("7")));
+    QVERIFY(html.contains(QStringLiteral("3")));
+    QVERIFY(html.contains(QStringLiteral("Dark")));
+
+    context.blockingEnabled = false;
+    QVERIFY(AboutPages::render(QStringLiteral("about:version"), context)
+                .contains(QStringLiteral("Disabled")));
+}
+
+void TestAboutPages::versionPageAlwaysReportsPlatform()
+{
+    AboutPageContext context = sampleContext();
+    context.platform.clear();
+
+    const QString html = AboutPages::render(QStringLiteral("about:version"), context);
+    QVERIFY(html.contains(QStringLiteral("Platform")));
+    QVERIFY(!html.contains(QStringLiteral("<td></td>")));
 }
 
 void TestAboutPages::htmlShellEscapesTitles()

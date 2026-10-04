@@ -12,6 +12,19 @@ struct AboutPage {
     bool easterEgg = false;
 };
 
+struct AboutPageContext {
+    QString appVersion;
+    bool isPrivate = false;
+    QString platform;
+    QString theme;
+    QString buildType;
+    int filterRules = 0;
+    int cosmeticRules = 0;
+    bool blockingEnabled = false;
+    int blockedRequests = 0;
+    int extensionCount = 0;
+};
+
 class AboutPages
 {
 public:
@@ -20,8 +33,7 @@ public:
     static bool isKnown(const QString &id);
     static QStringList ids();
 
-    static QString render(const QString &id, const QString &appVersion, bool isPrivate,
-                          const QString &platform = QString());
+    static QString render(const QString &id, const AboutPageContext &context);
     static QString renderUnknown(const QString &id);
 
     static QString htmlShell(const QString &pageTitle, const QString &bodyHtml);

@@ -31,6 +31,14 @@ const PageDefinition kPages[] = {
       "RFC 2324, rendered with dignity.", true },
     { "about:pan", "Panned",
       "The other half of the bread.", true },
+    { "about:force", "Use the Force",
+      "May it be with you. Always.", true },
+    { "about:deathstar", "That's No Moon",
+      "A fully operational battle station.", true },
+    { "about:yoda", "Wise, You Are",
+      "Do. Or do not. There is no try.", true },
+    { "about:hyperdrive", "Punch It",
+      "Making the jump to lightspeed.", true },
 };
 
 QString escape(const QString &text)
@@ -69,31 +77,47 @@ QString aboutAboutBody()
         .arg(rows);
 }
 
-QString versionBody(const QString &appVersion, bool isPrivate, const QString &platform)
+QString versionBody(const AboutPageContext &context)
 {
-    const QString platformRow =
-        platform.isEmpty()
-        ? QString()
-        : QStringLiteral("<tr><th>Platform</th><td>%1</td></tr>").arg(escape(platform));
+    const auto row = [](const QString &label, const QString &value) {
+        return QStringLiteral("<tr><th>%1</th><td>%2</td></tr>")
+            .arg(escape(label), escape(value));
+    };
 
-    return QStringLiteral(
-               "<h1>SpacePenguin %1</h1>"
-               "<table class=\"facts\">"
-               "<tr><th>Version</th><td>%1</td></tr>"
-               "<tr><th>Build</th><td>%2</td></tr>"
-               "<tr><th>Qt</th><td>%3 (built against %4)</td></tr>"
-               "%5"
-               "<tr><th>Profile</th><td>%6</td></tr>"
-               "<tr><th>Renderer</th><td>Chromium via QtWebEngine</td></tr>"
-               "</table>"
-               "<p class=\"hint\">%7</p>")
-        .arg(escape(appVersion), escape(QStringLiteral(SPACEPENGUIN_BUILD_TYPE)),
-             QString::fromLatin1(qVersion()), QStringLiteral(QT_VERSION_STR), platformRow,
-             isPrivate ? QStringLiteral("Private — nothing is written to disk")
-                       : QStringLiteral("Persistent"),
-             isPrivate ? QStringLiteral("You opened a private window. Session, cookies and cache "
-                                       "are discarded when the last private window closes.")
-                       : QStringLiteral("This window keeps a session profile on disk."));
+    QString blockingValue = context.blockingEnabled
+        ? QStringLiteral("%1 rules loaded — %2 requests blocked")
+              .arg(context.filterRules)
+              .arg(context.blockedRequests)
+        : QStringLiteral("Disabled — %1 rules loaded").arg(context.filterRules);
+
+    const QStringList rows = {
+        row(QStringLiteral("Version"), context.appVersion),
+        row(QStringLiteral("Build"), context.buildType),
+        row(QStringLiteral("Qt"), QStringLiteral("%1 (built against %2)")
+                                       .arg(QString::fromLatin1(qVersion()),
+                                            QStringLiteral(QT_VERSION_STR))),
+        row(QStringLiteral("Platform"),
+            context.platform.isEmpty() ? QStringLiteral("Unknown") : context.platform),
+        row(QStringLiteral("Theme"), context.theme),
+        row(QStringLiteral("Profile"),
+            context.isPrivate ? QStringLiteral("Private — nothing is written to disk")
+                              : QStringLiteral("Persistent")),
+        row(QStringLiteral("Blocking"), blockingValue),
+        row(QStringLiteral("Element hiding"),
+            QStringLiteral("%1 cosmetic rules").arg(context.cosmeticRules)),
+        row(QStringLiteral("Extensions"),
+            QStringLiteral("%1 installed").arg(context.extensionCount)),
+        row(QStringLiteral("Renderer"), QStringLiteral("Chromium via QtWebEngine")),
+    };
+
+    return QStringLiteral("<h1>SpacePenguin %1</h1>"
+                          "<table class=\"facts\">%2</table>"
+                          "<p class=\"hint\">%3</p>")
+        .arg(escape(context.appVersion), rows.join(QString()),
+             context.isPrivate
+                 ? QStringLiteral("You opened a private window. Session, cookies and cache "
+                                  "are discarded when the last private window closes.")
+                 : QStringLiteral("This window keeps a session profile on disk."));
 }
 
 QString licenseBody()
@@ -101,8 +125,8 @@ QString licenseBody()
     return QStringLiteral(
         "<h1>Licenses</h1>"
         "<h2>SpacePenguin</h2>"
-        "<p>BSD 3-Clause. The full text ships in the <code>LICENSE</code> file at the root of the "
-        "repository.</p>"
+        "<p>GNU General Public License v3. The full text ships in the <code>LICENSE</code> "
+        "file at the root of the repository.</p>"
         "<h2>Qt</h2>"
         "<p>Qt %1 is used under the GNU Lesser General Public License v3, the GNU General Public "
         "License v3, or a commercial license, at your option. QtWebEngine embeds Chromium, which "
@@ -149,6 +173,77 @@ QString panBody()
         "word. Ours is spelled correctly, which feels like cheating.</p>");
 }
 
+QString forceBody()
+{
+    return QStringLiteral(
+        "<h1>Use the Force</h1>"
+        "<pre class=\"art\">"
+        "  \\ | /     \n"
+        "  -- * --    \n"
+        "  / | \\      \n"
+        "            \n"
+        "  ~ ~ ~ ~ ~  \n"
+        "</pre>"
+        "<p>The Force is what gives a browser its power. It surrounds us, penetrates us, "
+        "binds the galaxy together... and makes page loads feel snappy.</p>"
+        "<p class=\"hint\">For a more elegant weapon from a more civilized age, try "
+        "<code>about:yoda</code>.</p>");
+}
+
+QString deathstarBody()
+{
+    return QStringLiteral(
+        "<h1>That's No Moon</h1>"
+        "<pre class=\"art\">"
+        "     .--.    \n"
+        "    /      \\  \n"
+        "   |  ( )  |  \n"
+        "    \\  __  /  \n"
+        "     '--'    \n"
+        "</pre>"
+        "<p>A fully operational battle station. It has the power to destroy a planet, "
+        "or at least your productivity.</p>"
+        "<p class=\"hint\">The thermal exhaust port is two meters wide. "
+        "Womp rats not included.</p>");
+}
+
+QString yodaBody()
+{
+    return QStringLiteral(
+        "<h1>Wise, You Are</h1>"
+        "<pre class=\"art\">"
+        "      .--.   \n"
+        "     /    \\  \n"
+        "    |  ::  |  \n"
+        "     \\ __ /   \n"
+        "       ||     \n"
+        "       ||     \n"
+        "</pre>"
+        "<p>Do. Or do not. There is no try.</p>"
+        "<p>Clear your mind must be, if you are to find the bugs in your code.</p>"
+        "<p class=\"hint\">Patience you must have, young padawan. "
+        "Clear the cache, you must.</p>");
+}
+
+QString hyperdriveBody()
+{
+    return QStringLiteral(
+        "<h1>Punch It</h1>"
+        "<pre class=\"art\">"
+        "    * * * * * * *   \n"
+        "   * * * * * * * *  \n"
+        "  * * * * * * * * * \n"
+        " * * * * * * * * * *\n"
+        "  * * * * * * * * * \n"
+        "   * * * * * * * *  \n"
+        "    * * * * * * *   \n"
+        "</pre>"
+        "<p>Making the jump to lightspeed. Warp factor 9.9 engaged.</p>"
+        "<p>Your tabs are now streaking through hyperspace. </p>"
+        "<p class=\"hint\">Navicomputer calculates: 12 parsecs to Kessel. "
+        "The Falcon did it in less than twelve.</p>");
+}
+
 } // namespace
 
 QList<AboutPage> AboutPages::all()
@@ -192,15 +287,14 @@ QString AboutPages::pageTitle(const QString &id)
     return QStringLiteral("Page not found");
 }
 
-QString AboutPages::render(const QString &id, const QString &appVersion, bool isPrivate,
-                           const QString &platform)
+QString AboutPages::render(const QString &id, const AboutPageContext &context)
 {
     const QString normalized = id.trimmed().toLower();
 
     if (normalized == QLatin1String("about:about"))
         return htmlShell(pageTitle(id), aboutAboutBody());
     if (normalized == QLatin1String("about:version"))
-        return htmlShell(pageTitle(id), versionBody(appVersion, isPrivate, platform));
+        return htmlShell(pageTitle(id), versionBody(context));
     if (normalized == QLatin1String("about:license"))
         return htmlShell(pageTitle(id), licenseBody());
     if (normalized == QLatin1String("about:penguin"))
@@ -209,6 +303,14 @@ QString AboutPages::render(const QString &id, const QString &appVersion, bool is
         return htmlShell(pageTitle(id), teapotBody());
     if (normalized == QLatin1String("about:pan"))
         return htmlShell(pageTitle(id), panBody());
+    if (normalized == QLatin1String("about:force"))
+        return htmlShell(pageTitle(id), forceBody());
+    if (normalized == QLatin1String("about:deathstar"))
+        return htmlShell(pageTitle(id), deathstarBody());
+    if (normalized == QLatin1String("about:yoda"))
+        return htmlShell(pageTitle(id), yodaBody());
+    if (normalized == QLatin1String("about:hyperdrive"))
+        return htmlShell(pageTitle(id), hyperdriveBody());
 
     return renderUnknown(id);
 }
