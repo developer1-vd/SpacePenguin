@@ -268,6 +268,67 @@ the helper process is still found from the new location.
 ctest --test-dir build --output-on-failure
 ```
 
+## Packaging
+
+### Linux AppImage
+
+```bash
+chmod +x build-appimage.sh
+./build-appimage.sh 0.1.0
+```
+
+Requires: `linuxdeployqt`, `appimagetool`, Qt6 development packages.
+
+Output: `SpacePenguin-0.1.0-x86_64.AppImage`
+
+### macOS DMG
+
+```bash
+chmod +x build-dmg.sh
+./build-dmg.sh 0.1.0
+```
+
+Must run on macOS. Requires: Xcode command line tools.
+
+Output: `SpacePenguin-0.1.0-macos.dmg`
+
+### Windows Installer (NSIS)
+
+```bash
+makensis installer.nsi
+```
+
+Requires: NSIS 3.x, Qt6 Windows binaries.
+
+Output: `SpacePenguin-0.1.0-windows-x64.exe`
+
+### Build All Platforms
+
+```bash
+chmod +x build-all.sh
+./build-all.sh 0.1.0
+```
+
+Or build for specific platform:
+
+```bash
+./build-all.sh 0.1.0 linux
+./build-all.sh 0.1.0 macos
+./build-all.sh 0.1.0 windows
+```
+
+### CI/CD
+
+See `.github/workflows/build.yml` for GitHub Actions workflow that builds all three formats and creates a GitHub Release on tag push.
+
+### Files
+
+- `build-appimage.sh` — Linux AppImage builder
+- `build-dmg.sh` — macOS DMG builder  
+- `installer.nsi` — Windows NSIS installer script
+- `build-all.sh` — Wrapper to build all platforms
+- `BUILD_SCRIPTS.md` — Detailed build documentation
+
 Four suites run: `urlresolver`, `aboutpages`, `adblocker` and `userextensions`.
 The first two are plain logic; the last two cover rule matching, filter parsing,
 script metadata, installation and enable/disable state.
