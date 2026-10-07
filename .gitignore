@@ -108,3 +108,10 @@ Desktop.ini
 
 # ---- Kilo code data  ------------------------------------------------------
 .kilo/
+
+# ---- Installers and packages ------------------------------------------------------
+*.nsi
+*.dmg
+*.appimage
+*.AppImage
+# just in case Ignore language is case-sensitive
