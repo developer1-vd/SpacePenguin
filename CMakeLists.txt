@@ -96,6 +96,7 @@ if(APPLE)
 endif()
 
 if(NOT APPLE)
+    set_target_properties(spacepenguin PROPERTIES OUTPUT_NAME "SpacePenguin")
     # An installed copy has to find QtWebEngineProcess, plugins and translations.
     # Derive the Qt layout from the qmake target so this works for any Qt build.
     get_target_property(SPACEPENGUIN_QMAKE Qt6::qmake IMPORTED_LOCATION)

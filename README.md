@@ -150,10 +150,17 @@ never fetched from the network.
 | `about:blank`   | Handled by the rendering engine                            |
 | `about:penguin` | 🐧                                                        |
 | `about:teapot`  | RFC 2324                                                   |
-| `about:pan`     | You have been panned                                       |
+| `about:pan`       | You have been panned                                       |
+| `about:mozilla`   | Book of Mozilla (verses)                                   |
+| `about:tatooine`  | Tatooine                                                  |
+| `about:hoth`      | Hoth                                                      |
+| `about:dagobah`   | Dagobah                                                   |
+| `about:endor`     | Endor                                                     |
+| `about:naboo`     | Naboo                                                     |
+| `about:coruscant` | Coruscant                                                 |
 
-Anything else — `about:nonsense` — gets an internal "no such page" answer
-instead of a network error.
+Any `about:` page not in the list above gets an internal "no such page" answer instead of a network error.
+
 
 ## Security posture
 

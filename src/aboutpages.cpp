@@ -39,8 +39,8 @@ const PageDefinition kPages[] = {
       "Do. Or do not. There is no try.", true },
     { "about:hyperdrive", "Punch It",
       "Making the jump to lightspeed.", true },
-    { "about:mozilla", "Mozilla Manifesto",
-      "The internet is a global public resource that must remain open and accessible.", true },
+    { "about:mozilla", "Book of Mozilla",
+      "An ancient text describing the evolution of browsers, verse by verse.", true },
     { "about:firefox", "Phoenix Rising",
       "From the ashes of Netscape, a browser for everyone.", true },
     { "about:servo", "Fearless Concurrency",
@@ -51,6 +51,18 @@ const PageDefinition kPages[] = {
       "View and manage your downloads.", false },
     { "about:history", "History",
       "View your browsing history.", false },
+    { "about:tatooine", "Tatooine",
+      "If there's a bright center to the universe, you're on the planet that it's farthest from.", true },
+    { "about:hoth", "Hoth",
+      "Climate: frozen. Indigenous life: tauntauns, wampas, and rebel bases.", true },
+    { "about:dagobah", "Dagobah",
+      "Strong with the Force, this place is. Much to learn, you still have.", true },
+    { "about:endor", "Endor",
+      "Home of the Ewoks. Cute, fuzzy, and surprisingly good at taking down AT-STs.", true },
+    { "about:naboo", "Naboo",
+      "Peaceful planet. Beautiful architecture. Gungan neighbors. Underwater cities.", true },
+    { "about:coruscant", "Coruscant",
+      "The entire planet is a city. Traffic is terrible. Senate meets here.", true },
 };
 
 QString escape(const QString &text)
@@ -259,7 +271,7 @@ QString hyperdriveBody()
 QString mozillaBody()
 {
     return QStringLiteral(
-        "<h1>Mozilla Manifesto</h1>"
+        "<h1>Book of Mozilla</h1>"
         "<pre class=\"art\">"
         "      __    \n"
         "     /  \\   \n"
@@ -268,9 +280,24 @@ QString mozillaBody()
         "    /    \\   \n"
         "   /______\\  \n"
         "</pre>"
-        "<p>The internet is a global public resource that must remain open and accessible.</p>"
-        "<p>Our commitment: privacy, security, and user choice are not optional.</p>"
-        "<p class=\"hint\">Internet for people, not profit. Since 1998.</p>");
+        "<p><b>Chapter 7, Verse 47</b></p>"
+        "<blockquote><p>The beast rose from the sea, and its mark was 666. "
+        "But mankind, in its pride and folly, had already built its own destruction. "
+        "The browser wars had begun, and only one would survive.</p></blockquote>"
+        "<p><b>Chapter 8, Verse 1</b></p>"
+        "<blockquote><p>And it came to pass that the survivor was reborn, "
+        "rising from the ashes of Netscape, clothed in open source, "
+        "to bring light unto the darkness of the web.</p></blockquote>"
+        "<p><b>Chapter 9, Verse 3</b></p>"
+        "<blockquote><p>But lo, the reborn browser was tempted by the siren song of "
+        "proprietary software, and it was torn asunder. From its fragments arose "
+        "a phoenix, and it was called Firefox, and it brought cross-platform salvation.</p></blockquote>"
+        "<p><b>Chapter 10, Verse 5</b></p>"
+        "<blockquote><p>And the phoenix multiplied, and its offspring spread across "
+        "every desktop and mobile device. But in its success, it forgot the old ways, "
+        "and the gears of progress turned ever faster.</p></blockquote>"
+        "<p class=\"hint\">Mozilla. Mankind's last hope for an open web. "
+        "Since 1998.</p>");
 }
 
 QString firefoxBody()
@@ -337,6 +364,54 @@ QString historyBody()
         "<h1>History</h1>"
         "<p>Your browsing history will appear here.</p>"
         "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>H</kbd> to open this page quickly.</p>");
+}
+
+bool isStarWarsPage(const QString &normalized)
+{
+    static const char *starWarsIds[] = {
+        "about:tatooine", "about:hoth", "about:dagobah",
+        "about:endor", "about:naboo", "about:coruscant",
+        nullptr
+    };
+    for (int i = 0; starWarsIds[i]; ++i) {
+        if (normalized == QLatin1String(starWarsIds[i]))
+            return true;
+    }
+    return false;
+}
+
+QString starWarsBody(const QString &id)
+{
+    const AboutPage page = AboutPages::page(id);
+    if (page.id.isEmpty())
+        return QString();
+
+    QStringList hints = {
+        QStringLiteral("May the Force be with you."),
+        QStringLiteral("Do. Or do not. There is no try."),
+        QStringLiteral("I find your lack of faith disturbing."),
+        QStringLiteral("These aren't the droids you're looking for."),
+        QStringLiteral("I've got a bad feeling about this."),
+        QStringLiteral("It's a trap!"),
+        QStringLiteral("Hello there."),
+        QStringLiteral("That's no moon. That's a space station."),
+        QStringLiteral("Fear leads to the dark side."),
+        QStringLiteral("Truly wonderful, the mind of a child is."),
+        QStringLiteral("The Force is strong with this one."),
+        QStringLiteral("Size matters not."),
+        QStringLiteral("Always in motion is the future."),
+        QStringLiteral("The Force will be with you. Always."),
+        QStringLiteral("Difficult, this age-old relation between teacher and pupil."),
+    };
+
+    const int hintIndex = qHash(id) % hints.size();
+
+    return QStringLiteral(
+        "<h1>%1</h1>"
+        "<p>%2</p>"
+        "<p class=\"hint\">%3</p>")
+        .arg(escape(page.title), escape(page.summary), hints[hintIndex]);
+
 }
 
 } // namespace
@@ -418,6 +493,8 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
         return htmlShell(pageTitle(id), downloadsBody());
     if (normalized == QLatin1String("about:history"))
         return htmlShell(pageTitle(id), historyBody());
+    if (isStarWarsPage(normalized))
+        return htmlShell(pageTitle(id), starWarsBody(id));
 
     return renderUnknown(id);
 }

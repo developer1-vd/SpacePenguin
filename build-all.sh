@@ -9,8 +9,9 @@ echo "Building SpacePenguin v${VERSION} for ${PLATFORM}..."
 
 # Build the project first
 echo "Building project..."
-cmake -B build -DCMAKE_BUILD_TYPE=Release -GNinja
-cmake --build build --config Release -j$(nproc)
+rm -rf build
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
 
 case "${PLATFORM}" in
     linux|all)

@@ -110,7 +110,6 @@ Desktop.ini
 .kilo/
 
 # ---- Installers and packages ------------------------------------------------------
-*.nsi
 *.dmg
 *.appimage
 *.AppImage
