@@ -4,7 +4,7 @@
 !define PRODUCT_NAME "SpacePenguin"
 !define PRODUCT_VERSION "0.1.0"
 !define PRODUCT_PUBLISHER "SpacePenguin Team"
-!define PRODUCT_WEB_SITE "https://github.com/yourusername/SpacePenguin"
+!define PRODUCT_WEB_SITE "https://github.com/developer1-vd/SpacePenguin"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\SpacePenguin.exe"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
