@@ -143,21 +143,32 @@ never fetched from the network.
 
 | Page            | What it shows                                              |
 | --------------- | ---------------------------------------------------------- |
-| `about:`        | Index of every internal page                               |
-| `about:about`   | The same index, with descriptions                          |
-| `about:version` | Version, build, Qt, platform, theme, profile, blocking rules, extension count |
-| `about:license` | SpacePenguin and Qt licensing                              |
-| `about:blank`   | Handled by the rendering engine                            |
-| `about:penguin` | 🐧                                                        |
-| `about:teapot`  | RFC 2324                                                   |
+| `about:`          | Index of every internal page                               |
+| `about:about`     | The same index, with descriptions                          |
+| `about:version`   | Version, build, Qt, platform, theme, profile, blocking rules, extension count |
+| `about:license`   | SpacePenguin and Qt licensing                              |
+| `about:blank`     | Handled by the rendering engine                            |
+| `about:penguin`   | 🐧                                                        |
+| `about:teapot`    | RFC 2324                                                   |
 | `about:pan`       | You have been panned                                       |
+| `about:force`     | Use the Force                                              |
+| `about:deathstar` | That's No Moon                                             |
+| `about:yoda`      | Wise, You Are                                              |
+| `about:hyperdrive`| Punch It                                                   |
 | `about:mozilla`   | Book of Mozilla (verses)                                   |
-| `about:tatooine`  | Tatooine                                                  |
-| `about:hoth`      | Hoth                                                      |
-| `about:dagobah`   | Dagobah                                                   |
-| `about:endor`     | Endor                                                     |
-| `about:naboo`     | Naboo                                                     |
-| `about:coruscant` | Coruscant                                                 |
+| `about:firefox`   | Phoenix Rising                                             |
+| `about:servo`     | Fearless Concurrency                                       |
+| `about:rust`      | Empowering Everyone                                        |
+| `about:downloads` | Download manager                                           |
+| `about:history`   | Browsing history                                           |
+| `about:extensions`| User scripts and extensions                                |
+| `about:settings`  | Open the settings dialog                                   |
+| `about:tatooine`  | Tatooine                                                   |
+| `about:hoth`      | Hoth                                                       |
+| `about:dagobah`   | Dagobah                                                    |
+| `about:endor`     | Endor                                                      |
+| `about:naboo`     | Naboo                                                      |
+| `about:coruscant` | Coruscant                                                  |
 
 Any `about:` page not in the list above gets an internal "no such page" answer instead of a network error.
 

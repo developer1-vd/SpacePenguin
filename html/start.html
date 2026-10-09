@@ -10,43 +10,99 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 1.5rem;
     font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
     background: #f6f7f9;
     color: #14161a;
   }
-  h1 { font-size: 2rem; margin: 0; letter-spacing: -0.01em; }
-  p { margin: 0; max-width: 34rem; text-align: center; opacity: 0.75; }
-  ul { list-style: none; display: flex; gap: 0.75rem; padding: 0; margin: 0; flex-wrap: wrap; justify-content: center; }
-  a {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    border: 1px solid rgba(20, 22, 26, 0.25);
-    border-radius: 0.5rem;
-    text-decoration: none;
-    color: inherit;
+  .container { max-width: 52rem; width: 100%; padding: 3rem 1.5rem; }
+  h1 { font-size: 2rem; margin: 0 0 0.5rem; letter-spacing: -0.01em; }
+  .subtitle { opacity: 0.75; margin: 0 0 2rem; text-align: center; }
+  .search-form { margin-bottom: 2.5rem; }
+  .search-form form { display: flex; max-width: 40rem; margin: 0 auto; }
+  .search-form input {
+    flex: 1; padding: 0.75rem 1rem; border: 1px solid rgba(20, 22, 26, 0.25);
+    border-right: none; border-radius: 0.5rem 0 0 0.5rem; font: inherit;
+    background: rgba(20, 22, 26, 0.02); outline: none;
   }
-  a:hover { border-color: rgba(20, 22, 26, 0.6); }
-  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9em; }
+  .search-form button {
+    padding: 0.75rem 1.25rem; border: 1px solid rgba(20, 22, 26, 0.25);
+    border-left: none; border-radius: 0 0.5rem 0.5rem 0;
+    background: rgba(47, 109, 237, 0.1); color: #2f6fed; cursor: pointer;
+    font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .search-form button:hover { background: rgba(47, 109, 237, 0.15); }
+  .quick-links h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
+  .quick-links ul {
+    list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.5rem; padding: 0; margin: 0 0 2rem;
+  }
+  .quick-links a {
+    display: inline-block; padding: 0.6rem 0.75rem; border: 1px solid rgba(20, 22, 26, 0.2);
+    border-radius: 0.4rem; text-decoration: none; color: inherit; text-align: center;
+    font-size: 0.9rem; transition: border-color 0.15s;
+  }
+  .quick-links a:hover { border-color: rgba(20, 22, 26, 0.5); }
+  .shortcuts h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
+  .shortcuts ul { list-style: none; padding: 0; margin: 0 0 2rem; }
+  .shortcuts li {
+    display: flex; justify-content: space-between; padding: 0.35rem 0;
+    border-bottom: 1px solid rgba(20, 22, 26, 0.08);
+  }
+  .shortcuts code {
+    background: rgba(20, 22, 26, 0.06); padding: 0.1em 0.35em; border-radius: 0.25em;
+    font-size: 0.85em; opacity: 0.7;
+  }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
   @media (prefers-color-scheme: dark) {
     body { background: #14161a; color: #f6f7f9; }
-    a { border-color: rgba(246, 247, 249, 0.25); }
-    a:hover { border-color: rgba(246, 247, 249, 0.6); }
+    .search-form input { background: rgba(246, 247, 249, 0.08); border-color: rgba(246, 247, 249, 0.25); }
+    .search-form button { background: rgba(122, 168, 255, 0.12); color: #7aa7ff; border-color: rgba(246, 247, 249, 0.25); }
+    .quick-links a { border-color: rgba(246, 247, 249, 0.15); }
+    .shortcuts { border-bottom-color: rgba(246, 247, 249, 0.14); }
+    code { background: rgba(246, 247, 249, 0.08); }
   }
 </style>
 </head>
 <body>
-  <h1>SpacePenguin</h1>
-  <p>Pre-alpha. Tabs, an address bar that searches when you type words, and a
-     deliberately locked-down security posture are in. Everything else is
-     still on the way.</p>
-  <ul>
-    <li><a href="https://example.com">example.com</a></li>
-    <li><a href="https://en.wikipedia.org/wiki/Main_Page">Wikipedia</a></li>
-    <li><a href="https://news.ycombinator.com">Hacker News</a></li>
-  </ul>
-  <p>New tab <code>Ctrl+T</code> &middot; Close tab <code>Ctrl+W</code> &middot;
-     Focus address bar <code>Ctrl+L</code> &middot; Reload <code>F5</code></p>
+  <div class="container">
+    <h1>SpacePenguin</h1>
+    <p class="subtitle">Privacy-first browsing built on Qt 6 and QtWebEngine.</p>
+
+    <div class="search-form">
+      <form action="https://duckduckgo.com/" method="GET" target="_self">
+        <input type="search" name="q" placeholder="Search the web with DuckDuckGo..." autocomplete="off" accesskey="s">
+        <button type="submit">Search</button>
+      </form>
+    </div>
+
+    <div class="quick-links">
+      <h2>Quick links</h2>
+      <ul>
+        <li><a href="https://en.wikipedia.org/wiki/Main_Page">Wikipedia</a></li>
+        <li><a href="https://news.ycombinator.com">Hacker News</a></li>
+        <li><a href="https://example.com">Example</a></li>
+      </ul>
+    </div>
+
+    <div class="shortcuts">
+      <h2>Keyboard shortcuts</h2>
+      <ul>
+        <li><span>New tab</span> <code>Ctrl+T</code></li>
+        <li><span>Close tab</span> <code>Ctrl+W</code></li>
+        <li><span>Focus address bar</span> <code>Ctrl+L</code></li>
+        <li><span>Reload</span> <code>F5</code></li>
+        <li><span>Find in page</span> <code>Ctrl+F</code></li>
+        <li><span>Settings</span> <code>Ctrl+,</code></li>
+        <li><span>Extensions</span> <code>Ctrl+Shift+E</code></li>
+        <li><span>Downloads</span> <code>Ctrl+J</code></li>
+        <li><span>History</span> <code>Ctrl+H</code></li>
+        <li><span>Toggle ad blocking</span> <code>Ctrl+Shift+B</code></li>
+      </ul>
+    </div>
+
+    <p style="opacity:0.6;font-size:0.85rem;text-align:center;">
+      New tab <code>Ctrl+T</code> &middot; Private window <code>Ctrl+Shift+N</code>
+    </p>
+  </div>
 </body>
 </html>

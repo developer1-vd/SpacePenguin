@@ -51,6 +51,10 @@ const PageDefinition kPages[] = {
       "View and manage your downloads.", false },
     { "about:history", "History",
       "View your browsing history.", false },
+    { "about:extensions", "Extensions",
+      "Manage your user scripts and extensions.", false },
+    { "about:settings", "Settings",
+      "Configure SpacePenguin.", false },
     { "about:tatooine", "Tatooine",
       "If there's a bright center to the universe, you're on the planet that it's farthest from.", true },
     { "about:hoth", "Hoth",
@@ -363,7 +367,41 @@ QString historyBody()
     return QStringLiteral(
         "<h1>History</h1>"
         "<p>Your browsing history will appear here.</p>"
-        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>H</kbd> to open this page quickly.</p>");
+        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>H</kbd> to open this page quickly. "
+        "Or use <code>Tools → Settings</code> to configure history.</p>");
+}
+
+QString extensionsBody(const AboutPageContext &context)
+{
+    QString body = QStringLiteral(
+        "<h1>Extensions</h1>");
+
+    if (context.extensionCount == 0) {
+        body += QStringLiteral(
+            "<p>No user scripts installed.</p>"
+            "<p>You can install scripts via the Extensions dialog or by placing "
+            "<code>.js</code> files in your extensions directory.</p>");
+    } else {
+        body += QStringLiteral(
+            "<p><b>%1</b> user script%2 installed.</p>")
+            .arg(context.extensionCount)
+            .arg(context.extensionCount == 1 ? QStringLiteral("") : QStringLiteral("s"));
+    }
+
+    body += QStringLiteral(
+        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd> to "
+        "manage extensions.</p>");
+
+    return body;
+}
+
+QString settingsBody()
+{
+    return QStringLiteral(
+        "<h1>Settings</h1>"
+        "<p>Open the Settings dialog to configure SpacePenguin.</p>"
+        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>,</kbd> or use "
+        "<code>Tools → Settings</code>.</p>");
 }
 
 bool isStarWarsPage(const QString &normalized)
@@ -493,6 +531,10 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
         return htmlShell(pageTitle(id), downloadsBody());
     if (normalized == QLatin1String("about:history"))
         return htmlShell(pageTitle(id), historyBody());
+    if (normalized == QLatin1String("about:extensions"))
+        return htmlShell(pageTitle(id), extensionsBody(context));
+    if (normalized == QLatin1String("about:settings"))
+        return htmlShell(pageTitle(id), settingsBody());
     if (isStarWarsPage(normalized))
         return htmlShell(pageTitle(id), starWarsBody(id));
 
