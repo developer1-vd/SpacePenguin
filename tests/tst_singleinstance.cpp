@@ -1,5 +1,7 @@
 #include <QtTest>
 
+#include <atomic>
+
 #include "singleinstance.h"
 
 using namespace spacepenguin;
@@ -34,12 +36,23 @@ void TestSingleInstance::handsArgumentsToRunningInstance()
     QVERIFY(running.listen());
     QSignalSpy received(&running, &SingleInstance::argumentsReceived);
 
-    SingleInstance second(key);
     const QStringList arguments = {QStringLiteral("--private"), QStringLiteral("https://example.com/"),
                                    QStringLiteral("penguins ünïcode")};
-    QVERIFY(second.sendToRunningInstance(arguments));
+
+    // A second launch is another process; send from another thread so this one's
+    // event loop can accept, as it would in the running browser. (A Windows named
+    // pipe write waits for the reader, so a same-thread send would deadlock.)
+    std::atomic<bool> sent = false;
+    QThread *sender = QThread::create([&key, &arguments, &sent] {
+        SingleInstance second(key);
+        sent = second.sendToRunningInstance(arguments);
+    });
+    sender->start();
 
     QVERIFY(received.wait(5000));
+    QVERIFY(sender->wait(5000));
+    delete sender;
+    QVERIFY(sent);
     QCOMPARE(received.first().first().toStringList(), arguments);
 }
 
