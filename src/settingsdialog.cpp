@@ -315,7 +315,13 @@ QWidget *SettingsDialog::createAppearanceTab()
     connect(menuBar, &QCheckBox::toggled, this,
             [](bool checked) { Preferences::instance()->setShowMenuBar(checked); });
     layout->addWidget(menuBar);
-    layout->addWidget(mutedLabel(tr("Everything in the menu bar is also in the ☰ menu.")));
+    auto *menuBarHint = mutedLabel(tr("Everything in the menu bar is also in the ☰ menu."));
+    layout->addWidget(menuBarHint);
+#ifdef Q_OS_MACOS
+    // The macOS menu bar is the system's and is always shown.
+    menuBar->hide();
+    menuBarHint->hide();
+#endif
 
     // Keep the controls honest when the same setting changes elsewhere.
     connect(Preferences::instance(), &Preferences::changed, page,

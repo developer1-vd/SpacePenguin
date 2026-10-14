@@ -1,48 +1,28 @@
-#!/bin/bash
-# Build all packages for SpacePenguin
+#!/usr/bin/env bash
+# Package SpacePenguin for the platform this runs on: ./build-all.sh [version]
+#
+#   Linux   -> SpacePenguin-<version>-<arch>.AppImage   (build-appimage.sh)
+#   macOS   -> SpacePenguin-<version>-macos.dmg         (build-dmg.sh)
+#   Windows -> installer and zip                        (build-windows.ps1, via Git Bash/MSYS)
+#
+# Each platform's package has to be built on that platform; the CI workflow in
+# .github/workflows/build.yml builds all three.
 set -euo pipefail
 
 VERSION="${1:-0.1.0}"
-PLATFORM="${2:-all}"
 
-echo "Building SpacePenguin v${VERSION} for ${PLATFORM}..."
-
-# Build the project first
-echo "Building project..."
-rm -rf build
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(nproc)
-
-case "${PLATFORM}" in
-    linux|all)
-        echo "Building Linux AppImage..."
-        chmod +x build-appimage.sh
-        ./build-appimage.sh "${VERSION}"
+case "$(uname -s)" in
+    Linux)
+        exec ./build-appimage.sh "${VERSION}"
+        ;;
+    Darwin)
+        exec ./build-dmg.sh "${VERSION}"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        exec powershell -ExecutionPolicy Bypass -File build-windows.ps1 -Version "${VERSION}"
+        ;;
+    *)
+        echo "Unsupported platform: $(uname -s)" >&2
+        exit 1
         ;;
 esac
-
-case "${PLATFORM}" in
-    macos|all)
-        if [[ "$(uname)" == "Darwin" ]]; then
-            echo "Building macOS DMG..."
-            chmod +x build-dmg.sh
-            ./build-dmg.sh "${VERSION}"
-        else
-            echo "Skipping macOS build (not on macOS)"
-        fi
-        ;;
-esac
-
-case "${PLATFORM}" in
-    windows|all)
-        if command -v makensis &> /dev/null; then
-            echo "Building Windows installer..."
-            makensis installer.nsi
-        else
-            echo "Skipping Windows build (NSIS not found)"
-        fi
-        ;;
-esac
-
-echo "Build complete!"
-ls -la SpacePenguin-* 2>/dev/null || true

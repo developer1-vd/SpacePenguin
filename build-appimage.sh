@@ -1,137 +1,72 @@
-#!/bin/bash
-# Build script for Linux AppImage
+#!/usr/bin/env bash
+# Build a Linux AppImage: ./build-appimage.sh [version]
+#
+# Uses linuxdeploy with its Qt plugin, which knows how to bundle QtWebEngine
+# (QtWebEngineProcess, resources, locales). Both are downloaded into
+# .cache/linuxdeploy on first use. Point CMAKE_PREFIX_PATH (or QMAKE) at your Qt
+# if it is not the system one.
 set -euo pipefail
 
-# Configuration
-PROJECT_NAME="SpacePenguin"
-BUILD_DIR="build"
-APPDIR="${BUILD_DIR}/${PROJECT_NAME}.AppDir"
 VERSION="${1:-0.1.0}"
+ARCH="$(uname -m)"
+BUILD_DIR="${BUILD_DIR:-build-appimage}"
+APPDIR="${BUILD_DIR}/AppDir"
+TOOLS_DIR=".cache/linuxdeploy"
+APP_ID="org.spacepenguin.SpacePenguin"
 
-echo "Building ${PROJECT_NAME} AppImage v${VERSION}..."
+if [[ "$(uname)" != "Linux" ]]; then
+    echo "AppImages are built on Linux." >&2
+    exit 1
+fi
 
-# Clean and create AppDir
+echo "==> Building SpacePenguin ${VERSION} (${ARCH})"
+cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+    -DSPACEPENGUIN_BUILD_TESTS=OFF -DSPACEPENGUIN_INSTALL_QT_CONF=OFF
+cmake --build "${BUILD_DIR}" --parallel
+
 rm -rf "${APPDIR}"
-mkdir -p "${APPDIR}/usr/bin"
-mkdir -p "${APPDIR}/usr/lib"
-mkdir -p "${APPDIR}/usr/share/applications"
-mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
-mkdir -p "${APPDIR}/usr/share/metainfo"
+DESTDIR="$(pwd)/${APPDIR}" cmake --install "${BUILD_DIR}"
 
-# Copy binary
-cp "${BUILD_DIR}/${PROJECT_NAME}" "${APPDIR}/usr/bin/"
-
-# Copy Qt libraries and plugins using linuxdeployqt (if available) or manual copy
-if command -v linuxdeployqt &> /dev/null; then
-    linuxdeployqt "${APPDIR}/usr/bin/${PROJECT_NAME}" -appimage
-else
-    # Manual Qt deployment - copy required libraries
-    echo "linuxdeployqt not found, copying Qt libraries manually..."
-    
-    # Find Qt installation
-    QT_PATH=$(dirname $(dirname $(which qmake6 2>/dev/null || which qmake 2>/dev/null)) 2>/dev/null || echo "")
-    if [ -z "${QT_PATH}" ]; then
-        QT_PATH="/usr/lib/qt6"
+mkdir -p "${TOOLS_DIR}"
+fetch() {
+    local name="$1" url="$2"
+    if [[ ! -x "${TOOLS_DIR}/${name}" ]]; then
+        echo "==> Downloading ${name}"
+        curl -fsSL -o "${TOOLS_DIR}/${name}" "${url}"
+        chmod +x "${TOOLS_DIR}/${name}"
     fi
-    
-    # Copy Qt libraries
-    cp -r "${QT_PATH}/lib/libQt6Core.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -r "${QT_PATH}/lib/libQt6Gui.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -r "${QT_PATH}/lib/libQt6Widgets.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -r "${QT_PATH}/lib/libQt6WebEngineCore.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -r "${QT_PATH}/lib/libQt6WebEngineWidgets.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -r "${QT_PATH}/lib/libQt6Network.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -r "${QT_PATH}/lib/libQt6DBus.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -r "${QT_PATH}/lib/libQt6OpenGL.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -r "${QT_PATH}/lib/libQt6PrintSupport.so."* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    
-    # Copy WebEngine resources
-    mkdir -p "${APPDIR}/usr/lib/qt6/resources"
-    cp -r "${QT_PATH}/resources/qtwebengine_resources"* "${APPDIR}/usr/lib/qt6/resources/" 2>/dev/null || true
-    cp -r "${QT_PATH}/resources/icudtl.dat" "${APPDIR}/usr/lib/qt6/resources/" 2>/dev/null || true
-    
-    # Copy WebEngine process
-    cp "${QT_PATH}/libexec/QtWebEngineProcess" "${APPDIR}/usr/bin/" 2>/dev/null || true
-    
-    # Copy Qt plugins
-    mkdir -p "${APPDIR}/usr/plugins"
-    cp -r "${QT_PATH}/plugins/platforms" "${APPDIR}/usr/plugins/" 2>/dev/null || true
-    cp -r "${QT_PATH}/plugins/webengine" "${APPDIR}/usr/plugins/" 2>/dev/null || true
-    cp -r "${QT_PATH}/plugins/iconengines" "${APPDIR}/usr/plugins/" 2>/dev/null || true
-    cp -r "${QT_PATH}/plugins/imageformats" "${APPDIR}/usr/plugins/" 2>/dev/null || true
+}
+fetch "linuxdeploy-${ARCH}.AppImage" \
+    "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${ARCH}.AppImage"
+fetch "linuxdeploy-plugin-qt-${ARCH}.AppImage" \
+    "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${ARCH}.AppImage"
+
+# The Qt plugin locates Qt through qmake.
+if [[ -z "${QMAKE:-}" ]]; then
+    QMAKE="$(command -v qmake6 || command -v qmake || true)"
+    if [[ -n "${CMAKE_PREFIX_PATH:-}" && -x "${CMAKE_PREFIX_PATH%%:*}/bin/qmake" ]]; then
+        QMAKE="${CMAKE_PREFIX_PATH%%:*}/bin/qmake"
+    fi
 fi
-
-# Create desktop file
-cat > "${APPDIR}/usr/share/applications/${PROJECT_NAME}.desktop" << EOF
-[Desktop Entry]
-Name=SpacePenguin
-Comment=A secure, lightweight, and usable browser written in Qt
-Exec=${PROJECT_NAME} %U
-Icon=${PROJECT_NAME}
-Terminal=false
-Type=Application
-Categories=Network;WebBrowser;
-MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/vnd.mozilla.xul+xml;application/rss+xml;application/rdf+xml;x-scheme-handler/http;x-scheme-handler/https;
-StartupNotify=true
-EOF
-
-# Create AppStream metadata
-cat > "${APPDIR}/usr/share/metainfo/${PROJECT_NAME}.metainfo.xml" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<component type="desktop">
-  <id>${PROJECT_NAME}.desktop</id>
-  <name>SpacePenguin</name>
-  <summary>A secure, lightweight, and usable browser written in Qt</summary>
-  <description>
-    <p>SpacePenguin is a browser focused on privacy, security, and usability. Built with Qt 6 and QtWebEngine.</p>
-    <p>Features: ad blocking, user scripts, theme support, private browsing, downloads, bookmarks, history.</p>
-  </description>
-  <url type="homepage">https://github.com/yourusername/SpacePenguin</url>
-  <url type="bugtracker">https://github.com/yourusername/SpacePenguin/issues</url>
-  <license>GPL-3.0-or-later</license>
-  <releases>
-    <release version="${VERSION}" date="$(date +%Y-%m-%d)"/>
-  </releases>
-</component>
-EOF
-
-# Copy icon (use a placeholder if not available)
-if [ -f "assets/icon.png" ]; then
-    cp assets/icon.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${PROJECT_NAME}.png"
-elif [ -f "html/icon.png" ]; then
-    cp html/icon.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${PROJECT_NAME}.png"
-else
-    # Create a simple placeholder icon
-    convert -size 256x256 xc:transparent -fill "#2f6fed" -draw "circle 128,128 128,20" \
-        -fill white -font DejaVu-Sans-Bold -pointsize 100 -gravity center -annotate +0+10 "🐧" \
-        "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${PROJECT_NAME}.png" 2>/dev/null || \
-    echo "Could not create icon, using placeholder"
+if [[ -z "${QMAKE}" ]]; then
+    echo "qmake not found; set QMAKE=/path/to/Qt/bin/qmake" >&2
+    exit 1
 fi
+export QMAKE
+# linuxdeploy resolves the binary's libraries through the normal search path.
+QT_LIBS="$("${QMAKE}" -query QT_INSTALL_LIBS)"
+export LD_LIBRARY_PATH="${QT_LIBS}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export EXTRA_QT_MODULES="webenginecore;webenginewidgets"
+export LDAI_OUTPUT="SpacePenguin-${VERSION}-${ARCH}.AppImage"
+# Lets the AppImages run inside containers without FUSE.
+export APPIMAGE_EXTRACT_AND_RUN=1
 
-# Create AppRun script
-cat > "${APPDIR}/AppRun" << 'EOF'
-#!/bin/bash
-set -euo pipefail
+echo "==> Bundling with linuxdeploy"
+PATH="$(pwd)/${TOOLS_DIR}:${PATH}" "${TOOLS_DIR}/linuxdeploy-${ARCH}.AppImage" \
+    --appdir "${APPDIR}" \
+    --desktop-file "${APPDIR}/usr/share/applications/${APP_ID}.desktop" \
+    --icon-file "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png" \
+    --plugin qt \
+    --output appimage
 
-HERE="$(dirname "$(readlink -f "${0}")")"
-export PATH="${HERE}/usr/bin:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH:-}"
-export QT_PLUGIN_PATH="${HERE}/usr/plugins:${QT_PLUGIN_PATH:-}"
-export QML2_IMPORT_PATH="${HERE}/usr/qml:${QML2_IMPORT_PATH:-}"
-
-# QtWebEngine specific
-export QTWEBENGINEPROCESS_PATH="${HERE}/usr/bin/QtWebEngineProcess"
-export QTWEBENGINE_RESOURCES_PATH="${HERE}/usr/lib/qt6/resources"
-
-exec "${HERE}/usr/bin/SpacePenguin" "$@"
-EOF
-chmod +x "${APPDIR}/AppRun"
-
-# Build AppImage
-if command -v appimagetool &> /dev/null; then
-    appimagetool "${APPDIR}" "${PROJECT_NAME}-${VERSION}-x86_64.AppImage"
-    echo "AppImage created: ${PROJECT_NAME}-${VERSION}-x86_64.AppImage"
-else
-    echo "appimagetool not found. Install it to create the AppImage."
-    echo "AppDir ready at: ${APPDIR}"
-fi
+echo "==> Created ${LDAI_OUTPUT}"

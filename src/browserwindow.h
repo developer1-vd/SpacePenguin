@@ -54,6 +54,9 @@ public:
     /** Opens an address, about: page or search in a new tab, as the omnibox would. */
     void openInNewTab(const QString &text);
 
+    /** Opens a new window, private or not, with a tab for each of @p texts. */
+    BrowserWindow *openWindow(bool isPrivate, const QStringList &texts = {});
+
     bool isPrivate() const { return m_isPrivate; }
 
 protected:
@@ -110,7 +113,7 @@ private:
     int indexOfView(const QWebEngineView *view) const;
     WebView *addTab(bool background);
     WebView *newTab(const QUrl &url = QUrl(), bool background = false);
-    void newWindow(bool isPrivate);
+    BrowserWindow *newWindow(bool isPrivate);
     void closeTab(int index);
     void closeOtherTabs(int index);
     void duplicateTab(int index);

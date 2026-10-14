@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name=SpacePenguin
+GenericName=Web Browser
+Comment=A secure, lightweight, and usable browser written in Qt
+Exec=SpacePenguin %U
+Icon=org.spacepenguin.SpacePenguin
+Terminal=false
+StartupNotify=true
+StartupWMClass=SpacePenguin
+Categories=Network;WebBrowser;
+MimeType=text/html;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+Keywords=web;browser;internet;privacy;
+Actions=new-window;new-private-window;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=SpacePenguin
+
+[Desktop Action new-private-window]
+Name=New Private Window
+Exec=SpacePenguin --private

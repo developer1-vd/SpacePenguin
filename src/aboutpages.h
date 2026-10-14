@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QList>
+#include <QMap>
 #include <QString>
 
 namespace spacepenguin {
@@ -32,6 +33,9 @@ struct AboutPageContext {
     int extensionCount = 0;
     QList<AboutPageEntry> history;
     QList<AboutPageEntry> downloads;
+    /** Shortcut text by command name ("history", "downloads", "extensions",
+     *  "settings"), as the platform writes it. Missing entries use Ctrl bindings. */
+    QMap<QString, QString> shortcuts;
 };
 
 class AboutPages

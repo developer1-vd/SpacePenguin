@@ -1,67 +1,60 @@
-#!/bin/bash
-# Build script for macOS DMG installer
+#!/usr/bin/env bash
+# Build a macOS disk image: ./build-dmg.sh [version]
+#
+# `cmake --install` runs macdeployqt, so the installed SpacePenguin.app already
+# carries Qt, QtWebEngineCore and its helper process. Set CODESIGN_IDENTITY to sign
+# with a Developer ID; without it the app is ad-hoc signed, which runs on the
+# machine that built it and needs right-click > Open elsewhere.
 set -euo pipefail
 
-# Configuration
-PROJECT_NAME="SpacePenguin"
-BUILD_DIR="build"
-APP_BUNDLE="${BUILD_DIR}/${PROJECT_NAME}.app"
-DMG_NAME="${PROJECT_NAME}-${VERSION:-0.1.0}-macos.dmg"
 VERSION="${1:-0.1.0}"
+BUILD_DIR="${BUILD_DIR:-build-macos}"
+DIST_DIR="${BUILD_DIR}/dist"
+APP="${DIST_DIR}/SpacePenguin.app"
+DMG="SpacePenguin-${VERSION}-macos.dmg"
 
-echo "Building ${PROJECT_NAME} DMG v${VERSION}..."
-
-# Check if we're on macOS
 if [[ "$(uname)" != "Darwin" ]]; then
-    echo "This script must be run on macOS"
+    echo "DMGs are built on macOS." >&2
     exit 1
 fi
 
-# Verify app bundle exists
-if [ ! -d "${APP_BUNDLE}" ]; then
-    echo "App bundle not found at ${APP_BUNDLE}. Build the project first."
+echo "==> Building SpacePenguin ${VERSION}"
+cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release -DSPACEPENGUIN_BUILD_TESTS=OFF \
+    ${CMAKE_OSX_ARCHITECTURES:+-DCMAKE_OSX_ARCHITECTURES="${CMAKE_OSX_ARCHITECTURES}"}
+cmake --build "${BUILD_DIR}" --parallel
+
+rm -rf "${DIST_DIR}"
+cmake --install "${BUILD_DIR}" --prefix "${DIST_DIR}"
+
+if [[ ! -d "${APP}" ]]; then
+    echo "Install did not produce ${APP}" >&2
     exit 1
 fi
 
-# Create a temporary directory for DMG contents
-DMG_DIR=$(mktemp -d)
-trap "rm -rf ${DMG_DIR}" EXIT
-
-# Copy app bundle
-cp -R "${APP_BUNDLE}" "${DMG_DIR}/"
-
-# Create Applications symlink
-ln -s /Applications "${DMG_DIR}/Applications"
-
-# Create DMG background (optional)
-# You can add a background image at resources/dmg-background.png
-if [ -f "resources/dmg-background.png" ]; then
-    cp resources/dmg-background.png "${DMG_DIR}/.background.png"
+echo "==> Signing"
+if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    # Hardened runtime, as notarisation requires, with the JIT entitlements
+    # QtWebEngine needs to run JavaScript.
+    codesign --force --deep --timestamp --options runtime \
+        --entitlements packaging/macos/entitlements.plist \
+        --sign "${CODESIGN_IDENTITY}" "${APP}"
+else
+    codesign --force --deep --sign - "${APP}"
 fi
 
-# Calculate required size (in MB)
-APP_SIZE=$(du -sm "${APP_BUNDLE}" | cut -f1)
-DMG_SIZE=$((APP_SIZE + 100))  # Add 100MB padding
+echo "==> Creating ${DMG}"
+STAGING="$(mktemp -d)"
+trap 'rm -rf "${STAGING}"' EXIT
+cp -R "${APP}" "${STAGING}/"
+ln -s /Applications "${STAGING}/Applications"
+rm -f "${DMG}"
+hdiutil create -volname "SpacePenguin ${VERSION}" -srcfolder "${STAGING}" \
+    -ov -format UDZO "${DMG}"
 
-# Create DMG
-echo "Creating DMG..."
-hdiutil create \
-    -volname "${PROJECT_NAME} ${VERSION}" \
-    -srcfolder "${DMG_DIR}" \
-    -ov \
-    -format UDZO \
-    -imagekey zlib-level=9 \
-    "${DMG_NAME}"
-
-# Sign the DMG (if certificates available)
-if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
-    echo "Signing DMG..."
-    codesign --force --sign "Developer ID Application" "${DMG_NAME}"
-    
-    # Notarize (requires Apple Developer account)
-    # xcrun notarytool submit "${DMG_NAME}" --apple-id "your@email.com" --team-id "TEAM_ID" --password "password" --wait
-    # xcrun stapler staple "${DMG_NAME}"
+if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    codesign --force --sign "${CODESIGN_IDENTITY}" "${DMG}"
+    # Notarise with: xcrun notarytool submit "${DMG}" --keychain-profile <profile> --wait
+    #                xcrun stapler staple "${DMG}"
 fi
 
-echo "DMG created: ${DMG_NAME}"
-echo "Size: $(du -h "${DMG_NAME}" | cut -f1)"
+echo "==> Created ${DMG} ($(du -h "${DMG}" | cut -f1))"

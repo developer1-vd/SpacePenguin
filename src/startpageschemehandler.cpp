@@ -1,6 +1,7 @@
 #include "startpageschemehandler.h"
 
 #include "preferences.h"
+#include "shortcuts.h"
 #include "theme.h"
 
 #include <QBuffer>
@@ -43,10 +44,27 @@ QByteArray StartPageSchemeHandler::renderPage(const QByteArray &templateHtml,
                                      {QStringLiteral("url"), tile.url}});
     }
 
+    // The footer shows this platform's bindings, which differ on macOS.
+    const QList<std::pair<QString, Shortcuts::Command>> footer = {
+        {QStringLiteral("New tab"), Shortcuts::NewTab},
+        {QStringLiteral("Address bar"), Shortcuts::FocusAddressBar},
+        {QStringLiteral("Bookmark"), Shortcuts::BookmarkPage},
+        {QStringLiteral("History"), Shortcuts::History},
+        {QStringLiteral("Downloads"), Shortcuts::Downloads},
+        {QStringLiteral("Private window"), Shortcuts::NewPrivateWindow},
+        {QStringLiteral("All shortcuts"), Shortcuts::KeyboardShortcuts},
+    };
+    QJsonArray shortcutArray;
+    for (const auto &[label, command] : footer) {
+        shortcutArray.append(QJsonObject{{QStringLiteral("label"), label},
+                                         {QStringLiteral("keys"), Shortcuts::text(command)}});
+    }
+
     const QJsonObject data{
         {QStringLiteral("search"), searchTemplate},
         {QStringLiteral("tiles"), tileArray},
         {QStringLiteral("private"), isPrivate},
+        {QStringLiteral("shortcuts"), shortcutArray},
     };
 
     // '<' never appears unescaped, so page titles cannot close the <script> element.

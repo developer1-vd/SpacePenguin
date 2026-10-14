@@ -1,161 +1,163 @@
-; SpacePenguin NSIS Installer Script
-; Build with: makensis installer.nsi
+; SpacePenguin Windows installer.
+;
+; Build the app first; build-windows.ps1 does everything:
+;   powershell -ExecutionPolicy Bypass -File build-windows.ps1 -Version 0.1.0
+; or by hand, after `cmake --install <build> --config Release --prefix <dist>`:
+;   makensis /DVERSION=0.1.0 /DSOURCE_DIR=<dist> installer.nsi
+;
+; SOURCE_DIR is the install prefix, which windeployqt has already filled with the
+; Qt DLLs, plugins, QtWebEngineProcess.exe and its resources.
+
+Unicode true
+
+!ifndef VERSION
+  !define VERSION "0.1.0"
+!endif
+!ifndef SOURCE_DIR
+  !define SOURCE_DIR "build-windows\dist"
+!endif
 
 !define PRODUCT_NAME "SpacePenguin"
-!define PRODUCT_VERSION "0.1.0"
-!define PRODUCT_PUBLISHER "SpacePenguin Team"
+!define PRODUCT_PUBLISHER "SpacePenguin"
 !define PRODUCT_WEB_SITE "https://github.com/developer1-vd/SpacePenguin"
-!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\SpacePenguin.exe"
+!define PRODUCT_EXE "SpacePenguin.exe"
+!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\${PRODUCT_EXE}"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
-!define PRODUCT_UNINST_ROOT_KEY "HKLM"
+!define PRODUCT_CAPABILITIES "Software\Clients\StartMenuInternet\${PRODUCT_NAME}\Capabilities"
+!define PRODUCT_PROGID "SpacePenguinHTML"
 
-; Modern UI
 !include "MUI2.nsh"
-!include "FileFunc.nsh"
 !include "x64.nsh"
+!include "LogicLib.nsh"
+!include "FileFunc.nsh"
 
-; General settings
-Name "${PRODUCT_NAME}"
-OutFile "SpacePenguin-${PRODUCT_VERSION}-windows-x64.exe"
+Name "${PRODUCT_NAME} ${VERSION}"
+OutFile "SpacePenguin-${VERSION}-windows-x64-setup.exe"
 InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
+RequestExecutionLevel admin
+SetCompressor /SOLID lzma
 ShowInstDetails show
 ShowUninstDetails show
 
-; Request admin rights
-RequestExecutionLevel admin
+!define MUI_ICON "packaging\windows\spacepenguin.ico"
+!define MUI_UNICON "packaging\windows\spacepenguin.ico"
+!define MUI_ABORTWARNING
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXE}"
 
-; Icon
-!define MUI_ICON "assets/icon.ico"
-!define MUI_UNICON "assets/icon.ico"
-
-; Modern UI pages
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE"
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE DirectoryLeave
 !insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 
-!insertmacro MUI_UNPAGE_WELCOME
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
-!insertmacro MUI_UNPAGE_FINISH
 
-; Language
 !insertmacro MUI_LANGUAGE "English"
 
-; Version info
-VIProductVersion "${PRODUCT_VERSION}"
+; VIProductVersion needs four numeric parts.
+VIProductVersion "${VERSION}.0"
 VIAddVersionKey "ProductName" "${PRODUCT_NAME}"
 VIAddVersionKey "CompanyName" "${PRODUCT_PUBLISHER}"
-VIAddVersionKey "LegalCopyright" "Copyright (C) 2026 SpacePenguin Team"
-VIAddVersionKey "FileDescription" "A secure, lightweight browser"
-VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
-VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
+VIAddVersionKey "LegalCopyright" "GNU General Public License v3"
+VIAddVersionKey "FileDescription" "${PRODUCT_NAME} installer"
+VIAddVersionKey "FileVersion" "${VERSION}"
+VIAddVersionKey "ProductVersion" "${VERSION}"
 
-; Sections
-Section "Main" SEC_MAIN
+Section "SpacePenguin (required)" SEC_MAIN
+    SectionIn RO
     SetOutPath "$INSTDIR"
+    File /r "${SOURCE_DIR}\*.*"
 
-    ; Main executable
-    File "build\SpacePenguin.exe"
-
-    ; Qt libraries
-    File /r "build\*.dll"
-    File /r "build\*.exe"
-
-    ; Qt plugins
-    File /r "build\plugins\*.*"
-
-    ; Qt translations
-    File /r "build\translations\*.qm"
-
-    ; WebEngine resources
-    File /r "build\resources\*.*"
-
-    ; WebEngine process
-    File "build\QtWebEngineProcess.exe"
-
-    ; Create uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-    ; Registry entries
-    WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SpacePenguin.exe"
+    WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\${PRODUCT_EXE}"
     WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\Uninstall.exe"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
+    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\${PRODUCT_EXE},0"
+    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${VERSION}"
     WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
-    WriteRegStr HKLM "${PRODUCT_UNST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
+    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
+    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
     WriteRegDWORD HKLM "${PRODUCT_UNINST_KEY}" "NoModify" 1
     WriteRegDWORD HKLM "${PRODUCT_UNINST_KEY}" "NoRepair" 1
 
-    ; Start menu shortcuts
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\SpacePenguin.exe"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-
-    ; Desktop shortcut
-    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\SpacePenguin.exe"
-
-    ; File associations
-    WriteRegStr HKCR ".html" "" "SpacePenguinHTML"
-    WriteRegStr HKCR "SpacePenguinHTML" "" "HTML Document"
-    WriteRegStr HKCR "SpacePenguinHTML\DefaultIcon" "" "$INSTDIR\SpacePenguin.exe,0"
-    WriteRegStr HKCR "SpacePenguinHTML\shell\open\command" "" '"$INSTDIR\SpacePenguin.exe" "%1"'
-
-    WriteRegStr HKCR ".htm" "" "SpacePenguinHTML"
-    WriteRegStr HKCR ".url" "" "SpacePenguinURL"
-    WriteRegStr HKCR "SpacePenguinURL" "" "URL Shortcut"
-    WriteRegStr HKCR "SpacePenguinURL\DefaultIcon" "" "$INSTDIR\SpacePenguin.exe,0"
-    WriteRegStr HKCR "SpacePenguinURL\shell\open\command" "" '"$INSTDIR\SpacePenguin.exe" "%1"'
-
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME} (Private).lnk" \
+        "$INSTDIR\${PRODUCT_EXE}" "--private"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "$INSTDIR\Uninstall.exe"
 SectionEnd
 
-; Optional: Additional languages section
-Section "Additional Languages" SEC_LANGUAGES
-    SetOutPath "$INSTDIR\translations"
-    File /r "build\translations\*.qm"
+Section "Desktop shortcut" SEC_DESKTOP
+    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}"
 SectionEnd
 
-; Uninstaller
+; Lists SpacePenguin under Settings > Apps > Default apps. Windows asks the user
+; before it becomes the default; nothing is taken over silently.
+Section "Offer as a default browser" SEC_BROWSER
+    WriteRegStr HKLM "Software\Classes\${PRODUCT_PROGID}" "" "SpacePenguin HTML Document"
+    WriteRegStr HKLM "Software\Classes\${PRODUCT_PROGID}\DefaultIcon" "" "$INSTDIR\${PRODUCT_EXE},0"
+    WriteRegStr HKLM "Software\Classes\${PRODUCT_PROGID}\shell\open\command" "" \
+        '"$INSTDIR\${PRODUCT_EXE}" "%1"'
+
+    WriteRegStr HKLM "Software\Clients\StartMenuInternet\${PRODUCT_NAME}" "" "${PRODUCT_NAME}"
+    WriteRegStr HKLM "Software\Clients\StartMenuInternet\${PRODUCT_NAME}\DefaultIcon" "" \
+        "$INSTDIR\${PRODUCT_EXE},0"
+    WriteRegStr HKLM "Software\Clients\StartMenuInternet\${PRODUCT_NAME}\shell\open\command" "" \
+        '"$INSTDIR\${PRODUCT_EXE}"'
+    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}" "ApplicationName" "${PRODUCT_NAME}"
+    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}" "ApplicationIcon" "$INSTDIR\${PRODUCT_EXE},0"
+    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}" "ApplicationDescription" \
+        "A secure, lightweight, and usable browser written in Qt"
+    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}\FileAssociations" ".htm" "${PRODUCT_PROGID}"
+    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}\FileAssociations" ".html" "${PRODUCT_PROGID}"
+    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}\URLAssociations" "http" "${PRODUCT_PROGID}"
+    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}\URLAssociations" "https" "${PRODUCT_PROGID}"
+    WriteRegStr HKLM "Software\RegisteredApplications" "${PRODUCT_NAME}" "${PRODUCT_CAPABILITIES}"
+SectionEnd
+
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_MAIN} "The browser itself."
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DESKTOP} "Put a SpacePenguin shortcut on the desktop."
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_BROWSER} \
+        "List SpacePenguin in Windows' Default apps so you can choose it as your browser."
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
 Section "Uninstall"
-    ; Remove files
-    Delete "$INSTDIR\*.*"
-    RMDir /r "$INSTDIR\plugins"
-    RMDir /r "$INSTDIR\translations"
-    RMDir /r "$INSTDIR\resources"
+    ${If} ${FileExists} "$INSTDIR\${PRODUCT_EXE}"
+        RMDir /r "$INSTDIR"
+    ${EndIf}
 
-    ; Remove registry
     DeleteRegKey HKLM "${PRODUCT_DIR_REGKEY}"
     DeleteRegKey HKLM "${PRODUCT_UNINST_KEY}"
+    DeleteRegKey HKLM "Software\Classes\${PRODUCT_PROGID}"
+    DeleteRegKey HKLM "Software\Clients\StartMenuInternet\${PRODUCT_NAME}"
+    DeleteRegValue HKLM "Software\RegisteredApplications" "${PRODUCT_NAME}"
 
-    ; Remove file associations
-    DeleteRegKey HKCR "SpacePenguinHTML"
-    DeleteRegKey HKCR "SpacePenguinURL"
-
-    ; Remove shortcuts
-    Delete "$SMPROGRAMS\${PRODUCT_NAME}\*.*"
-    RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
+    RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
-
-    ; Remove install directory
-    RMDir "$INSTDIR"
 SectionEnd
 
-; Functions
 Function .onInit
-    ; Check if already installed
-    StrCpy $0 0
-    ReadRegStr $0 HKLM "${PRODUCT_UNINST_KEY}" "DisplayVersion"
-    ${If} $0 != ""
-        MessageBox MB_YESNO|MB_ICONQUESTION \
-            "SpacePenguin is already installed (version $0).$\n$\nDo you want to reinstall?" \
-            IDNO +2
+    ${IfNot} ${RunningX64}
+        MessageBox MB_OK|MB_ICONSTOP "SpacePenguin needs 64-bit Windows."
         Abort
+    ${EndIf}
+    SetRegView 64
+FunctionEnd
+
+; Always install into a folder of our own, so the uninstaller's recursive delete
+; can never reach anything else (for example if "C:\Program Files" is chosen).
+Function DirectoryLeave
+    ${GetFileName} "$INSTDIR" $0
+    ${If} $0 != "${PRODUCT_NAME}"
+        StrCpy $INSTDIR "$INSTDIR\${PRODUCT_NAME}"
     ${EndIf}
 FunctionEnd
 
-Function un.onUninstallSuccess
-    HideWindow
-    MessageBox MB_OK|MB_ICONINFORMATION "SpacePenguin has been successfully uninstalled."
+Function un.onInit
+    SetRegView 64
 FunctionEnd

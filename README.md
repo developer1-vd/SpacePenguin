@@ -210,93 +210,116 @@ These are deliberate choices, not defaults we inherited:
 ## Keyboard
 
 Every binding below is implemented and wired to a menu entry (the ☰ menu, or the
-menu bar if you turn it on); `F1` opens the same list from inside the app, so it
-cannot drift from the code.
+menu bar); `F1` (`⌘?` on macOS) opens the same list from inside the app, so it
+cannot drift from the code. All bindings live in one table, `src/shortcuts.cpp`,
+and a test checks that no two commands share a key on the platform it runs on.
 
-| Shortcut                | Action                |
-| ----------------------- | --------------------- |
-| `Ctrl+T`                | New tab               |
-| `Ctrl+W`                | Close tab             |
-| `Ctrl+Shift+T`          | Reopen closed tab     |
-| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab  |
-| `Ctrl+1` … `Ctrl+8`     | Go to tab 1–8         |
-| `Ctrl+9`                | Go to the last tab    |
-| `Ctrl+N`                | New window            |
-| `Ctrl+Shift+N`          | New private window    |
-| `Ctrl+Shift+W`          | Close window          |
-| `Ctrl+Q`                | Quit                  |
-| `Alt+Left` / `Alt+Right`| Back / forward        |
-| `F5`                    | Reload                |
-| `Esc`                   | Stop loading (while a load is in flight) |
-| `Alt+Home`              | Home                  |
-| `Ctrl+L`                | Focus address bar     |
-| `Ctrl+F`                | Find in page          |
-| `Ctrl++` / `Ctrl+-`     | Zoom in / out         |
-| `Ctrl+0`                | Reset zoom            |
-| `F11`                   | Full screen           |
-| `Ctrl+D`                | Bookmark this page    |
-| `Ctrl+Shift+B`          | Show bookmarks bar    |
-| `Ctrl+Shift+O`          | Bookmarks             |
-| `Ctrl+H`                | History               |
-| `Ctrl+J`                | Downloads             |
-| `Ctrl+Shift+E`          | Extensions            |
-| `Ctrl+,`                | Settings              |
-| `F1`                    | Keyboard shortcuts    |
+macOS uses `⌘` where Windows and Linux use `Ctrl`. Where a binding would collide
+with the desktop itself — `⌘H` hides the app, `⌘Tab` switches apps, `F11` shows
+the desktop — macOS gets the binding Safari and Chrome use there instead.
 
-`Ctrl` is `Cmd` on macOS. We keep the bindings identical on every platform
-rather than following each desktop's local convention, with two deliberate
-exceptions: macOS gets standard application menu roles for Quit and About, and
-`Cmd+W` closes the tab rather than the window.
+| Action                | Windows / Linux                 | macOS                         |
+| --------------------- | ------------------------------- | ----------------------------- |
+| New tab               | `Ctrl+T`                        | `⌘T`                          |
+| Close tab             | `Ctrl+W`                        | `⌘W`                          |
+| Reopen closed tab     | `Ctrl+Shift+T`                  | `⇧⌘T`                         |
+| Next / previous tab   | `Ctrl+Tab` / `Ctrl+Shift+Tab`, `Ctrl+PgDn` / `Ctrl+PgUp` | `⌃Tab` / `⌃⇧Tab`, `⌥⌘→` / `⌥⌘←`, `⇧⌘]` / `⇧⌘[` |
+| Go to tab 1–8 / last  | `Ctrl+1` … `Ctrl+8` / `Ctrl+9`  | `⌘1` … `⌘8` / `⌘9`            |
+| New window            | `Ctrl+N`                        | `⌘N`                          |
+| New private window    | `Ctrl+Shift+N`                  | `⇧⌘N`                         |
+| Close window          | `Ctrl+Shift+W`                  | `⇧⌘W`                         |
+| Quit                  | `Ctrl+Q`                        | `⌘Q`                          |
+| Back / forward        | `Alt+Left` / `Alt+Right`        | `⌘[` / `⌘]`                   |
+| Reload                | `F5`, `Ctrl+R`                  | `⌘R`                          |
+| Stop loading          | `Esc` (while a load is in flight) | `Esc`                       |
+| Home                  | `Alt+Home`                      | `⇧⌘H`                         |
+| Focus address bar     | `Ctrl+L`, `Alt+D`, `F6`         | `⌘L`                          |
+| Find in page          | `Ctrl+F`                        | `⌘F`                          |
+| Zoom in / out / reset | `Ctrl++` / `Ctrl+-` / `Ctrl+0`  | `⌘+` / `⌘-` / `⌘0`            |
+| Full screen           | `F11`                           | `⌃⌘F`                         |
+| Bookmark this page    | `Ctrl+D`                        | `⌘D`                          |
+| Show bookmarks bar    | `Ctrl+Shift+B`                  | `⇧⌘B`                         |
+| Bookmarks             | `Ctrl+Shift+O`                  | `⌥⌘B`                         |
+| History               | `Ctrl+H`                        | `⌘Y`                          |
+| Downloads             | `Ctrl+J`                        | `⌥⌘L`                         |
+| Extensions            | `Ctrl+Shift+E`                  | `⇧⌘E`                         |
+| Settings              | `Ctrl+,`                        | `⌘,`                          |
+| Keyboard shortcuts    | `F1`                            | `⌘?`                          |
+
+The start page and the `about:` pages show the bindings for the platform you are
+on.
 
 ## Platforms
 
-| Platform | Status | Notes |
-| -------- | ------ | ----- |
-| Linux (X11, Wayland) | Built and verified | `cmake --install` ships a generated `qt.conf` |
-| Windows | Builds from the same CMake project | MSVC `/W4`, GUI subsystem so no console window |
-| macOS | Builds as `SpacePenguin.app` | `Info.plist` declares the `http`/`https` handler |
+SpacePenguin is one CMake project for all three desktops. CI
+(`.github/workflows/build.yml`) builds it, runs every test and produces a package
+on each of them for every push.
 
-Platform integration handled in the build:
+| Platform | Built with | Package | Notes |
+| -------- | ---------- | ------- | ----- |
+| Linux (X11, Wayland) | GCC, Qt 6.8 | AppImage | desktop entry, AppStream metadata and icons installed under `share/` |
+| Windows 10/11 x64 | MSVC 2022, Qt 6.8 | NSIS installer and portable zip | icon and version info embedded; no console window |
+| macOS 12+ (Apple silicon and Intel with a universal Qt) | Apple Clang, Qt 6.8 | DMG | `SpacePenguin.app` with icon, registered for `http`/`https` |
 
-- `cmake/qt.conf.in` is configured from the detected Qt layout, so an installed
-  Linux or Windows copy finds `QtWebEngineProcess`, plugins and translations
-  without environment variables
-- `cmake/Info.plist.in` sets the bundle identifier, high-resolution support and
-  automatic graphics switching, and advertises the app as a web-page handler
-- Windows builds set `WIN32_EXECUTABLE`, so no console window appears behind the
-  browser
+What is handled per platform:
+
+- **Look** — every platform uses the Fusion style with SpacePenguin's own palette,
+  stylesheet and painted icons, so the window is the same everywhere and follows
+  the system light/dark setting (including the dark title bar on Windows 11)
+- **Menus** — on macOS the menu bar is the system's, with Quit, About and Settings
+  in the application menu; on Windows and Linux it is off by default and
+  everything is in the ☰ menu
+- **One process per profile** — Chromium locks a profile to one process, so a
+  second launch (a link clicked in another app, a second click on the launcher,
+  the "New Private Window" jump-list or dock action) hands its pages to the
+  running browser over a local socket (a named pipe on Windows) and exits.
+  macOS delivers links opened from Finder or sent to the default browser as
+  events; those open in the front window too
+- **Default browser** — the Linux desktop entry, the Windows installer (through
+  Settings › Apps › Default apps, never silently) and the macOS `Info.plist` all
+  register SpacePenguin as a handler for `http`, `https` and HTML files
+- **Deployment** — on Windows and macOS `cmake --install` runs `windeployqt` /
+  `macdeployqt`, so the install prefix is a self-contained app. On Linux the
+  install uses the system's Qt through a generated `qt.conf`, and the AppImage
+  bundles Qt with `linuxdeploy`
+- **Source encoding** — MSVC builds with `/utf-8`, so strings such as "…" and
+  "—" come out right
 - `about:version` reports the running Qt platform plugin (`xcb`, `wayland`,
   `windows`, `cocoa`)
 
 Platform data locations come from `QStandardPaths`, so the profile lands in
 `~/.local/share/SpacePenguin` on Linux, `~/Library/Application Support` on
-macOS, and `%LOCALAPPDATA%` on Windows.
+macOS, and `%APPDATA%` on Windows.
 
 ## Building
 
-Requires Qt 6.8 or newer with QtWebEngine, and a C++20 compiler.
+Requires Qt 6.8 or newer with QtWebEngine, CMake 3.21 or newer, and a C++20
+compiler: GCC 11+ or Clang 14+ on Linux, MSVC 2022 on Windows, Xcode 14+ on macOS.
 
 ```sh
-cmake -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.11.2/gcc_64
-cmake --build build
-./build/spacepenguin
+cmake -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/<gcc_64|msvc2022_64|macos>
+cmake --build build --config Release
 ```
+
+Run it from the build tree:
+
+| Platform | Command |
+| -------- | ------- |
+| Linux    | `./build/SpacePenguin` |
+| Windows  | `build\Release\SpacePenguin.exe` (Visual Studio generator) or `build\SpacePenguin.exe` (Ninja), with Qt's `bin` on `PATH` |
+| macOS    | `open build/SpacePenguin.app` |
 
 On Nix:
 
 ```sh
 nix-shell -p 'qt6.qtbase' 'qt6.qtdeclarative' 'qt6.qtwebengine' cmake gnumake libglvnd --run \
-  'cmake -B build && cmake --build build && ./build/spacepenguin'
+  'cmake -B build && cmake --build build && ./build/SpacePenguin'
 ```
 
-On macOS the output is an app bundle, so run
-`open build/SpacePenguin.app`; to ship it, deploy the frameworks with
-`macdeployqt build/SpacePenguin.app` before code signing.
-
-Run the binary from the build tree rather than installing it — QtWebEngine finds
-its helper process and resources relative to the executable. An install
-(`cmake --install build --prefix <dir>`) brings the generated `qt.conf` along, so
-the helper process is still found from the new location.
+To get a copy you can move elsewhere, install it:
+`cmake --install build --config Release --prefix <dir>`. On Windows and macOS that
+deploys Qt into `<dir>`; on Linux it installs the binary, a `qt.conf` pointing at
+the Qt it was built with, the desktop entry, metadata and icons.
 
 ### Options
 
@@ -310,74 +333,30 @@ the helper process is still found from the new location.
 ### Tests
 
 ```sh
-ctest --test-dir build --output-on-failure
+ctest --test-dir build -C Release --output-on-failure
 ```
+
+Set `QT_QPA_PLATFORM=offscreen` to run them without a display. Seven suites run:
+`urlresolver`, `aboutpages`, `adblocker`, `userextensions`, `startpage`,
+`shortcuts` and `singleinstance`. The first two are plain logic; the next two
+cover rule matching, filter parsing, script metadata, installation and
+enable/disable state; `startpage` checks that start page data is injected without
+letting page titles escape it; `shortcuts` checks the platform's key table for
+clashes; `singleinstance` checks that a second launch hands its pages over.
 
 ## Packaging
 
-### Linux AppImage
+Each package is built on its own platform. `./build-all.sh <version>` picks the
+right script for the machine it runs on; CI builds all three and, for a `v*` tag,
+attaches them to a GitHub release.
 
-```bash
-chmod +x build-appimage.sh
-./build-appimage.sh 0.1.0
-```
+| Platform | Command | Output | Needs |
+| -------- | ------- | ------ | ----- |
+| Linux | `./build-appimage.sh 0.1.0` | `SpacePenguin-0.1.0-x86_64.AppImage` | Qt 6.8 with QtWebEngine; `linuxdeploy` and its Qt plugin are downloaded on first use |
+| macOS | `./build-dmg.sh 0.1.0` | `SpacePenguin-0.1.0-macos.dmg` | Xcode command line tools; set `CODESIGN_IDENTITY` to sign with a Developer ID |
+| Windows | `powershell -ExecutionPolicy Bypass -File build-windows.ps1 -Version 0.1.0` | `SpacePenguin-0.1.0-windows-x64-setup.exe` and `…-windows-x64.zip` | MSVC 2022 shell, Qt on `PATH`, NSIS 3 for the installer |
 
-Requires: `linuxdeployqt`, `appimagetool`, Qt6 development packages.
-
-Output: `SpacePenguin-0.1.0-x86_64.AppImage`
-
-### macOS DMG
-
-```bash
-chmod +x build-dmg.sh
-./build-dmg.sh 0.1.0
-```
-
-Must run on macOS. Requires: Xcode command line tools.
-
-Output: `SpacePenguin-0.1.0-macos.dmg`
-
-### Windows Installer (NSIS)
-
-```bash
-makensis installer.nsi
-```
-
-Requires: NSIS 3.x, Qt6 Windows binaries.
-
-Output: `SpacePenguin-0.1.0-windows-x64.exe`
-
-### Build All Platforms
-
-```bash
-chmod +x build-all.sh
-./build-all.sh 0.1.0
-```
-
-Or build for specific platform:
-
-```bash
-./build-all.sh 0.1.0 linux
-./build-all.sh 0.1.0 macos
-./build-all.sh 0.1.0 windows
-```
-
-### CI/CD
-
-See `.github/workflows/build.yml` for GitHub Actions workflow that builds all three formats and creates a GitHub Release on tag push.
-
-### Files
-
-- `build-appimage.sh` — Linux AppImage builder
-- `build-dmg.sh` — macOS DMG builder  
-- `installer.nsi` — Windows NSIS installer script
-- `build-all.sh` — Wrapper to build all platforms
-- `BUILD_SCRIPTS.md` — Detailed build documentation
-
-Five suites run: `urlresolver`, `aboutpages`, `adblocker`, `userextensions` and
-`startpage`. The first two are plain logic; the next two cover rule matching,
-filter parsing, script metadata, installation and enable/disable state; the last
-checks that start page data is injected without letting page titles escape it.
+See `BUILD_SCRIPTS.md` for what each script does.
 
 ## Known limitations
 
@@ -396,10 +375,10 @@ checks that start page data is injected without letting page titles escape it.
 - Internal `about:` pages do not create a back/forward history entry
 - Session restore saves URLs only — not scroll position or history depth
 - `Ctrl+F` uses the renderer's find pass, one tab at a time
-- Only Linux is verified end to end; the Windows and macOS build paths are
-  written but untested on real hardware
-- No code signing, notarisation (macOS), MSIX packaging (Windows) or desktop
-  entry / icon assets
+- Packages are not code signed. Unsigned Windows installers trigger SmartScreen,
+  and an ad-hoc signed macOS app needs right-click › Open the first time;
+  `build-dmg.sh` signs and is ready to notarise when given a Developer ID
+- No MSIX (Windows), Flatpak or distribution packages (Linux)
 
 ## Layout
 
@@ -409,6 +388,8 @@ src/browserpage.*     QWebEnginePage subclass holding the security policy
 src/webview.*         per-tab view: load state, links opened as new tabs
 src/icons.*           painted icon set that follows the theme
 src/preferences.*     QSettings-backed preferences shared by every window
+src/shortcuts.*       per-platform keyboard bindings
+src/singleinstance.*  hands a second launch's pages to the running browser
 src/settingsdialog.*  settings window
 src/historydialog.*   history window
 src/downloadsdialog.* downloads window
@@ -425,7 +406,8 @@ src/urlresolver.*     URL, about: or search resolution (unit tested)
 src/main.cpp          profile setup, command line, entry point
 html/start.html       built-in start page
 filters/default.txt   built-in starter filter list
-cmake/                Info.plist and qt.conf templates for macOS and desktop
+cmake/                Info.plist and qt.conf templates
+packaging/            icons, Linux desktop entry and metadata, Windows resource, macOS icon and entitlements
 tests/                unit tests
 docs/                 GitHub Pages site
 ```

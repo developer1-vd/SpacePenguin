@@ -230,15 +230,7 @@
     <nav class="tiles" id="tiles" aria-label="Most visited"></nav>
   </main>
 
-  <footer>
-    <span>New tab<kbd>Ctrl+T</kbd></span>
-    <span>Address bar<kbd>Ctrl+L</kbd></span>
-    <span>Bookmark<kbd>Ctrl+D</kbd></span>
-    <span>History<kbd>Ctrl+H</kbd></span>
-    <span>Downloads<kbd>Ctrl+J</kbd></span>
-    <span>Private window<kbd>Ctrl+Shift+N</kbd></span>
-    <span>All shortcuts<kbd>F1</kbd></span>
-  </footer>
+  <footer id="shortcuts" aria-label="Keyboard shortcuts"></footer>
 
 <script>
 (function () {
@@ -269,6 +261,17 @@
     for (var i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) | 0;
     return palette[Math.abs(hash) % palette.length];
   }
+
+  var footer = document.getElementById("shortcuts");
+  (data.shortcuts || []).forEach(function (shortcut) {
+    if (!shortcut.keys) return;
+    var item = document.createElement("span");
+    item.textContent = shortcut.label;
+    var keys = document.createElement("kbd");
+    keys.textContent = shortcut.keys;
+    item.appendChild(keys);
+    footer.appendChild(item);
+  });
 
   var tiles = document.getElementById("tiles");
   (data.tiles || []).slice(0, 8).forEach(function (tile) {

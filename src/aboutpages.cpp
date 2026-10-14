@@ -381,6 +381,12 @@ QString entryTable(const QList<AboutPageEntry> &entries, const QString &detailHe
         .arg(escape(detailHeading), rows);
 }
 
+QString shortcutHint(const AboutPageContext &context, const QString &command,
+                     const QString &fallback)
+{
+    return QStringLiteral("<kbd>%1</kbd>").arg(escape(context.shortcuts.value(command, fallback)));
+}
+
 QString downloadsBody(const AboutPageContext &context)
 {
     QString body = QStringLiteral("<h1>Downloads</h1>");
@@ -390,8 +396,9 @@ QString downloadsBody(const AboutPageContext &context)
     } else {
         body += entryTable(context.downloads, QStringLiteral("Status"));
     }
-    body += QStringLiteral("<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>J</kbd> to open the "
-                           "downloads window, where you can cancel, open and clear files.</p>");
+    body += QStringLiteral("<p class=\"hint\">Press %1 to open the downloads window, where you "
+                           "can cancel, open and clear files.</p>")
+                .arg(shortcutHint(context, QStringLiteral("downloads"), QStringLiteral("Ctrl+J")));
     return body;
 }
 
@@ -406,8 +413,8 @@ QString historyBody(const AboutPageContext &context)
     } else {
         body += entryTable(context.history, QStringLiteral("Last visited"));
     }
-    body += QStringLiteral("<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>H</kbd> to search, "
-                           "delete or clear history.</p>");
+    body += QStringLiteral("<p class=\"hint\">Press %1 to search, delete or clear history.</p>")
+                .arg(shortcutHint(context, QStringLiteral("history"), QStringLiteral("Ctrl+H")));
     return body;
 }
 
@@ -428,20 +435,21 @@ QString extensionsBody(const AboutPageContext &context)
             .arg(context.extensionCount == 1 ? QStringLiteral("") : QStringLiteral("s"));
     }
 
-    body += QStringLiteral(
-        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd> to "
-        "manage extensions.</p>");
+    body += QStringLiteral("<p class=\"hint\">Press %1 to manage extensions.</p>")
+                .arg(shortcutHint(context, QStringLiteral("extensions"),
+                                  QStringLiteral("Ctrl+Shift+E")));
 
     return body;
 }
 
-QString settingsBody()
+QString settingsBody(const AboutPageContext &context)
 {
     return QStringLiteral(
-        "<h1>Settings</h1>"
-        "<p>The settings window opens on top of this page.</p>"
-        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>,</kbd> any time, or use "
-        "<b>Settings</b> in the main menu.</p>");
+               "<h1>Settings</h1>"
+               "<p>The settings window opens on top of this page.</p>"
+               "<p class=\"hint\">Press %1 any time, or use <b>Settings</b> in the main "
+               "menu.</p>")
+        .arg(shortcutHint(context, QStringLiteral("settings"), QStringLiteral("Ctrl+,")));
 }
 
 bool isStarWarsPage(const QString &normalized)
@@ -574,7 +582,7 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
     if (normalized == QLatin1String("about:extensions"))
         return htmlShell(pageTitle(id), extensionsBody(context));
     if (normalized == QLatin1String("about:settings"))
-        return htmlShell(pageTitle(id), settingsBody());
+        return htmlShell(pageTitle(id), settingsBody(context));
     if (isStarWarsPage(normalized))
         return htmlShell(pageTitle(id), starWarsBody(id));
 

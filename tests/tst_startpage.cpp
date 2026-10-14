@@ -37,6 +37,11 @@ void TestStartPage::fillsPlaceholder()
              QStringLiteral("https://search.example/?q={query}"));
     QCOMPARE(data.value(QStringLiteral("private")).toBool(), true);
     QCOMPARE(data.value(QStringLiteral("tiles")).toArray().size(), 1);
+
+    const QJsonArray shortcuts = data.value(QStringLiteral("shortcuts")).toArray();
+    QVERIFY(!shortcuts.isEmpty());
+    for (const QJsonValue &shortcut : shortcuts)
+        QVERIFY(!shortcut.toObject().value(QStringLiteral("keys")).toString().isEmpty());
 }
 
 void TestStartPage::escapesScriptBreakout()

@@ -15,6 +15,7 @@
 #include "icons.h"
 #include "preferences.h"
 #include "settingsdialog.h"
+#include "shortcuts.h"
 #include "userextensions.h"
 #include "webview.h"
 
@@ -270,52 +271,52 @@ BrowserWindow::~BrowserWindow()
 
 void BrowserWindow::createActions()
 {
-    const auto makeAction = [this](const QString &text, const QKeySequence &shortcut = {},
+    const auto makeAction = [this](const QString &text, const QList<QKeySequence> &shortcuts = {},
                                    const QIcon &icon = QIcon()) {
         auto *action = new QAction(icon, text, this);
-        if (!shortcut.isEmpty())
-            action->setShortcut(shortcut);
+        if (!shortcuts.isEmpty())
+            action->setShortcuts(shortcuts);
         // Actions live on the window so their shortcuts work with the menu bar hidden.
         addAction(action);
         return action;
     };
 
-    m_newTabAction = makeAction(tr("New Tab"), QKeySequence(Qt::CTRL | Qt::Key_T),
+    m_newTabAction = makeAction(tr("New Tab"), Shortcuts::keys(Shortcuts::NewTab),
                                 Icons::icon(Icons::Plus));
     connect(m_newTabAction, &QAction::triggered, this, [this] {
         newTab();
         m_omnibox->setFocus();
     });
 
-    m_newWindowAction = makeAction(tr("New Window"), QKeySequence(Qt::CTRL | Qt::Key_N));
+    m_newWindowAction = makeAction(tr("New Window"), Shortcuts::keys(Shortcuts::NewWindow));
     connect(m_newWindowAction, &QAction::triggered, this, [this] { newWindow(m_isPrivate); });
 
     m_newPrivateWindowAction = makeAction(tr("New Private Window"),
-                                          QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N),
+                                          Shortcuts::keys(Shortcuts::NewPrivateWindow),
                                           Icons::icon(Icons::Private));
     connect(m_newPrivateWindowAction, &QAction::triggered, this, [this] { newWindow(true); });
 
-    m_closeTabAction = makeAction(tr("Close Tab"), QKeySequence(Qt::CTRL | Qt::Key_W));
+    m_closeTabAction = makeAction(tr("Close Tab"), Shortcuts::keys(Shortcuts::CloseTab));
     connect(m_closeTabAction, &QAction::triggered, this,
             [this] { closeTab(m_tabBar->currentIndex()); });
 
     m_closeWindowAction = makeAction(tr("Close Window"),
-                                     QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
+                                     Shortcuts::keys(Shortcuts::CloseWindow));
     connect(m_closeWindowAction, &QAction::triggered, this, &QWidget::close);
 
     m_reopenTabAction = makeAction(tr("Reopen Closed Tab"),
-                                   QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T));
+                                   Shortcuts::keys(Shortcuts::ReopenClosedTab));
     m_reopenTabAction->setEnabled(false);
     connect(m_reopenTabAction, &QAction::triggered, this, &BrowserWindow::reopenClosedTab);
 
-    m_nextTabAction = makeAction(tr("Next Tab"), QKeySequence(Qt::CTRL | Qt::Key_Tab));
+    m_nextTabAction = makeAction(tr("Next Tab"), Shortcuts::keys(Shortcuts::NextTab));
     connect(m_nextTabAction, &QAction::triggered, this, [this] { selectTabByOffset(1); });
 
     m_previousTabAction = makeAction(tr("Previous Tab"),
-                                     QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab));
+                                     Shortcuts::keys(Shortcuts::PreviousTab));
     connect(m_previousTabAction, &QAction::triggered, this, [this] { selectTabByOffset(-1); });
 
-    m_quitAction = makeAction(tr("Quit"), QKeySequence(Qt::CTRL | Qt::Key_Q));
+    m_quitAction = makeAction(tr("Quit"), Shortcuts::keys(Shortcuts::Quit));
     m_quitAction->setMenuRole(QAction::QuitRole);
     connect(m_quitAction, &QAction::triggered, this, [this] {
         // Keep the session of the window the user quit from, then close everything.
@@ -324,58 +325,58 @@ void BrowserWindow::createActions()
         QApplication::closeAllWindows();
     });
 
-    m_backAction = makeAction(tr("Back"), QKeySequence::Back, Icons::icon(Icons::Back));
+    m_backAction = makeAction(tr("Back"), Shortcuts::keys(Shortcuts::Back), Icons::icon(Icons::Back));
     connect(m_backAction, &QAction::triggered, this,
             [this] { if (WebView *view = currentView()) view->back(); });
 
-    m_forwardAction = makeAction(tr("Forward"), QKeySequence::Forward, Icons::icon(Icons::Forward));
+    m_forwardAction = makeAction(tr("Forward"), Shortcuts::keys(Shortcuts::Forward), Icons::icon(Icons::Forward));
     connect(m_forwardAction, &QAction::triggered, this,
             [this] { if (WebView *view = currentView()) view->forward(); });
 
-    m_reloadAction = makeAction(tr("Reload"), QKeySequence::Refresh, Icons::icon(Icons::Reload));
+    m_reloadAction = makeAction(tr("Reload"), Shortcuts::keys(Shortcuts::Reload), Icons::icon(Icons::Reload));
     connect(m_reloadAction, &QAction::triggered, this,
             [this] { if (WebView *view = currentView()) view->reload(); });
 
-    m_stopAction = makeAction(tr("Stop"), QKeySequence(Qt::Key_Escape), Icons::icon(Icons::Stop));
+    m_stopAction = makeAction(tr("Stop"), Shortcuts::keys(Shortcuts::Stop), Icons::icon(Icons::Stop));
     m_stopAction->setEnabled(false);
     connect(m_stopAction, &QAction::triggered, this,
             [this] { if (WebView *view = currentView()) view->stop(); });
 
-    m_homeAction = makeAction(tr("Home"), QKeySequence(Qt::ALT | Qt::Key_Home),
+    m_homeAction = makeAction(tr("Home"), Shortcuts::keys(Shortcuts::Home),
                               Icons::icon(Icons::Home));
     connect(m_homeAction, &QAction::triggered, this, &BrowserWindow::goHome);
 
-    m_focusAddressAction = makeAction(tr("Focus Address Bar"), QKeySequence(Qt::CTRL | Qt::Key_L));
+    m_focusAddressAction = makeAction(tr("Focus Address Bar"), Shortcuts::keys(Shortcuts::FocusAddressBar));
     connect(m_focusAddressAction, &QAction::triggered, this, [this] {
         m_omnibox->setFocus(Qt::ShortcutFocusReason);
         m_omnibox->selectAll();
     });
 
-    m_findAction = makeAction(tr("Find in Page…"), QKeySequence::Find, Icons::icon(Icons::Search));
+    m_findAction = makeAction(tr("Find in Page…"), Shortcuts::keys(Shortcuts::Find), Icons::icon(Icons::Search));
     connect(m_findAction, &QAction::triggered, this, &BrowserWindow::showFindBar);
 
-    m_zoomInAction = makeAction(tr("Zoom In"), QKeySequence::ZoomIn, Icons::icon(Icons::Plus));
+    m_zoomInAction = makeAction(tr("Zoom In"), Shortcuts::keys(Shortcuts::ZoomIn), Icons::icon(Icons::Plus));
     connect(m_zoomInAction, &QAction::triggered, this,
             [this] { setZoom(currentZoom() + kZoomStep); });
 
-    m_zoomOutAction = makeAction(tr("Zoom Out"), QKeySequence::ZoomOut);
+    m_zoomOutAction = makeAction(tr("Zoom Out"), Shortcuts::keys(Shortcuts::ZoomOut));
     connect(m_zoomOutAction, &QAction::triggered, this,
             [this] { setZoom(currentZoom() - kZoomStep); });
 
-    m_zoomResetAction = makeAction(tr("Reset Zoom"), QKeySequence(Qt::CTRL | Qt::Key_0));
+    m_zoomResetAction = makeAction(tr("Reset Zoom"), Shortcuts::keys(Shortcuts::ZoomReset));
     connect(m_zoomResetAction, &QAction::triggered, this, [this] { setZoom(1.0); });
 
-    m_fullScreenAction = makeAction(tr("Full Screen"), QKeySequence(Qt::Key_F11));
+    m_fullScreenAction = makeAction(tr("Full Screen"), Shortcuts::keys(Shortcuts::FullScreen));
     m_fullScreenAction->setCheckable(true);
     connect(m_fullScreenAction, &QAction::triggered, this, &BrowserWindow::toggleFullScreen);
 
-    m_bookmarkPageAction = makeAction(tr("Bookmark This Page…"), QKeySequence(Qt::CTRL | Qt::Key_D),
+    m_bookmarkPageAction = makeAction(tr("Bookmark This Page…"), Shortcuts::keys(Shortcuts::BookmarkPage),
                                       Icons::icon(Icons::Star));
     connect(m_bookmarkPageAction, &QAction::triggered, this,
             &BrowserWindow::toggleBookmarkForCurrentPage);
 
     m_bookmarksBarAction = makeAction(tr("Show Bookmarks Bar"),
-                                      QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_B));
+                                      Shortcuts::keys(Shortcuts::BookmarksBar));
     m_bookmarksBarAction->setCheckable(true);
     connect(m_bookmarksBarAction, &QAction::triggered, this,
             [](bool checked) { Preferences::instance()->setShowBookmarksBar(checked); });
@@ -385,31 +386,31 @@ void BrowserWindow::createActions()
     connect(m_menuBarAction, &QAction::triggered, this,
             [](bool checked) { Preferences::instance()->setShowMenuBar(checked); });
 
-    m_bookmarksAction = makeAction(tr("Bookmarks…"), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_O),
+    m_bookmarksAction = makeAction(tr("Bookmarks…"), Shortcuts::keys(Shortcuts::Bookmarks),
                                    Icons::icon(Icons::Bookmarks));
     connect(m_bookmarksAction, &QAction::triggered, this, &BrowserWindow::showBookmarks);
 
-    m_historyAction = makeAction(tr("History…"), QKeySequence(Qt::CTRL | Qt::Key_H),
+    m_historyAction = makeAction(tr("History…"), Shortcuts::keys(Shortcuts::History),
                                  Icons::icon(Icons::History));
     connect(m_historyAction, &QAction::triggered, this, &BrowserWindow::showHistory);
 
-    m_downloadsAction = makeAction(tr("Downloads…"), QKeySequence(Qt::CTRL | Qt::Key_J),
+    m_downloadsAction = makeAction(tr("Downloads…"), Shortcuts::keys(Shortcuts::Downloads),
                                    Icons::icon(Icons::Download));
     connect(m_downloadsAction, &QAction::triggered, this, &BrowserWindow::showDownloads);
 
-    m_extensionsAction = makeAction(tr("Extensions…"), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E),
+    m_extensionsAction = makeAction(tr("Extensions…"), Shortcuts::keys(Shortcuts::Extensions),
                                     Icons::icon(Icons::Extensions));
     connect(m_extensionsAction, &QAction::triggered, this, &BrowserWindow::showExtensionsDialog);
 
-    m_settingsAction = makeAction(tr("Settings…"), QKeySequence(Qt::CTRL | Qt::Key_Comma),
+    m_settingsAction = makeAction(tr("Settings…"), Shortcuts::keys(Shortcuts::Settings),
                                   Icons::icon(Icons::Settings));
     m_settingsAction->setMenuRole(QAction::PreferencesRole);
     connect(m_settingsAction, &QAction::triggered, this, &BrowserWindow::showSettings);
 
-    m_shortcutsAction = makeAction(tr("Keyboard Shortcuts"), QKeySequence::HelpContents);
+    m_shortcutsAction = makeAction(tr("Keyboard Shortcuts"), Shortcuts::keys(Shortcuts::KeyboardShortcuts));
     connect(m_shortcutsAction, &QAction::triggered, this, &BrowserWindow::showShortcuts);
 
-    m_aboutAction = makeAction(tr("About SpacePenguin"), QKeySequence(),
+    m_aboutAction = makeAction(tr("About SpacePenguin"), {},
                                Icons::icon(Icons::Info));
     m_aboutAction->setMenuRole(QAction::AboutRole);
     connect(m_aboutAction, &QAction::triggered, this, [this] {
@@ -880,8 +881,14 @@ void BrowserWindow::applyPreferences()
     m_homeButton->setVisible(preferences->showHomeButton());
     m_bookmarksBar->setVisible(preferences->showBookmarksBar());
     m_bookmarksBarAction->setChecked(preferences->showBookmarksBar());
+#ifdef Q_OS_MACOS
+    // The macOS menu bar belongs to the system, at the top of the screen, and is
+    // always there; there is nothing to show or hide.
+    m_menuBarAction->setVisible(false);
+#else
     menuBar()->setVisible(preferences->showMenuBar());
     m_menuBarAction->setChecked(preferences->showMenuBar());
+#endif
 
     syncThemeMenu();
     updateBlockingIndicator();
@@ -1010,7 +1017,7 @@ void BrowserWindow::showShortcuts()
     }
     auto *tabs = new QTreeWidgetItem(tree);
     tabs->setText(0, tr("Go to tab 1–8 / last tab"));
-    tabs->setText(1, tr("Ctrl+1 … Ctrl+9"));
+    tabs->setText(1, tr("%1+1 … %1+9").arg(Shortcuts::primaryModifier()));
 
     tree->sortItems(0, Qt::AscendingOrder);
     tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
@@ -1359,7 +1366,21 @@ void BrowserWindow::openInNewTab(const QString &text)
     newTab(m_resolver.resolve(text));
 }
 
-void BrowserWindow::newWindow(bool isPrivate)
+BrowserWindow *BrowserWindow::openWindow(bool isPrivate, const QStringList &texts)
+{
+    BrowserWindow *window = newWindow(isPrivate);
+    if (!texts.isEmpty()) {
+        // Replace the new window's start tab with the requested pages.
+        const int startTabs = window->m_tabBar->count();
+        for (const QString &text : texts)
+            window->openInNewTab(text);
+        for (int index = startTabs - 1; index >= 0; --index)
+            window->closeTab(index);
+    }
+    return window;
+}
+
+BrowserWindow *BrowserWindow::newWindow(bool isPrivate)
 {
     ServiceRegistry &shared = registry();
     const QString filterList = m_services.adBlocker ? m_services.adBlocker->listPath() : QString();
@@ -1384,6 +1405,7 @@ void BrowserWindow::newWindow(bool isPrivate)
     auto *window = new BrowserWindow(std::move(services));
     window->setAttribute(Qt::WA_DeleteOnClose);
     window->show();
+    return window;
 }
 
 void BrowserWindow::closeTab(int index)
@@ -1566,6 +1588,11 @@ AboutPageContext BrowserWindow::aboutContext() const
 
     if (m_services.userScripts)
         context.extensionCount = m_services.userScripts->scripts().size();
+
+    context.shortcuts.insert(QStringLiteral("history"), Shortcuts::text(Shortcuts::History));
+    context.shortcuts.insert(QStringLiteral("downloads"), Shortcuts::text(Shortcuts::Downloads));
+    context.shortcuts.insert(QStringLiteral("extensions"), Shortcuts::text(Shortcuts::Extensions));
+    context.shortcuts.insert(QStringLiteral("settings"), Shortcuts::text(Shortcuts::Settings));
 
     if (m_services.historyManager && !m_isPrivate) {
         const QLocale locale;
