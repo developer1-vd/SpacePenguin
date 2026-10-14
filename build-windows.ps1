@@ -7,7 +7,8 @@
 # The installer is built when NSIS (makensis) is available.
 param(
     [string]$Version = "0.1.0",
-    [string])
+    [string]$BuildDir = "build-windows"
+)
 $ErrorActionPreference = "Stop"
 
 $DistDir = Join-Path $BuildDir "dist"
