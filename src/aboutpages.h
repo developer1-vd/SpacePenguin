@@ -12,6 +12,13 @@ struct AboutPage {
     bool easterEgg = false;
 };
 
+/** A row on a data-backed internal page such as about:history. */
+struct AboutPageEntry {
+    QString title;
+    QString url;
+    QString detail;
+};
+
 struct AboutPageContext {
     QString appVersion;
     bool isPrivate = false;
@@ -23,6 +30,8 @@ struct AboutPageContext {
     bool blockingEnabled = false;
     int blockedRequests = 0;
     int extensionCount = 0;
+    QList<AboutPageEntry> history;
+    QList<AboutPageEntry> downloads;
 };
 
 class AboutPages

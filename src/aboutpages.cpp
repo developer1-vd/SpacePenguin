@@ -77,7 +77,7 @@ QString escape(const QString &text)
 QString buildRow(const AboutPage &page)
 {
     return QStringLiteral("<tr><td><a href=\"%1\">%1</a></td><td>%2</td>"
-                          "<td>%3</td></tr>")
+                          "<td class=\"tag\">%3</td></tr>")
         .arg(escape(page.id), escape(page.summary),
              page.easterEgg ? QStringLiteral("easter egg") : QString());
 }
@@ -354,21 +354,61 @@ QString rustBody()
         "<p class=\"hint\">If it compiles, it probably works. Mostly.</p>");
 }
 
-QString downloadsBody()
+bool isWebUrl(const QString &url)
 {
-    return QStringLiteral(
-        "<h1>Downloads</h1>"
-        "<p>Downloads will appear here as you download files.</p>"
-        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>J</kbd> to open this page quickly.</p>");
+    return url.startsWith(QLatin1String("https://"), Qt::CaseInsensitive)
+        || url.startsWith(QLatin1String("http://"), Qt::CaseInsensitive);
 }
 
-QString historyBody()
+QString entryLink(const AboutPageEntry &entry)
 {
-    return QStringLiteral(
-        "<h1>History</h1>"
-        "<p>Your browsing history will appear here.</p>"
-        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>H</kbd> to open this page quickly. "
-        "Or use <code>Tools → Settings</code> to configure history.</p>");
+    const QString label = entry.title.trimmed().isEmpty() ? entry.url : entry.title;
+    // Only web addresses become links; anything else is shown as text.
+    if (!isWebUrl(entry.url))
+        return escape(label);
+    return QStringLiteral("<a href=\"%1\">%2</a>").arg(escape(entry.url), escape(label));
+}
+
+QString entryTable(const QList<AboutPageEntry> &entries, const QString &detailHeading)
+{
+    QString rows;
+    for (const AboutPageEntry &entry : entries) {
+        rows += QStringLiteral("<tr><td>%1<div class=\"url\">%2</div></td><td class=\"detail\">%3</td></tr>")
+                    .arg(entryLink(entry), escape(entry.url), escape(entry.detail));
+    }
+    return QStringLiteral("<table class=\"entries\"><thead><tr><th>Page</th><th>%1</th></tr></thead>"
+                          "<tbody>%2</tbody></table>")
+        .arg(escape(detailHeading), rows);
+}
+
+QString downloadsBody(const AboutPageContext &context)
+{
+    QString body = QStringLiteral("<h1>Downloads</h1>");
+    if (context.downloads.isEmpty()) {
+        body += QStringLiteral("<p class=\"empty\">Nothing downloaded in this session yet. Files you "
+                               "download appear here.</p>");
+    } else {
+        body += entryTable(context.downloads, QStringLiteral("Status"));
+    }
+    body += QStringLiteral("<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>J</kbd> to open the "
+                           "downloads window, where you can cancel, open and clear files.</p>");
+    return body;
+}
+
+QString historyBody(const AboutPageContext &context)
+{
+    QString body = QStringLiteral("<h1>History</h1>");
+    if (context.isPrivate) {
+        body += QStringLiteral("<p class=\"empty\">This is a private window. Nothing you visit "
+                               "here is recorded.</p>");
+    } else if (context.history.isEmpty()) {
+        body += QStringLiteral("<p class=\"empty\">No history yet. Pages you visit appear here.</p>");
+    } else {
+        body += entryTable(context.history, QStringLiteral("Last visited"));
+    }
+    body += QStringLiteral("<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>H</kbd> to search, "
+                           "delete or clear history.</p>");
+    return body;
 }
 
 QString extensionsBody(const AboutPageContext &context)
@@ -399,9 +439,9 @@ QString settingsBody()
 {
     return QStringLiteral(
         "<h1>Settings</h1>"
-        "<p>Open the Settings dialog to configure SpacePenguin.</p>"
-        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>,</kbd> or use "
-        "<code>Tools → Settings</code>.</p>");
+        "<p>The settings window opens on top of this page.</p>"
+        "<p class=\"hint\">Press <kbd>Ctrl</kbd>+<kbd>,</kbd> any time, or use "
+        "<b>Settings</b> in the main menu.</p>");
 }
 
 bool isStarWarsPage(const QString &normalized)
@@ -528,9 +568,9 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
     if (normalized == QLatin1String("about:rust"))
         return htmlShell(pageTitle(id), rustBody());
     if (normalized == QLatin1String("about:downloads"))
-        return htmlShell(pageTitle(id), downloadsBody());
+        return htmlShell(pageTitle(id), downloadsBody(context));
     if (normalized == QLatin1String("about:history"))
-        return htmlShell(pageTitle(id), historyBody());
+        return htmlShell(pageTitle(id), historyBody(context));
     if (normalized == QLatin1String("about:extensions"))
         return htmlShell(pageTitle(id), extensionsBody(context));
     if (normalized == QLatin1String("about:settings"))
@@ -556,34 +596,65 @@ QString AboutPages::htmlShell(const QString &pageTitle, const QString &bodyHtml)
 {
     return QStringLiteral(
                "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+               "<meta name=\"color-scheme\" content=\"light dark\">"
                "<title>%1 — SpacePenguin</title>"
                "<style>"
-               "body{margin:0;min-height:100vh;display:flex;align-items:center;"
-               "justify-content:center;padding:3rem 1.5rem;box-sizing:border-box;"
-               "font:16px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;"
-               "background:#f6f7f9;color:#14161a}"
-               "main{max-width:44rem;width:100%}"
-               "h1{font-size:2rem;margin:0 0 1rem;letter-spacing:-0.01em}"
-               "h2{font-size:1.1rem;margin:1.75rem 0 0.5rem}"
+               ":root{--bg:#f4f6fb;--card:#fff;--text:#1b1e25;--muted:#5f6675;"
+               "--line:rgba(27,30,37,.1);--accent:#2f5fe8;--chip:rgba(27,30,37,.06)}"
+               "@media (prefers-color-scheme: dark){:root{--bg:#15171d;--card:#22252d;"
+               "--text:#e9ebf1;--muted:#9aa1b1;--line:rgba(233,235,241,.1);--accent:#82a0ff;"
+               "--chip:rgba(233,235,241,.08)}}"
+               // The browser's own theme, when it is not following the system.
+               ":root.light{color-scheme:light;--bg:#f4f6fb;--card:#fff;--text:#1b1e25;"
+               "--muted:#5f6675;--line:rgba(27,30,37,.1);--accent:#2f5fe8;--chip:rgba(27,30,37,.06)}"
+               ":root.dark{color-scheme:dark;--bg:#15171d;--card:#22252d;--text:#e9ebf1;"
+               "--muted:#9aa1b1;--line:rgba(233,235,241,.1);--accent:#82a0ff;"
+               "--chip:rgba(233,235,241,.08)}"
+               "*{box-sizing:border-box}"
+               "body{margin:0;min-height:100vh;padding:3.5rem 1.5rem;"
+               "font:15px/1.6 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;"
+               "background:var(--bg);color:var(--text)}"
+               "header{max-width:52rem;margin:0 auto 1.25rem;display:flex;align-items:center;"
+               "gap:.6rem;color:var(--muted);font-weight:600;letter-spacing:.02em}"
+               "header svg{width:28px;height:28px}"
+               "main{max-width:52rem;margin:0 auto;background:var(--card);border:1px solid var(--line);"
+               "border-radius:18px;padding:2.25rem 2.5rem;box-shadow:0 10px 30px rgba(0,0,0,.06)}"
+               "h1{font-size:1.9rem;margin:0 0 1rem;letter-spacing:-.02em}"
+               "h2{font-size:1.05rem;margin:2rem 0 .5rem}"
                "p{margin:0 0 1rem}"
-               ".lead{opacity:0.75}"
-               ".hint{opacity:0.6;font-size:0.9rem;margin-top:2rem}"
-               "a{color:#2f6fed}"
-               "code{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:0.9em;"
-               "background:rgba(20,22,26,0.06);padding:0.1em 0.35em;border-radius:0.25em}"
-               "table{border-collapse:collapse;width:100%%}"
-               "th,td{text-align:left;padding:0.5rem 0.75rem;border-bottom:1px solid "
-               "rgba(20,22,26,0.12);vertical-align:top}"
-               "table.facts th{width:9rem;opacity:0.6;font-weight:600}"
-               "pre.art{font-family:ui-monospace,'SF Mono',Menlo,monospace;line-height:1.15;"
-               "background:rgba(20,22,26,0.06);padding:1rem 1.25rem;border-radius:0.5rem;"
-               "overflow-x:auto}"
-               "@media (prefers-color-scheme: dark){"
-               "body{background:#14161a;color:#f6f7f9}"
-               "a{color:#7aa7ff}"
-               "code,pre.art{background:rgba(246,247,249,0.08)}"
-               "th,td{border-bottom-color:rgba(246,247,249,0.14)}}"
-               "</style></head><body><main>%2</main></body></html>")
+               ".lead{color:var(--muted);font-size:1.05rem}"
+               ".hint{color:var(--muted);font-size:.9rem;margin-top:2rem}"
+               ".empty{color:var(--muted);padding:1.5rem;border:1px dashed var(--line);"
+               "border-radius:12px;text-align:center}"
+               "a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}"
+               "code,kbd{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:.88em;"
+               "background:var(--chip);padding:.1em .4em;border-radius:6px}"
+               "kbd{border:1px solid var(--line);border-bottom-width:2px}"
+               "blockquote{margin:0 0 1rem;padding:.25rem 1rem;border-left:3px solid var(--accent);"
+               "color:var(--muted)}"
+               "table{border-collapse:collapse;width:100%}"
+               "th,td{text-align:left;padding:.55rem .75rem;border-bottom:1px solid var(--line);"
+               "vertical-align:top}"
+               "thead th{color:var(--muted);font-size:.8rem;text-transform:uppercase;"
+               "letter-spacing:.06em}"
+               "table.facts th{width:10rem;color:var(--muted);font-weight:600}"
+               "td.tag{white-space:nowrap;color:var(--muted);font-size:.8rem}"
+               "table.entries .url{color:var(--muted);font-size:.8rem;word-break:break-all}"
+               "table.entries .detail{white-space:nowrap;color:var(--muted);font-size:.85rem}"
+               "pre.art{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;line-height:1.15;"
+               "background:var(--chip);padding:1rem 1.25rem;border-radius:12px;overflow-x:auto}"
+               "</style></head><body>"
+               "<header><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">"
+               "<circle cx=\"12\" cy=\"12\" r=\"11.5\" fill=\"#24307a\"/>"
+               "<ellipse cx=\"12\" cy=\"13.2\" rx=\"5.4\" ry=\"8.2\" fill=\"#10121c\"/>"
+               "<ellipse cx=\"12\" cy=\"15.1\" rx=\"3.6\" ry=\"5.5\" fill=\"#f4f6fb\"/>"
+               "<circle cx=\"10.4\" cy=\"9.1\" r=\"1.9\" fill=\"#f4f6fb\"/>"
+               "<circle cx=\"13.6\" cy=\"9.1\" r=\"1.9\" fill=\"#f4f6fb\"/>"
+               "<circle cx=\"10.6\" cy=\"9.1\" r=\".8\" fill=\"#10121c\"/>"
+               "<circle cx=\"13.4\" cy=\"9.1\" r=\".8\" fill=\"#10121c\"/>"
+               "<path d=\"M10.7 10.6h2.6L12 12.4z\" fill=\"#ffb02e\"/></svg>"
+               "SpacePenguin</header>"
+               "<main>%2</main></body></html>")
         .arg(escape(pageTitle), bodyHtml);
 }
 

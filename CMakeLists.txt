@@ -10,6 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
+get_property(SPACEPENGUIN_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT SPACEPENGUIN_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 if(COMMAND qt_standard_project_setup)
     qt_standard_project_setup()
 endif()
@@ -26,6 +31,18 @@ qt_add_executable(spacepenguin
     src/browserwindow.h
     src/browserpage.cpp
     src/browserpage.h
+    src/webview.cpp
+    src/webview.h
+    src/icons.cpp
+    src/icons.h
+    src/preferences.cpp
+    src/preferences.h
+    src/historydialog.cpp
+    src/historydialog.h
+    src/downloadsdialog.cpp
+    src/downloadsdialog.h
+    src/bookmarksdialog.cpp
+    src/bookmarksdialog.h
     src/adblocker.cpp
     src/adblocker.h
     src/cosmeticfilters.cpp
@@ -42,12 +59,6 @@ qt_add_executable(spacepenguin
     src/historymanager.h
     src/settingsdialog.cpp
     src/settingsdialog.h
-    src/historymanager.cpp
-    src/historymanager.h
-    src/datasavermanager.cpp
-    src/datasavermanager.h
-    src/cookiemanager.cpp
-    src/cookiemanager.h
     src/extensionsdialog.cpp
     src/extensionsdialog.h
     src/theme.cpp
@@ -97,35 +108,25 @@ endif()
 
 if(NOT APPLE)
     set_target_properties(spacepenguin PROPERTIES OUTPUT_NAME "SpacePenguin")
-    # An installed copy has to find QtWebEngineProcess, plugins and translations.
-    # Derive the Qt layout from the qmake target so this works for any Qt build.
-    get_target_property(SPACEPENGUIN_QMAKE Qt6::qmake IMPORTED_LOCATION)
-    if(SPACEPENGUIN_QMAKE)
-        get_filename_component(SPACEPENGUIN_QT_BIN_DIR "${SPACEPENGUIN_QMAKE}" DIRECTORY)
-        get_filename_component(SPACEPENGUIN_QT_ROOT "${SPACEPENGUIN_QT_BIN_DIR}" DIRECTORY)
-
-        set(SPACEPENGUIN_QT_LIB_DIR "")
-        foreach(candidate IN ITEMS "${SPACEPENGUIN_QT_ROOT}/lib64" "${SPACEPENGUIN_QT_ROOT}/lib")
-            if(EXISTS "${candidate}")
-                set(SPACEPENGUIN_QT_LIB_DIR "${candidate}")
-                break()
+    # An installed copy has to find QtWebEngineProcess, plugins, resources and
+    # translations. Qt publishes its own layout, so use that rather than guessing.
+    if(DEFINED QT6_INSTALL_PREFIX)
+        set(SPACEPENGUIN_QT_ROOT "${QT6_INSTALL_PREFIX}")
+        foreach(kind IN ITEMS BINS LIBS PLUGINS LIBEXECS DATA TRANSLATIONS)
+            if(IS_ABSOLUTE "${QT6_INSTALL_${kind}}")
+                set(SPACEPENGUIN_QT_${kind} "${QT6_INSTALL_${kind}}")
+            else()
+                set(SPACEPENGUIN_QT_${kind} "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_${kind}}")
             endif()
         endforeach()
-        if(NOT SPACEPENGUIN_QT_LIB_DIR)
-            set(SPACEPENGUIN_QT_LIB_DIR "${SPACEPENGUIN_QT_BIN_DIR}")
-        endif()
 
-        set(SPACEPENGUIN_QT_EXEC_DIR "${SPACEPENGUIN_QT_ROOT}/libexec")
-        if(NOT EXISTS "${SPACEPENGUIN_QT_EXEC_DIR}")
-            set(SPACEPENGUIN_QT_EXEC_DIR "${SPACEPENGUIN_QT_BIN_DIR}")
-        endif()
-
-        configure_file(cmake/qt.conf.in "${CMAKE_CURRENT_BINARY_DIR}/qt.conf" @ONLY)
-        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/qt.conf"
-            DESTINATION ${CMAKE_INSTALL_BINDIR})
+        configure_file(cmake/qt.conf.in "${CMAKE_CURRENT_BINARY_DIR}/qt.conf.install" @ONLY)
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/qt.conf.install"
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            RENAME qt.conf)
     else()
         message(WARNING
-            "Qt6::qmake location unknown; skipping qt.conf generation. "
+            "Qt install layout unknown; skipping qt.conf generation. "
             "Installed copies will not find QtWebEngineProcess.")
     endif()
 endif()
@@ -176,12 +177,25 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_userextensions PRIVATE Qt6::Test Qt6::WebEngineCore)
         target_include_directories(tst_userextensions PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME userextensions COMMAND tst_userextensions)
+
+        qt_add_executable(tst_startpage
+            tests/tst_startpage.cpp
+            src/startpageschemehandler.cpp
+            src/startpageschemehandler.h
+            src/preferences.cpp
+            src/preferences.h
+            src/theme.cpp
+            src/theme.h
+            src/urlresolver.cpp
+            src/urlresolver.h
+        )
+        target_link_libraries(tst_startpage PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
+        target_include_directories(tst_startpage PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_definitions(tst_startpage PRIVATE
+            SPACEPENGUIN_START_PAGE="${CMAKE_CURRENT_SOURCE_DIR}/html/start.html")
+        add_test(NAME startpage COMMAND tst_startpage)
     endif()
 endif()
-
-include(GNUInstallDirs)
-
-include(GNUInstallDirs)
 
 if(APPLE)
     install(TARGETS spacepenguin

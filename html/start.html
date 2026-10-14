@@ -2,107 +2,306 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>SpacePenguin</title>
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Tab</title>
 <style>
+  :root {
+    --bg: #eef1f8;
+    --bg2: #dfe5f3;
+    --card: rgba(255, 255, 255, 0.82);
+    --card-hover: #ffffff;
+    --text: #1b1e25;
+    --muted: #5f6675;
+    --line: rgba(27, 30, 37, 0.1);
+    --accent: #2f5fe8;
+    --star: rgba(47, 95, 232, 0.22);
+    --private: #7c4ddb;
+    --on-accent: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1016;
+      --bg2: #161a2b;
+      --card: rgba(34, 37, 45, 0.78);
+      --card-hover: #2c303a;
+      --text: #e9ebf1;
+      --muted: #9aa1b1;
+      --line: rgba(233, 235, 241, 0.1);
+      --accent: #82a0ff;
+      --star: rgba(255, 255, 255, 0.5);
+      --private: #b48cff;
+      --on-accent: #10142a;
+    }
+  }
+  /* Set by the browser when its theme is not "Follow system". */
+  :root.light {
+    color-scheme: light;
+    --bg: #eef1f8; --bg2: #dfe5f3; --card: rgba(255, 255, 255, 0.82); --card-hover: #ffffff;
+    --text: #1b1e25; --muted: #5f6675; --line: rgba(27, 30, 37, 0.1); --accent: #2f5fe8;
+    --star: rgba(47, 95, 232, 0.22); --private: #7c4ddb; --on-accent: #ffffff;
+  }
+  :root.dark {
+    color-scheme: dark;
+    --bg: #0e1016; --bg2: #161a2b; --card: rgba(34, 37, 45, 0.78); --card-hover: #2c303a;
+    --text: #e9ebf1; --muted: #9aa1b1; --line: rgba(233, 235, 241, 0.1); --accent: #82a0ff;
+    --star: rgba(255, 255, 255, 0.5); --private: #b48cff; --on-accent: #10142a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
-    min-height: 100vh;
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(1.5px 1.5px at 12% 18%, var(--star) 50%, transparent 51%),
+      radial-gradient(1px 1px at 78% 12%, var(--star) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 88% 64%, var(--star) 50%, transparent 51%),
+      radial-gradient(1px 1px at 22% 78%, var(--star) 50%, transparent 51%),
+      radial-gradient(1px 1px at 52% 8%, var(--star) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 64% 88%, var(--star) 50%, transparent 51%),
+      radial-gradient(1px 1px at 6% 52%, var(--star) 50%, transparent 51%),
+      radial-gradient(ellipse at 50% -10%, var(--bg2), var(--bg) 70%);
+    background-attachment: fixed;
     display: flex;
     flex-direction: column;
     align-items: center;
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: #f6f7f9;
-    color: #14161a;
   }
-  .container { max-width: 52rem; width: 100%; padding: 3rem 1.5rem; }
-  h1 { font-size: 2rem; margin: 0 0 0.5rem; letter-spacing: -0.01em; }
-  .subtitle { opacity: 0.75; margin: 0 0 2rem; text-align: center; }
-  .search-form { margin-bottom: 2.5rem; }
-  .search-form form { display: flex; max-width: 40rem; margin: 0 auto; }
-  .search-form input {
-    flex: 1; padding: 0.75rem 1rem; border: 1px solid rgba(20, 22, 26, 0.25);
-    border-right: none; border-radius: 0.5rem 0 0 0.5rem; font: inherit;
-    background: rgba(20, 22, 26, 0.02); outline: none;
+  main {
+    width: 100%;
+    max-width: 46rem;
+    padding: 12vh 1.5rem 2rem;
+    flex: 1;
   }
-  .search-form button {
-    padding: 0.75rem 1.25rem; border: 1px solid rgba(20, 22, 26, 0.25);
-    border-left: none; border-radius: 0 0.5rem 0.5rem 0;
-    background: rgba(47, 109, 237, 0.1); color: #2f6fed; cursor: pointer;
-    font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  .brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.9rem;
+    margin-bottom: 2rem;
   }
-  .search-form button:hover { background: rgba(47, 109, 237, 0.15); }
-  .quick-links h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
-  .quick-links ul {
-    list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 0.5rem; padding: 0; margin: 0 0 2rem;
+  .brand svg { width: 64px; height: 64px; filter: drop-shadow(0 6px 18px rgba(36, 48, 122, 0.35)); }
+  .brand h1 { font-size: 2.2rem; margin: 0; letter-spacing: -0.03em; font-weight: 800; }
+  .brand h1 span { color: var(--accent); }
+
+  form {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0.35rem 0.4rem 0.35rem 1.2rem;
+    box-shadow: 0 10px 30px rgba(10, 16, 40, 0.12);
+    backdrop-filter: blur(10px);
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .quick-links a {
-    display: inline-block; padding: 0.6rem 0.75rem; border: 1px solid rgba(20, 22, 26, 0.2);
-    border-radius: 0.4rem; text-decoration: none; color: inherit; text-align: center;
-    font-size: 0.9rem; transition: border-color 0.15s;
+  form:focus-within { border-color: var(--accent); box-shadow: 0 10px 34px rgba(47, 95, 232, 0.22); }
+  form svg { width: 20px; height: 20px; flex: none; stroke: var(--muted); }
+  input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 1.05rem;
+    padding: 0.65rem 0;
   }
-  .quick-links a:hover { border-color: rgba(20, 22, 26, 0.5); }
-  .shortcuts h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
-  .shortcuts ul { list-style: none; padding: 0; margin: 0 0 2rem; }
-  .shortcuts li {
-    display: flex; justify-content: space-between; padding: 0.35rem 0;
-    border-bottom: 1px solid rgba(20, 22, 26, 0.08);
+  button {
+    border: none;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font: 600 0.95rem system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 0.7rem 1.3rem;
+    cursor: pointer;
   }
-  .shortcuts code {
-    background: rgba(20, 22, 26, 0.06); padding: 0.1em 0.35em; border-radius: 0.25em;
-    font-size: 0.85em; opacity: 0.7;
+  button:hover { filter: brightness(1.08); }
+
+  .private {
+    display: none;
+    margin: 1.5rem 0 0;
+    padding: 1rem 1.2rem;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--muted);
   }
-  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-  @media (prefers-color-scheme: dark) {
-    body { background: #14161a; color: #f6f7f9; }
-    .search-form input { background: rgba(246, 247, 249, 0.08); border-color: rgba(246, 247, 249, 0.25); }
-    .search-form button { background: rgba(122, 168, 255, 0.12); color: #7aa7ff; border-color: rgba(246, 247, 249, 0.25); }
-    .quick-links a { border-color: rgba(246, 247, 249, 0.15); }
-    .shortcuts { border-bottom-color: rgba(246, 247, 249, 0.14); }
-    code { background: rgba(246, 247, 249, 0.08); }
+  .private strong { color: var(--private); }
+  body.is-private .private { display: block; }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-top: 2.25rem;
+  }
+  .tile {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: inherit;
+    text-decoration: none;
+    min-width: 0;
+    transition: transform 0.12s, background 0.12s;
+  }
+  .tile:hover { background: var(--card-hover); transform: translateY(-2px); }
+  .avatar {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    color: #fff;
+  }
+  .label { min-width: 0; }
+  .label div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .label .host { font-size: 0.78rem; color: var(--muted); }
+
+  footer {
+    padding: 1.5rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem 1.2rem;
+  }
+  kbd {
+    font: 0.78rem ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    padding: 0.05rem 0.35rem;
+    margin-left: 0.3rem;
   }
 </style>
 </head>
 <body>
-  <div class="container">
-    <h1>SpacePenguin</h1>
-    <p class="subtitle">Privacy-first browsing built on Qt 6 and QtWebEngine.</p>
-
-    <div class="search-form">
-      <form action="https://duckduckgo.com/" method="GET" target="_self">
-        <input type="search" name="q" placeholder="Search the web with DuckDuckGo..." autocomplete="off" accesskey="s">
-        <button type="submit">Search</button>
-      </form>
+  <main>
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <defs>
+          <radialGradient id="sky" cx="0.35" cy="0.3" r="0.8">
+            <stop offset="0" stop-color="#3d5ad6"/>
+            <stop offset="1" stop-color="#141a45"/>
+          </radialGradient>
+        </defs>
+        <circle cx="12" cy="12" r="11.5" fill="url(#sky)"/>
+        <circle cx="5.2" cy="6.2" r="0.7" fill="#fff" opacity="0.85"/>
+        <circle cx="19.2" cy="5" r="0.5" fill="#fff" opacity="0.85"/>
+        <circle cx="18.5" cy="9.6" r="0.4" fill="#fff" opacity="0.85"/>
+        <ellipse cx="12" cy="13.2" rx="5.4" ry="8.2" fill="#10121c"/>
+        <ellipse cx="12" cy="15.1" rx="3.6" ry="5.5" fill="#f4f6fb"/>
+        <circle cx="10.4" cy="9.1" r="1.9" fill="#f4f6fb"/>
+        <circle cx="13.6" cy="9.1" r="1.9" fill="#f4f6fb"/>
+        <circle cx="10.6" cy="9.1" r="0.8" fill="#10121c"/>
+        <circle cx="13.4" cy="9.1" r="0.8" fill="#10121c"/>
+        <path d="M10.7 10.6h2.6L12 12.4z" fill="#ffb02e"/>
+        <ellipse cx="9.9" cy="20.8" rx="1.6" ry="0.8" fill="#ffb02e"/>
+        <ellipse cx="14.1" cy="20.8" rx="1.6" ry="0.8" fill="#ffb02e"/>
+      </svg>
+      <h1>Space<span>Penguin</span></h1>
     </div>
 
-    <div class="quick-links">
-      <h2>Quick links</h2>
-      <ul>
-        <li><a href="https://en.wikipedia.org/wiki/Main_Page">Wikipedia</a></li>
-        <li><a href="https://news.ycombinator.com">Hacker News</a></li>
-        <li><a href="https://example.com">Example</a></li>
-      </ul>
-    </div>
+    <form id="search" role="search" autocomplete="off">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>
+      </svg>
+      <input id="q" type="search" name="q" placeholder="Search the web or type an address"
+             aria-label="Search" autofocus>
+      <button type="submit">Search</button>
+    </form>
 
-    <div class="shortcuts">
-      <h2>Keyboard shortcuts</h2>
-      <ul>
-        <li><span>New tab</span> <code>Ctrl+T</code></li>
-        <li><span>Close tab</span> <code>Ctrl+W</code></li>
-        <li><span>Focus address bar</span> <code>Ctrl+L</code></li>
-        <li><span>Reload</span> <code>F5</code></li>
-        <li><span>Find in page</span> <code>Ctrl+F</code></li>
-        <li><span>Settings</span> <code>Ctrl+,</code></li>
-        <li><span>Extensions</span> <code>Ctrl+Shift+E</code></li>
-        <li><span>Downloads</span> <code>Ctrl+J</code></li>
-        <li><span>History</span> <code>Ctrl+H</code></li>
-        <li><span>Toggle ad blocking</span> <code>Ctrl+Shift+B</code></li>
-      </ul>
-    </div>
-
-    <p style="opacity:0.6;font-size:0.85rem;text-align:center;">
-      New tab <code>Ctrl+T</code> &middot; Private window <code>Ctrl+Shift+N</code>
+    <p class="private">
+      <strong>Private window.</strong> Pages you open here leave no history, cookies or cache
+      on this computer once you close every private window. Websites, your network and your
+      employer can still see what you do.
     </p>
-  </div>
+
+    <nav class="tiles" id="tiles" aria-label="Most visited"></nav>
+  </main>
+
+  <footer>
+    <span>New tab<kbd>Ctrl+T</kbd></span>
+    <span>Address bar<kbd>Ctrl+L</kbd></span>
+    <span>Bookmark<kbd>Ctrl+D</kbd></span>
+    <span>History<kbd>Ctrl+H</kbd></span>
+    <span>Downloads<kbd>Ctrl+J</kbd></span>
+    <span>Private window<kbd>Ctrl+Shift+N</kbd></span>
+    <span>All shortcuts<kbd>F1</kbd></span>
+  </footer>
+
+<script>
+(function () {
+  "use strict";
+  // Filled in by the browser for every request; see StartPageSchemeHandler.
+  var data = /*SP_DATA*/null || { search: "https://duckduckgo.com/?q={query}", tiles: [], private: false };
+
+  if (data.private) document.body.classList.add("is-private");
+
+  function looksLikeAddress(text) {
+    return /^[a-z][a-z0-9+.-]*:\/\//i.test(text) || /^[^\s\/]+\.[a-z]{2,}(\/\S*)?$/i.test(text);
+  }
+
+  document.getElementById("search").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var text = document.getElementById("q").value.trim();
+    if (!text) return;
+    if (looksLikeAddress(text)) {
+      location.href = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : "https://" + text;
+    } else {
+      location.href = data.search.replace("{query}", encodeURIComponent(text));
+    }
+  });
+
+  var palette = ["#2f5fe8", "#7c4ddb", "#d0428a", "#e0632f", "#1f8a4c", "#0f8fa8", "#b2771a", "#4a5568"];
+  function hue(text) {
+    var hash = 0;
+    for (var i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) | 0;
+    return palette[Math.abs(hash) % palette.length];
+  }
+
+  var tiles = document.getElementById("tiles");
+  (data.tiles || []).slice(0, 8).forEach(function (tile) {
+    var url;
+    try { url = new URL(tile.url); } catch (e) { return; }
+    if (url.protocol !== "https:" && url.protocol !== "http:") return;
+
+    var host = url.hostname.replace(/^www\./, "");
+    var link = document.createElement("a");
+    link.className = "tile";
+    link.href = url.href;
+    link.title = tile.title || url.href;
+
+    var avatar = document.createElement("span");
+    avatar.className = "avatar";
+    avatar.style.background = hue(host);
+    avatar.textContent = (host.charAt(0) || "?").toUpperCase();
+
+    var label = document.createElement("span");
+    label.className = "label";
+    var title = document.createElement("div");
+    title.textContent = tile.title || host;
+    var hostLine = document.createElement("div");
+    hostLine.className = "host";
+    hostLine.textContent = host;
+    label.appendChild(title);
+    label.appendChild(hostLine);
+
+    link.appendChild(avatar);
+    link.appendChild(label);
+    tiles.appendChild(link);
+  });
+})();
+</script>
 </body>
 </html>

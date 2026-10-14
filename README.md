@@ -8,16 +8,31 @@ checkbox list.
 
 ## What it does
 
-- **Tabs** — new, close, drag to reorder, reopen closed, session restored on restart
+- **Tabs** — tab strip on top; new, close, middle-click to close, drag to reorder,
+  duplicate, close others, reopen closed, session restored on restart. Links that ask
+  for a new tab or window (`target=_blank`, "Open link in new tab") open as tabs
 - **Address bar** — takes URLs, `about:` pages and plain-language queries; anything
-  that isn't a URL becomes a search on DuckDuckGo
+  that isn't a URL becomes a search on the chosen engine (DuckDuckGo by default).
+  Suggests matching bookmarks and history as you type; shows a lock, warning or info
+  icon for the page's security state and a star to bookmark it
 - **Navigation** — back, forward, reload, stop, home
 - **Find in page** — `Ctrl+F`, with match count and next/previous
 - **Zoom** — per-tab, `Ctrl`+`+` / `Ctrl`+`-` / `Ctrl`+`0`
 - **Windows** — new window, new private window (`Ctrl`+`Shift`+`N`); private
   windows never write a session, cookies or cache to disk
-- **Status line** — load progress, Secure / Not secure / Bundled page /
-  Internal page indicator, and a blocking control
+- **Bookmarks** — `Ctrl`+`D` bookmarks the page, the star edits it; a bookmarks bar
+  (`Ctrl`+`Shift`+`B`) and a searchable manager (`Ctrl`+`Shift`+`O`)
+- **History** — searchable history window (`Ctrl`+`H`) with delete and clear;
+  `about:history` lists recent visits. Private windows record nothing
+- **Downloads** — downloads window (`Ctrl`+`J`) with progress, cancel, open and
+  show in folder
+- **Start page** — search box for the chosen engine and tiles for your most
+  visited sites, served locally by `sp://start/`
+- **Load state** — thin progress line under the toolbar, hovered link preview,
+  and a shield button with the blocked-request count and blocking controls
+- **Settings** — `Ctrl`+`,`: start-up, home page, search engine, theme, toolbar,
+  ad blocking and paused sites, data saver, clearing history/cookies/cache,
+  download folder
 - **Theme** — follow system, light or dark (`View → Theme`), remembered between
   runs
 - **Content blocking** — an Adblock Plus style filter list, applied through a
@@ -27,13 +42,17 @@ checkbox list.
 
 ## Theme
 
-`View → Theme` offers **Follow system**, **Light** and **Dark**. The choice is
-written to `QSettings` under `appearance/theme` and reapplied at startup.
+`☰ → Theme` (or `View → Theme`, or Settings → Appearance) offers **Follow
+system**, **Light** and **Dark**. The choice is written to `QSettings` under
+`appearance/theme` and reapplied at startup.
 
 SpacePenguin applies the mode to the application chrome with
-`QStyleHints::setColorScheme`. It does **not** restyle pages: websites that
-honour `prefers-color-scheme` follow the OS setting on their own, and websites
-that ignore it are left alone. Claiming otherwise would be a lie in the UI.
+`QStyleHints::setColorScheme` plus its own palette and stylesheet, drawn on the
+Fusion style with a built-in icon set so the window looks the same on every
+platform. The start page and `about:` pages follow the same choice. It does
+**not** restyle websites: those that honour `prefers-color-scheme` follow the OS
+setting on their own, and those that ignore it are left alone. Claiming otherwise
+would be a lie in the UI.
 
 ## Extensions
 
@@ -133,9 +152,6 @@ anything a page tries to load as a document. In-page pop-ups — interstitials,
 "pop-out" players, overlay dialogs — are cosmetic, so they need `##` rules from
 your list.
 
-Type any of these in the address bar. They are rendered by the browser itself,
-never fetched from the network.
-
 ## Internal pages
 
 Type any of these in the address bar. They are rendered by the browser itself,
@@ -186,13 +202,16 @@ These are deliberate choices, not defaults we inherited:
   so a page from the local disk or an in-app page can't reach the network.
 - `AllowRunningInsecureContent` is off — no mixed content, ever.
 - `JavascriptCanOpenWindows` is off until we implement popup windows properly.
+  Links the user opens in a new tab or window become tabs; script pop-ups and
+  dialogs are still refused.
 - No telemetry, no background services, no auto-updater, no remote
   configuration. The browser does not phone home.
 
 ## Keyboard
 
-Every binding below is implemented and wired to a visible menu entry; `F1`
-opens the same list from inside the app, so it cannot drift from the code.
+Every binding below is implemented and wired to a menu entry (the ☰ menu, or the
+menu bar if you turn it on); `F1` opens the same list from inside the app, so it
+cannot drift from the code.
 
 | Shortcut                | Action                |
 | ----------------------- | --------------------- |
@@ -200,7 +219,8 @@ opens the same list from inside the app, so it cannot drift from the code.
 | `Ctrl+W`                | Close tab             |
 | `Ctrl+Shift+T`          | Reopen closed tab     |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab  |
-| `Ctrl+1` … `Ctrl+9`     | Go to tab 1–9         |
+| `Ctrl+1` … `Ctrl+8`     | Go to tab 1–8         |
+| `Ctrl+9`                | Go to the last tab    |
 | `Ctrl+N`                | New window            |
 | `Ctrl+Shift+N`          | New private window    |
 | `Ctrl+Shift+W`          | Close window          |
@@ -213,8 +233,14 @@ opens the same list from inside the app, so it cannot drift from the code.
 | `Ctrl+F`                | Find in page          |
 | `Ctrl++` / `Ctrl+-`     | Zoom in / out         |
 | `Ctrl+0`                | Reset zoom            |
-| `Ctrl+J`                | About                 |
+| `F11`                   | Full screen           |
+| `Ctrl+D`                | Bookmark this page    |
+| `Ctrl+Shift+B`          | Show bookmarks bar    |
+| `Ctrl+Shift+O`          | Bookmarks             |
+| `Ctrl+H`                | History               |
+| `Ctrl+J`                | Downloads             |
 | `Ctrl+Shift+E`          | Extensions            |
+| `Ctrl+,`                | Settings              |
 | `F1`                    | Keyboard shortcuts    |
 
 `Ctrl` is `Cmd` on macOS. We keep the bindings identical on every platform
@@ -278,6 +304,7 @@ the helper process is still found from the new location.
 --private               do not write history, cookies, or cache for this session
 --user-data-dir <dir>   store persistent data in <dir>
 --filter-list <file>    load ad blocking rules from <file>
+[urls...]               open each address or search in a new tab
 ```
 
 ### Tests
@@ -347,14 +374,16 @@ See `.github/workflows/build.yml` for GitHub Actions workflow that builds all th
 - `build-all.sh` — Wrapper to build all platforms
 - `BUILD_SCRIPTS.md` — Detailed build documentation
 
-Four suites run: `urlresolver`, `aboutpages`, `adblocker` and `userextensions`.
-The first two are plain logic; the last two cover rule matching, filter parsing,
-script metadata, installation and enable/disable state.
+Five suites run: `urlresolver`, `aboutpages`, `adblocker`, `userextensions` and
+`startpage`. The first two are plain logic; the next two cover rule matching,
+filter parsing, script metadata, installation and enable/disable state; the last
+checks that start page data is injected without letting page titles escape it.
 
 ## Known limitations
 
-- No bookmarks, history UI, or downloads UI
-- No fullscreen (request support is disabled until we handle it correctly)
+- Bookmarks are a flat list; the backend's folders are not shown
+- No page-requested fullscreen (video players cannot go full screen); `F11`
+  makes the whole window full screen
 - No `file://` support, no popups, no PDF viewer
 - No Chrome extension support — QtWebEngine cannot load them, so extensions are
   user scripts instead (`// @name`, `// @match`)
@@ -362,12 +391,11 @@ script metadata, installation and enable/disable state.
   `$redirect`/`$removeparam` rewrites or `##+js(...)` scriptlets, so a few
   sites still show "ad" placeholders or count blocked requests
 - A very large filter list means a large stylesheet injected into every page
-- The theme applies to application chrome only; page colours follow each site's
-  own CSS
+- The theme applies to application chrome and internal pages only; website
+  colours follow each site's own CSS
 - Internal `about:` pages do not create a back/forward history entry
 - Session restore saves URLs only — not scroll position or history depth
-- `Ctrl+F` uses the renderer's find pass; clearing the box clears highlighting
-  only for the page that was open when the search started
+- `Ctrl+F` uses the renderer's find pass, one tab at a time
 - Only Linux is verified end to end; the Windows and macOS build paths are
   written but untested on real hardware
 - No code signing, notarisation (macOS), MSIX packaging (Windows) or desktop
@@ -376,16 +404,23 @@ script metadata, installation and enable/disable state.
 ## Layout
 
 ```
-src/browserwindow.*   main window: tabs, toolbar, find bar, omnibox, status bar
+src/browserwindow.*   main window: tab strip, toolbar, omnibox, bookmarks bar, find bar, menus
 src/browserpage.*     QWebEnginePage subclass holding the security policy
+src/webview.*         per-tab view: load state, links opened as new tabs
+src/icons.*           painted icon set that follows the theme
+src/preferences.*     QSettings-backed preferences shared by every window
+src/settingsdialog.*  settings window
+src/historydialog.*   history window
+src/downloadsdialog.* downloads window
+src/bookmarksdialog.* bookmark manager and bookmark editor
 src/aboutpages.*      internal about: pages, including the easter eggs
 src/profiles.*        profile factory, plus blocking and user-script install
-src/theme.*           System / Light / Dark appearance setting
+src/theme.*           System / Light / Dark setting, palette and stylesheet
 src/adblocker.*       QWebEngineUrlRequestInterceptor, filter and cosmetic parsing
 src/cosmeticfilters.* builds the injected element-hiding stylesheet
 src/userextensions.*  user script discovery and QWebEngineScript installation
 src/extensionsdialog.*  extension manager UI
-src/startpageschemehandler.*  serves html/start.html over the sp:// scheme
+src/startpageschemehandler.*  serves html/start.html over sp://, with search and top sites
 src/urlresolver.*     URL, about: or search resolution (unit tested)
 src/main.cpp          profile setup, command line, entry point
 html/start.html       built-in start page

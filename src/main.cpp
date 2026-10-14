@@ -3,9 +3,12 @@
 #include <QCommandLineParser>
 #include <QDir>
 #include <QWebEngineProfile>
+#include <QWebEngineUrlScheme>
 
 #include "browserwindow.h"
+#include "icons.h"
 #include "profiles.h"
+#include "theme.h"
 
 #ifndef SPACEPENGUIN_VERSION
 #    define SPACEPENGUIN_VERSION "0.0.0"
@@ -15,7 +18,16 @@ int main(int argc, char *argv[])
 {
     QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
+    // The start page scheme must be known to Chromium before the first profile exists.
+    QWebEngineUrlScheme startScheme(QByteArrayLiteral("sp"));
+    startScheme.setSyntax(QWebEngineUrlScheme::Syntax::Host);
+    startScheme.setFlags(QWebEngineUrlScheme::SecureScheme);
+    QWebEngineUrlScheme::registerScheme(startScheme);
+
     QApplication app(argc, argv);
+    // Fusion draws the same everywhere, which the chrome stylesheet relies on.
+    QApplication::setStyle(spacepenguin::Theme::createStyle());
+    QApplication::setWindowIcon(spacepenguin::Icons::appIcon());
     QCoreApplication::setOrganizationName(QStringLiteral("SpacePenguin"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("spacepenguin.invalid"));
     QCoreApplication::setApplicationName(QStringLiteral("SpacePenguin"));
@@ -32,7 +44,7 @@ int main(int argc, char *argv[])
         QStringLiteral("Do not write history, cookies, or cache to disk for this session."));
     parser.addOption(privateModeOption);
 
-    const     QCommandLineOption userDataOption(
+    const QCommandLineOption userDataOption(
         QStringList{QStringLiteral("user-data-dir")},
         QStringLiteral("Store persistent data in <dir> instead of the default location."),
         QStringLiteral("dir"));
@@ -43,6 +55,10 @@ int main(int argc, char *argv[])
         QStringLiteral("Load ad blocking rules from <file>."),
         QStringLiteral("file"));
     parser.addOption(filterListOption);
+
+    parser.addPositionalArgument(QStringLiteral("urls"),
+                                 QStringLiteral("Addresses or searches to open in new tabs."),
+                                 QStringLiteral("[urls...]"));
 
     parser.process(app);
 
@@ -58,5 +74,9 @@ int main(int argc, char *argv[])
 
     spacepenguin::BrowserWindow window(std::move(services));
     window.show();
+
+    const QStringList urls = parser.positionalArguments();
+    for (const QString &url : urls)
+        window.openInNewTab(url);
     return app.exec();
 }
