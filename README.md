@@ -317,7 +317,8 @@ nix-shell -p 'qt6.qtbase' 'qt6.qtdeclarative' 'qt6.qtwebengine' cmake gnumake li
 ```
 
 To get a copy you can move elsewhere, install it:
-`cmake --install build --config Release --prefix <dir>`. On Windows and macOS that
+`cmake --install build --config Release --prefix <absolute dir>` (Qt's deploy step
+rejects a relative prefix). On Windows and macOS that
 deploys Qt into `<dir>`; on Linux it installs the binary, a `qt.conf` pointing at
 the Qt it was built with, the desktop entry, metadata and icons.
 

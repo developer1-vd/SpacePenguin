@@ -9,7 +9,7 @@ set -euo pipefail
 
 VERSION="${1:-0.1.0}"
 BUILD_DIR="${BUILD_DIR:-build-macos}"
-DIST_DIR="${BUILD_DIR}/dist"
+DIST_DIR="$(pwd)/${BUILD_DIR}/dist"  # Qt's deploy step wants an absolute prefix
 APP="${DIST_DIR}/SpacePenguin.app"
 DMG="SpacePenguin-${VERSION}-macos.dmg"
 

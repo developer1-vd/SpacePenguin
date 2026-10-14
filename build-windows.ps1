@@ -11,7 +11,8 @@ param(
 )
 $ErrorActionPreference = "Stop"
 
-$DistDir = Join-Path $BuildDir "dist"
+# Qt's deploy step (windeployqt) needs an absolute install prefix.
+$DistDir = Join-Path (Get-Location).Path (Join-Path $BuildDir "dist")
 
 Write-Host "==> Building SpacePenguin $Version"
 cmake -S . -B $BuildDir -DSPACEPENGUIN_BUILD_TESTS=OFF
@@ -31,7 +32,7 @@ Compress-Archive -Path (Join-Path $DistDir "*") -DestinationPath $Zip
 $makensis = Get-Command makensis -ErrorAction SilentlyContinue
 if ($makensis) {
     Write-Host "==> Creating installer"
-    & $makensis.Source "/DVERSION=$Version" "/DSOURCE_DIR=$((Resolve-Path $DistDir).Path)" installer.nsi
+    & $makensis.Source "/DVERSION=$Version" "/DSOURCE_DIR=$DistDir" installer.nsi
     if ($LASTEXITCODE) { exit $LASTEXITCODE }
 } else {
     Write-Host "makensis not found; skipping the installer (the zip is ready)."
