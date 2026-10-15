@@ -174,7 +174,7 @@ packages_apt() {
     done
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file dpkg-dev)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-dev qt6-webengine-dev qt6-tools-dev
-                                           qt6-base-dev-tools libgl-dev)
+                                           qt6-base-dev-tools libgl-dev qt6-wayland)
     return 0
 }
 system_qt_version_apt() {
@@ -195,7 +195,7 @@ packages_dnf() {
           freetype libdrm libX11 libX11-xcb libXext libXfixes libXi libXrender expat
           libwayland-client libwayland-cursor libwayland-egl cups-libs)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file rpm-build)
-    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-qtbase-devel qt6-qtwebengine-devel qt6-qttools-devel)
+    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-qtbase-devel qt6-qtwebengine-devel qt6-qttools-devel qt6-qtwayland)
     return 0
 }
 system_qt_version_dnf() {
@@ -221,7 +221,7 @@ packages_pacman() {
           nss libxcomposite libxdamage libxrandr libxtst libxkbfile alsa-lib glib2 krb5
           libxshmfence freetype2 libdrm libx11 libxext libxfixes libxi libxrender expat wayland libcups)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file)
-    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base qt6-webengine qt6-tools)
+    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base qt6-webengine qt6-tools qt6-wayland)
     return 0
 }
 system_qt_version_pacman() {
@@ -241,7 +241,7 @@ packages_zypper() {
           libgbm1 libxshmfence1 libfreetype6 libdrm2 libX11-6 libX11-xcb1 libXext6 libXfixes3 libXi6
           libXrender1 libexpat1 libwayland-client0 libwayland-cursor0 libwayland-egl1 libcups2)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils AppStream file rpm-build)
-    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-devel qt6-webenginewidgets-devel qt6-tools-devel)
+    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-devel qt6-webenginewidgets-devel qt6-tools-devel qt6-wayland)
     return 0
 }
 system_qt_version_zypper() {
@@ -260,7 +260,7 @@ packages_apk() {
           xcb-util-image nss libxcomposite libxdamage libxrandr libxtst libxkbfile alsa-lib
           wayland-libs-client wayland-libs-cursor wayland-libs-egl cups-libs)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file)
-    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-qtbase-dev qt6-qtwebengine-dev qt6-qttools-dev)
+    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-qtbase-dev qt6-qtwebengine-dev qt6-qttools-dev qt6-qtwayland)
     return 0
 }
 system_qt_version_apk() {
@@ -278,7 +278,7 @@ packages_xbps() {
           mit-krb5-libs libgbm libxshmfence freetype libdrm libX11 libXext libXfixes libXi
           libXrender expat wayland libcups)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils AppStream file)
-    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-devel qt6-webengine-devel qt6-tools-devel)
+    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-devel qt6-webengine-devel qt6-tools-devel qt6-wayland)
     return 0
 }
 system_qt_version_xbps() {
@@ -299,7 +299,7 @@ packages_emerge() {
           x11-libs/libxkbfile media-libs/alsa-lib dev-libs/glib app-crypt/mit-krb5
           dev-libs/wayland net-print/cups)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(dev-util/desktop-file-utils dev-libs/appstream sys-apps/file)
-    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(dev-qt/qtbase:6 dev-qt/qtwebengine:6 dev-qt/qttools:6)
+    [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(dev-qt/qtbase:6 dev-qt/qtwebengine:6 dev-qt/qttools:6 dev-qt/qtwayland:6)
     return 0
 }
 system_qt_version_emerge() {
