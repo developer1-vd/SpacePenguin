@@ -1,4 +1,6 @@
 # ---- Build trees ----------------------------------------------------------
+# Qt installed by install-deps.sh / install-deps.ps1
+.qt/
 build/
 build-*/
 cmake-build-*/
@@ -114,3 +116,7 @@ Desktop.ini
 *.appimage
 *.AppImage
 # just in case Ignore language is case-sensitive
+
+# Packages built by the build-*.sh scripts
+dist/
+.cache/

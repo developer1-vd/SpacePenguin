@@ -36,6 +36,25 @@ endif()
 
 include(GNUInstallDirs)
 
+# Qt installed by install-deps.sh / install-deps.ps1 lives in .qt/ and is used
+# automatically when no other Qt was given.
+option(SPACEPENGUIN_USE_LOCAL_QT "Use a Qt installed into .qt/ by install-deps" ON)
+if(SPACEPENGUIN_USE_LOCAL_QT AND NOT CMAKE_PREFIX_PATH AND NOT DEFINED ENV{CMAKE_PREFIX_PATH}
+   AND NOT DEFINED Qt6_DIR)
+    file(GLOB SPACEPENGUIN_LOCAL_QT_CONFIGS
+        "${CMAKE_CURRENT_SOURCE_DIR}/.qt/6.*/*/lib/cmake/Qt6/Qt6Config.cmake")
+    if(SPACEPENGUIN_LOCAL_QT_CONFIGS)
+        list(SORT SPACEPENGUIN_LOCAL_QT_CONFIGS COMPARE NATURAL ORDER DESCENDING)
+        list(GET SPACEPENGUIN_LOCAL_QT_CONFIGS 0 SPACEPENGUIN_LOCAL_QT_CONFIG)
+        cmake_path(GET SPACEPENGUIN_LOCAL_QT_CONFIG PARENT_PATH SPACEPENGUIN_LOCAL_QT)
+        cmake_path(APPEND SPACEPENGUIN_LOCAL_QT ".." ".." "..")
+        cmake_path(NORMAL_PATH SPACEPENGUIN_LOCAL_QT)
+        string(REGEX REPLACE "/$" "" SPACEPENGUIN_LOCAL_QT "${SPACEPENGUIN_LOCAL_QT}")
+        message(STATUS "Using Qt from ${SPACEPENGUIN_LOCAL_QT}")
+        list(APPEND CMAKE_PREFIX_PATH "${SPACEPENGUIN_LOCAL_QT}")
+    endif()
+endif()
+
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network Widgets WebEngineWidgets)
 
 qt_add_executable(spacepenguin
@@ -280,4 +299,50 @@ if((WIN32 OR APPLE) AND COMMAND qt_generate_deploy_app_script)
         OUTPUT_SCRIPT SPACEPENGUIN_DEPLOY_SCRIPT
         NO_UNSUPPORTED_PLATFORM_ERROR)
     install(SCRIPT "${SPACEPENGUIN_DEPLOY_SCRIPT}")
+endif()
+
+# ---- Linux distribution packages (CPack) ------------------------------------
+#
+# `cpack -G DEB` / `cpack -G RPM` / `cpack -G TGZ` in a build tree configured with
+# -DCMAKE_INSTALL_PREFIX=/usr -DSPACEPENGUIN_INSTALL_QT_CONF=OFF against the
+# distribution's own Qt (6.8+) gives a native package whose dependencies are
+# worked out from the binary. build-linux-packages.sh does all of that.
+
+if(UNIX AND NOT APPLE)
+    set(CPACK_PACKAGE_NAME "spacepenguin")
+    set(CPACK_PACKAGE_VENDOR "SpacePenguin")
+    set(CPACK_PACKAGE_CONTACT "SpacePenguin <https://github.com/developer1-vd/SpacePenguin/issues>")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+    set(CPACK_PACKAGE_DESCRIPTION
+        "SpacePenguin is a small web browser built on Qt 6 and QtWebEngine. It blocks ads with Adblock Plus style filter lists, runs JavaScript user scripts, keeps private windows off the disk, and never phones home.")
+    set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/developer1-vd/SpacePenguin")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    set(CPACK_STRIP_FILES ON)
+    set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_PROCESSOR}")
+
+    # Debian / Ubuntu
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    set(CPACK_DEBIAN_PACKAGE_SECTION "web")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    set(CPACK_DEBIAN_PACKAGE_PROVIDES "www-browser")
+    # Loaded at run time, so the shared-library scan cannot see them.
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins, libqt6webenginecore6-bin")
+
+    # Fedora / openSUSE / RHEL
+    set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
+    set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
+    set(CPACK_RPM_PACKAGE_GROUP "Applications/Internet")
+    set(CPACK_RPM_PACKAGE_AUTOREQ ON)
+    set(CPACK_RPM_PACKAGE_PROVIDES "webclient")
+    set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+        /usr/share/applications /usr/share/metainfo /usr/share/icons
+        /usr/share/icons/hicolor /usr/share/icons/hicolor/16x16 /usr/share/icons/hicolor/16x16/apps
+        /usr/share/icons/hicolor/32x32 /usr/share/icons/hicolor/32x32/apps
+        /usr/share/icons/hicolor/48x48 /usr/share/icons/hicolor/48x48/apps
+        /usr/share/icons/hicolor/64x64 /usr/share/icons/hicolor/64x64/apps
+        /usr/share/icons/hicolor/128x128 /usr/share/icons/hicolor/128x128/apps
+        /usr/share/icons/hicolor/256x256 /usr/share/icons/hicolor/256x256/apps
+        /usr/share/icons/hicolor/512x512 /usr/share/icons/hicolor/512x512/apps)
+
+    include(CPack)
 endif()

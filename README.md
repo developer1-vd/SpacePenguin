@@ -255,11 +255,11 @@ SpacePenguin is one CMake project for all three desktops. CI
 (`.github/workflows/build.yml`) builds it, runs every test and produces a package
 on each of them for every push.
 
-| Platform | Built with | Package | Notes |
-| -------- | ---------- | ------- | ----- |
-| Linux (X11, Wayland) | GCC, Qt 6.8 | AppImage | desktop entry, AppStream metadata and icons installed under `share/` |
-| Windows 10/11 x64 | MSVC 2022, Qt 6.8 | NSIS installer and portable zip | icon and version info embedded; no console window |
-| macOS 12+ (Apple silicon and Intel with a universal Qt) | Apple Clang, Qt 6.8 | DMG | `SpacePenguin.app` with icon, registered for `http`/`https` |
+| Platform | Built with | Packages | Notes |
+| -------- | ---------- | -------- | ----- |
+| Linux (X11 and Wayland), any distribution | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package | desktop entry, AppStream metadata and icons installed under `share/` |
+| Windows 10/11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
+| macOS 12+, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | icon, registered for `http`/`https`; ready to notarise |
 
 What is handled per platform:
 
@@ -293,13 +293,49 @@ macOS, and `%APPDATA%` on Windows.
 
 ## Building
 
-Requires Qt 6.8 or newer with QtWebEngine, CMake 3.21 or newer, and a C++20
-compiler: GCC 11+ or Clang 14+ on Linux, MSVC 2022 on Windows, Xcode 14+ on macOS.
+### 1. Install the dependencies
+
+One command sets up a machine: the compiler, CMake, Ninja, the libraries
+QtWebEngine needs, and Qt 6.8 with QtWebEngine.
+
+| System | Command |
+| ------ | ------- |
+| Linux, macOS | `./install-deps.sh` |
+| Windows | `powershell -ExecutionPolicy Bypass -File install-deps.ps1` |
+| NixOS / Nix | `nix-shell` (uses `shell.nix`) |
+
+`install-deps.sh` knows apt (Debian, Ubuntu, Mint, Pop!_OS, elementary, …),
+dnf/yum (Fedora, RHEL, CentOS Stream, Rocky, AlmaLinux, with CRB and EPEL
+enabled), pacman (Arch, Manjaro, EndeavourOS, CachyOS, …), zypper (openSUSE,
+SLE), apk (Alpine, postmarketOS), xbps (Void), emerge (Gentoo) and Homebrew. On
+Alpine and Void install `bash` first.
+
+Most distributions ship a Qt older than 6.8, so by default (`--qt auto`) the script
+asks the package manager which Qt it has and:
+
+- uses the distribution's Qt when it is 6.8 or newer (Debian 13, Ubuntu 25.04,
+  Fedora 41, openSUSE Tumbleweed, Arch, Alpine, …) or when the system uses musl,
+  which cannot run Qt's prebuilt binaries;
+- otherwise downloads Qt from the official Qt mirrors (through `aqtinstall`) into
+  `.qt/` in the repository. Nothing outside the repository changes, and CMake
+  finds `.qt/` by itself.
+
+`--qt system` or `--qt bundled` forces either choice; `--dry-run` shows what would
+run; `--help` lists the rest. `install-deps.ps1` installs Visual Studio 2022 Build
+Tools with C++ (unless MSVC is already there), CMake, Ninja, Python and NSIS with
+winget or Chocolatey, and Qt for MSVC into `.qt\`.
+
+### 2. Build and run
 
 ```sh
-cmake -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/<gcc_64|msvc2022_64|macos>
-cmake --build build --config Release
+cmake -B build
+cmake --build build --config Release --parallel
 ```
+
+Qt from `.qt/` or the system is found automatically; to use another Qt, pass
+`-DCMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/<gcc_64|msvc2022_64|macos>`. The toolchain
+needs CMake 3.21+ and a C++20 compiler: GCC 11+ or Clang 14+ on Linux, MSVC 2022
+on Windows, Xcode 14+ on macOS.
 
 Run it from the build tree:
 
@@ -309,18 +345,11 @@ Run it from the build tree:
 | Windows  | `build\Release\SpacePenguin.exe` (Visual Studio generator) or `build\SpacePenguin.exe` (Ninja), with Qt's `bin` on `PATH` |
 | macOS    | `open build/SpacePenguin.app` |
 
-On Nix:
-
-```sh
-nix-shell -p 'qt6.qtbase' 'qt6.qtdeclarative' 'qt6.qtwebengine' cmake gnumake libglvnd --run \
-  'cmake -B build && cmake --build build && ./build/SpacePenguin'
-```
-
 To get a copy you can move elsewhere, install it:
 `cmake --install build --config Release --prefix <absolute dir>` (Qt's deploy step
-rejects a relative prefix). On Windows and macOS that
-deploys Qt into `<dir>`; on Linux it installs the binary, a `qt.conf` pointing at
-the Qt it was built with, the desktop entry, metadata and icons.
+rejects a relative prefix). On Windows and macOS that deploys Qt into `<dir>`; on
+Linux it installs the binary, a `qt.conf` pointing at the Qt it was built with, the
+desktop entry, metadata and icons.
 
 ### Options
 
@@ -347,17 +376,25 @@ clashes; `singleinstance` checks that a second launch hands its pages over.
 
 ## Packaging
 
-Each package is built on its own platform. `./build-all.sh <version>` picks the
-right script for the machine it runs on; CI builds all three and, for a `v*` tag,
-attaches them to a GitHub release.
+Each package is built on the platform it is for, by one script. Every script
+builds, deploys Qt, checks the result by launching it, and writes the package and
+a SHA-256 checksum to `dist/`. `./build-all.sh` runs the right one for the machine
+it is on; CI builds them all and, for a `v*` tag, attaches them to a GitHub release.
 
-| Platform | Command | Output | Needs |
-| -------- | ------- | ------ | ----- |
-| Linux | `./build-appimage.sh 0.1.0` | `SpacePenguin-0.1.0-x86_64.AppImage` | Qt 6.8 with QtWebEngine; `linuxdeploy` and its Qt plugin are downloaded on first use |
-| macOS | `./build-dmg.sh 0.1.0` | `SpacePenguin-0.1.0-macos.dmg` | Xcode command line tools; set `CODESIGN_IDENTITY` to sign with a Developer ID |
-| Windows | `powershell -ExecutionPolicy Bypass -File build-windows.ps1 -Version 0.1.0` | `SpacePenguin-0.1.0-windows-x64-setup.exe` and `…-windows-x64.zip` | MSVC 2022 shell, Qt on `PATH`, NSIS 3 for the installer |
+| Package | Command | Output | Runs on |
+| ------- | ------- | ------ | ------- |
+| AppImage | `./build-appimage.sh` | `SpacePenguin-<v>-x86_64.AppImage` (or `aarch64`) | any Linux distribution with glibc at least as new as the build machine's (CI: Ubuntu 22.04 and newer, Debian 12+, Fedora 36+, RHEL 9+) |
+| Flatpak | `flatpak-builder` with `packaging/flatpak/org.spacepenguin.SpacePenguin.yml` | `SpacePenguin.flatpak` | any distribution with Flatpak |
+| `.deb` / `.rpm` | `./build-linux-packages.sh` | `spacepenguin_<v>_amd64.deb`, `spacepenguin-<v>-1.x86_64.rpm` | the distribution it was built on; needs that distribution's Qt 6.8+ (Debian 13, Ubuntu 25.04, Fedora 41, openSUSE Tumbleweed, …) |
+| Arch package | `makepkg -si` in `packaging/arch` | `spacepenguin-<v>-1-x86_64.pkg.tar.zst` | Arch, Manjaro, EndeavourOS, … |
+| macOS | `./build-dmg.sh --universal` | `SpacePenguin-<v>-macos.dmg` and `.zip` of the `.app` | macOS 12+, Apple silicon and Intel |
+| Windows | `powershell -ExecutionPolicy Bypass -File build-windows.ps1` | `SpacePenguin-<v>-windows-x64-setup.exe` and `-windows-x64.zip` | Windows 10/11 x64, nothing else needed |
 
-See `BUILD_SCRIPTS.md` for what each script does.
+Every script takes `--help` (`-Help` on Windows). Signing is optional:
+`build-appimage.sh --sign` (GPG), `build-dmg.sh --sign "Developer ID Application: …"
+--notarize`, and `build-windows.ps1 -CertificateThumbprint <hash>`.
+
+See `BUILD_SCRIPTS.md` for what each script does step by step.
 
 ## Known limitations
 
@@ -379,7 +416,8 @@ See `BUILD_SCRIPTS.md` for what each script does.
 - Packages are not code signed. Unsigned Windows installers trigger SmartScreen,
   and an ad-hoc signed macOS app needs right-click › Open the first time;
   `build-dmg.sh` signs and is ready to notarise when given a Developer ID
-- No MSIX (Windows), Flatpak or distribution packages (Linux)
+- No MSIX package (Windows), and no packages published in distribution
+  repositories, Flathub or Homebrew yet; the files to build them are here
 
 ## Layout
 
@@ -408,7 +446,8 @@ src/main.cpp          profile setup, command line, entry point
 html/start.html       built-in start page
 filters/default.txt   built-in starter filter list
 cmake/                Info.plist and qt.conf templates
-packaging/            icons, Linux desktop entry and metadata, Windows resource, macOS icon and entitlements
+packaging/            icons, Linux desktop entry and metadata, Flatpak manifest, Arch PKGBUILD,
+                      Windows resource, macOS icon and entitlements
 tests/                unit tests
 docs/                 GitHub Pages site
 ```

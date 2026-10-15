@@ -1,20 +1,36 @@
-; SpacePenguin Windows installer.
+; SpacePenguin Windows installer (NSIS 3).
 ;
-; Build the app first; build-windows.ps1 does everything:
-;   powershell -ExecutionPolicy Bypass -File build-windows.ps1 -Version 0.1.0
-; or by hand, after `cmake --install <build> --config Release --prefix <dist>`:
-;   makensis /DVERSION=0.1.0 /DSOURCE_DIR=<dist> installer.nsi
+; build-windows.ps1 builds the app and then this installer. By hand, after
+; `cmake --install <build> --config Release --prefix <absolute dist dir>`:
 ;
-; SOURCE_DIR is the install prefix, which windeployqt has already filled with the
-; Qt DLLs, plugins, QtWebEngineProcess.exe and its resources.
+;   makensis /DVERSION=0.1.0 /DSOURCE_DIR=<dist dir> [/DOUTPUT_DIR=<dir>] installer.nsi
+;
+; SOURCE_DIR is the install prefix: SpacePenguin.exe with the Qt DLLs, plugins,
+; QtWebEngineProcess.exe, its resources and the MSVC runtime beside it.
+;
+; The installer offers a per-user install (no administrator rights, into
+; %LOCALAPPDATA%) or an install for everyone (into Program Files). It upgrades an
+; existing installation in place and keeps browsing data unless the uninstaller is
+; told to remove it. Command line:
+;   setup.exe /S                     silent install (per-user unless run elevated)
+;   setup.exe /S /AllUsers           silent install for everyone (needs elevation)
+;   setup.exe /S /CurrentUser        silent per-user install
+;   setup.exe /S /D=C:\Path          choose the folder (must be last)
 
 Unicode true
+ManifestDPIAware true
 
 !ifndef VERSION
   !define VERSION "0.1.0"
 !endif
+!ifndef VERSION_QUAD
+  !define VERSION_QUAD "${VERSION}.0"
+!endif
 !ifndef SOURCE_DIR
   !define SOURCE_DIR "build-windows\dist"
+!endif
+!ifndef OUTPUT_DIR
+  !define OUTPUT_DIR "."
 !endif
 
 !define PRODUCT_NAME "SpacePenguin"
@@ -23,49 +39,84 @@ Unicode true
 !define PRODUCT_EXE "SpacePenguin.exe"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\${PRODUCT_EXE}"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
-!define PRODUCT_CAPABILITIES "Software\Clients\StartMenuInternet\${PRODUCT_NAME}\Capabilities"
+!define PRODUCT_CLIENT_KEY "Software\Clients\StartMenuInternet\${PRODUCT_NAME}"
+!define PRODUCT_CAPABILITIES "${PRODUCT_CLIENT_KEY}\Capabilities"
 !define PRODUCT_PROGID "SpacePenguinHTML"
 
+; ---- Per-user or all-users install ----------------------------------------------
+
+!define MULTIUSER_EXECUTIONLEVEL Highest
+!define MULTIUSER_MUI
+!define MULTIUSER_INSTALLMODE_COMMANDLINE
+!define MULTIUSER_USE_PROGRAMFILES64
+!define MULTIUSER_INSTALLMODE_INSTDIR "${PRODUCT_NAME}"
+; Remember where and how an earlier version was installed.
+!define MULTIUSER_INSTALLMODE_DEFAULT_REGISTRY_KEY "${PRODUCT_UNINST_KEY}"
+!define MULTIUSER_INSTALLMODE_DEFAULT_REGISTRY_VALUENAME "UninstallString"
+!define MULTIUSER_INSTALLMODE_INSTDIR_REGISTRY_KEY "${PRODUCT_UNINST_KEY}"
+!define MULTIUSER_INSTALLMODE_INSTDIR_REGISTRY_VALUENAME "InstallLocation"
+
+!include "MultiUser.nsh"
 !include "MUI2.nsh"
 !include "x64.nsh"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
 
 Name "${PRODUCT_NAME} ${VERSION}"
-OutFile "SpacePenguin-${VERSION}-windows-x64-setup.exe"
-InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
-InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
-RequestExecutionLevel admin
+OutFile "${OUTPUT_DIR}\SpacePenguin-${VERSION}-windows-x64-setup.exe"
+BrandingText "${PRODUCT_NAME} ${VERSION}"
 SetCompressor /SOLID lzma
+SetCompressorDictSize 64
 ShowInstDetails show
 ShowUninstDetails show
 
 !define MUI_ICON "packaging\windows\spacepenguin.ico"
 !define MUI_UNICON "packaging\windows\spacepenguin.ico"
 !define MUI_ABORTWARNING
+!define MUI_COMPONENTSPAGE_SMALLDESC
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXE}"
+!define MUI_FINISHPAGE_RUN_TEXT "Start ${PRODUCT_NAME}"
+!define MUI_FINISHPAGE_LINK "${PRODUCT_NAME} on GitHub"
+!define MUI_FINISHPAGE_LINK_LOCATION "${PRODUCT_WEB_SITE}"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE"
+!insertmacro MULTIUSER_PAGE_INSTALLMODE
+!insertmacro MUI_PAGE_COMPONENTS
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DirectoryLeave
 !insertmacro MUI_PAGE_DIRECTORY
-!insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_COMPONENTS
 !insertmacro MUI_UNPAGE_INSTFILES
 
 !insertmacro MUI_LANGUAGE "English"
 
-; VIProductVersion needs four numeric parts.
-VIProductVersion "${VERSION}.0"
+VIProductVersion "${VERSION_QUAD}"
+VIFileVersion "${VERSION_QUAD}"
 VIAddVersionKey "ProductName" "${PRODUCT_NAME}"
 VIAddVersionKey "CompanyName" "${PRODUCT_PUBLISHER}"
 VIAddVersionKey "LegalCopyright" "GNU General Public License v3"
 VIAddVersionKey "FileDescription" "${PRODUCT_NAME} installer"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "ProductVersion" "${VERSION}"
+
+; ---- Install --------------------------------------------------------------------
+
+Section "-Remove the previous version"
+    ; Upgrading in place: run the old uninstaller silently. It keeps browsing data,
+    ; because its "remove browsing data" option is off by default.
+    ReadRegStr $0 SHCTX "${PRODUCT_UNINST_KEY}" "InstallLocation"
+    ${If} $0 != ""
+    ${AndIf} ${FileExists} "$0\Uninstall.exe"
+        DetailPrint "Removing the installed version from $0"
+        ExecWait '"$0\Uninstall.exe" /S _?=$0'
+        Delete "$0\Uninstall.exe"
+        RMDir "$0"
+    ${EndIf}
+SectionEnd
 
 Section "SpacePenguin (required)" SEC_MAIN
     SectionIn RO
@@ -74,21 +125,29 @@ Section "SpacePenguin (required)" SEC_MAIN
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-    WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\${PRODUCT_EXE}"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\${PRODUCT_EXE},0"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${VERSION}"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
-    WriteRegDWORD HKLM "${PRODUCT_UNINST_KEY}" "NoModify" 1
-    WriteRegDWORD HKLM "${PRODUCT_UNINST_KEY}" "NoRepair" 1
+    WriteRegStr SHCTX "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\${PRODUCT_EXE}"
+    WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
+    WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\${PRODUCT_EXE},0"
+    WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${VERSION}"
+    WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+    WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
+    WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "InstallLocation" "$INSTDIR"
+    WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "UninstallString" \
+        '"$INSTDIR\Uninstall.exe" /$MultiUser.InstallMode'
+    WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "QuietUninstallString" \
+        '"$INSTDIR\Uninstall.exe" /$MultiUser.InstallMode /S'
+    WriteRegDWORD SHCTX "${PRODUCT_UNINST_KEY}" "NoModify" 1
+    WriteRegDWORD SHCTX "${PRODUCT_UNINST_KEY}" "NoRepair" 1
+    ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
+    IntFmt $0 "0x%08X" $0
+    WriteRegDWORD SHCTX "${PRODUCT_UNINST_KEY}" "EstimatedSize" "$0"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
     CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME} (Private).lnk" \
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME} (Private Window).lnk" \
         "$INSTDIR\${PRODUCT_EXE}" "--private"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "$INSTDIR\Uninstall.exe"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "$INSTDIR\Uninstall.exe" \
+        "/$MultiUser.InstallMode"
 SectionEnd
 
 Section "Desktop shortcut" SEC_DESKTOP
@@ -98,25 +157,27 @@ SectionEnd
 ; Lists SpacePenguin under Settings > Apps > Default apps. Windows asks the user
 ; before it becomes the default; nothing is taken over silently.
 Section "Offer as a default browser" SEC_BROWSER
-    WriteRegStr HKLM "Software\Classes\${PRODUCT_PROGID}" "" "SpacePenguin HTML Document"
-    WriteRegStr HKLM "Software\Classes\${PRODUCT_PROGID}\DefaultIcon" "" "$INSTDIR\${PRODUCT_EXE},0"
-    WriteRegStr HKLM "Software\Classes\${PRODUCT_PROGID}\shell\open\command" "" \
+    WriteRegStr SHCTX "Software\Classes\${PRODUCT_PROGID}" "" "SpacePenguin HTML Document"
+    WriteRegStr SHCTX "Software\Classes\${PRODUCT_PROGID}\DefaultIcon" "" "$INSTDIR\${PRODUCT_EXE},0"
+    WriteRegStr SHCTX "Software\Classes\${PRODUCT_PROGID}\shell\open\command" "" \
         '"$INSTDIR\${PRODUCT_EXE}" "%1"'
 
-    WriteRegStr HKLM "Software\Clients\StartMenuInternet\${PRODUCT_NAME}" "" "${PRODUCT_NAME}"
-    WriteRegStr HKLM "Software\Clients\StartMenuInternet\${PRODUCT_NAME}\DefaultIcon" "" \
-        "$INSTDIR\${PRODUCT_EXE},0"
-    WriteRegStr HKLM "Software\Clients\StartMenuInternet\${PRODUCT_NAME}\shell\open\command" "" \
-        '"$INSTDIR\${PRODUCT_EXE}"'
-    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}" "ApplicationName" "${PRODUCT_NAME}"
-    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}" "ApplicationIcon" "$INSTDIR\${PRODUCT_EXE},0"
-    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}" "ApplicationDescription" \
+    WriteRegStr SHCTX "${PRODUCT_CLIENT_KEY}" "" "${PRODUCT_NAME}"
+    WriteRegStr SHCTX "${PRODUCT_CLIENT_KEY}\DefaultIcon" "" "$INSTDIR\${PRODUCT_EXE},0"
+    WriteRegStr SHCTX "${PRODUCT_CLIENT_KEY}\shell\open\command" "" '"$INSTDIR\${PRODUCT_EXE}"'
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}" "ApplicationName" "${PRODUCT_NAME}"
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}" "ApplicationIcon" "$INSTDIR\${PRODUCT_EXE},0"
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}" "ApplicationDescription" \
         "A secure, lightweight, and usable browser written in Qt"
-    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}\FileAssociations" ".htm" "${PRODUCT_PROGID}"
-    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}\FileAssociations" ".html" "${PRODUCT_PROGID}"
-    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}\URLAssociations" "http" "${PRODUCT_PROGID}"
-    WriteRegStr HKLM "${PRODUCT_CAPABILITIES}\URLAssociations" "https" "${PRODUCT_PROGID}"
-    WriteRegStr HKLM "Software\RegisteredApplications" "${PRODUCT_NAME}" "${PRODUCT_CAPABILITIES}"
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}\FileAssociations" ".htm" "${PRODUCT_PROGID}"
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}\FileAssociations" ".html" "${PRODUCT_PROGID}"
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}\FileAssociations" ".xhtml" "${PRODUCT_PROGID}"
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}\URLAssociations" "http" "${PRODUCT_PROGID}"
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}\URLAssociations" "https" "${PRODUCT_PROGID}"
+    WriteRegStr SHCTX "${PRODUCT_CAPABILITIES}\StartMenu" "StartMenuInternet" "${PRODUCT_NAME}"
+    WriteRegStr SHCTX "Software\RegisteredApplications" "${PRODUCT_NAME}" "${PRODUCT_CAPABILITIES}"
+    ; Tell Explorer the associations changed (SHCNE_ASSOCCHANGED).
+    System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 SectionEnd
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
@@ -126,38 +187,62 @@ SectionEnd
         "List SpacePenguin in Windows' Default apps so you can choose it as your browser."
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
-Section "Uninstall"
+; ---- Uninstall ------------------------------------------------------------------
+
+Section "un.SpacePenguin" UNSEC_MAIN
+    SectionIn RO
+    ; The install folder is always one of our own (see DirectoryLeave), so the
+    ; recursive delete cannot reach anything else.
     ${If} ${FileExists} "$INSTDIR\${PRODUCT_EXE}"
         RMDir /r "$INSTDIR"
     ${EndIf}
 
-    DeleteRegKey HKLM "${PRODUCT_DIR_REGKEY}"
-    DeleteRegKey HKLM "${PRODUCT_UNINST_KEY}"
-    DeleteRegKey HKLM "Software\Classes\${PRODUCT_PROGID}"
-    DeleteRegKey HKLM "Software\Clients\StartMenuInternet\${PRODUCT_NAME}"
-    DeleteRegValue HKLM "Software\RegisteredApplications" "${PRODUCT_NAME}"
+    DeleteRegKey SHCTX "${PRODUCT_DIR_REGKEY}"
+    DeleteRegKey SHCTX "${PRODUCT_UNINST_KEY}"
+    DeleteRegKey SHCTX "Software\Classes\${PRODUCT_PROGID}"
+    DeleteRegKey SHCTX "${PRODUCT_CLIENT_KEY}"
+    DeleteRegValue SHCTX "Software\RegisteredApplications" "${PRODUCT_NAME}"
+    System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 
     RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
 SectionEnd
 
+Section /o "un.Remove browsing data" UNSEC_DATA
+    ; History, bookmarks, settings (QSettings lives in the registry on Windows),
+    ; cookies, cache, filter lists and user scripts of the current user.
+    RMDir /r "$APPDATA\${PRODUCT_NAME}"
+    RMDir /r "$LOCALAPPDATA\${PRODUCT_NAME}"
+    DeleteRegKey HKCU "Software\${PRODUCT_NAME}"
+SectionEnd
+
+!insertmacro MUI_UNFUNCTION_DESCRIPTION_BEGIN
+    !insertmacro MUI_DESCRIPTION_TEXT ${UNSEC_MAIN} "The program, its shortcuts and its registration."
+    !insertmacro MUI_DESCRIPTION_TEXT ${UNSEC_DATA} \
+        "Also delete your history, bookmarks, settings, cookies and cache. Off by default."
+!insertmacro MUI_UNFUNCTION_DESCRIPTION_END
+
+; ---- Functions ------------------------------------------------------------------
+
 Function .onInit
     ${IfNot} ${RunningX64}
-        MessageBox MB_OK|MB_ICONSTOP "SpacePenguin needs 64-bit Windows."
+        MessageBox MB_OK|MB_ICONSTOP "${PRODUCT_NAME} needs 64-bit Windows."
         Abort
     ${EndIf}
     SetRegView 64
+    !insertmacro MULTIUSER_INIT
 FunctionEnd
 
-; Always install into a folder of our own, so the uninstaller's recursive delete
-; can never reach anything else (for example if "C:\Program Files" is chosen).
+Function un.onInit
+    SetRegView 64
+    !insertmacro MULTIUSER_UNINIT
+FunctionEnd
+
+; Always install into a folder of our own, so the uninstaller's recursive delete can
+; never reach anything else (for example if "C:\Program Files" itself is chosen).
 Function DirectoryLeave
     ${GetFileName} "$INSTDIR" $0
     ${If} $0 != "${PRODUCT_NAME}"
         StrCpy $INSTDIR "$INSTDIR\${PRODUCT_NAME}"
     ${EndIf}
-FunctionEnd
-
-Function un.onInit
-    SetRegView 64
 FunctionEnd

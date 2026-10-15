@@ -1,25 +1,33 @@
 #!/usr/bin/env bash
-# Package SpacePenguin for the platform this runs on: ./build-all.sh [version]
+# Build every package this machine can make: ./build-all.sh [options passed on]
 #
-#   Linux   -> SpacePenguin-<version>-<arch>.AppImage   (build-appimage.sh)
-#   macOS   -> SpacePenguin-<version>-macos.dmg         (build-dmg.sh)
-#   Windows -> installer and zip                        (build-windows.ps1, via Git Bash/MSYS)
+#   Linux   -> AppImage (build-appimage.sh), plus .deb/.rpm when the distribution's
+#              own Qt is 6.8+ (build-linux-packages.sh)
+#   macOS   -> universal .app zip and DMG (build-dmg.sh --universal)
+#   Windows -> installer and portable zip (build-windows.ps1, from Git Bash/MSYS)
 #
-# Each platform's package has to be built on that platform; the CI workflow in
-# .github/workflows/build.yml builds all three.
+# Packages for the other systems have to be built on them; CI
+# (.github/workflows/build.yml) builds all of them.
 set -euo pipefail
-
-VERSION="${1:-0.1.0}"
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
 case "$(uname -s)" in
     Linux)
-        exec ./build-appimage.sh "${VERSION}"
+        ./build-appimage.sh "$@"
+        qtpaths="$(command -v qtpaths6 || command -v qtpaths || true)"
+        if [[ -n "${qtpaths}" ]] &&
+           [[ "$(printf '%s\n6.8.0\n' "$("${qtpaths}" --qt-query QT_VERSION)" | sort -V | head -n1)" == 6.8.0 ]] &&
+           { command -v dpkg-deb >/dev/null || command -v rpmbuild >/dev/null; }; then
+            ./build-linux-packages.sh
+        else
+            echo "Skipping .deb/.rpm: they need the distribution's own Qt 6.8+ (./install-deps.sh --qt system)."
+        fi
         ;;
     Darwin)
-        exec ./build-dmg.sh "${VERSION}"
+        exec ./build-dmg.sh --universal "$@"
         ;;
     MINGW*|MSYS*|CYGWIN*)
-        exec powershell -ExecutionPolicy Bypass -File build-windows.ps1 -Version "${VERSION}"
+        exec powershell -ExecutionPolicy Bypass -File build-windows.ps1 "$@"
         ;;
     *)
         echo "Unsupported platform: $(uname -s)" >&2

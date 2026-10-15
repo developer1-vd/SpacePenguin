@@ -1,0 +1,53 @@
+# Maintainer: SpacePenguin contributors <https://github.com/developer1-vd/SpacePenguin>
+#
+# Arch Linux, Manjaro, EndeavourOS, CachyOS and other pacman distributions.
+#
+# From a release:   makepkg -si
+# From this checkout (no tag needed):
+#   SPACEPENGUIN_SOURCE="$(git -C ../.. rev-parse --show-toplevel)" makepkg -si
+pkgname=spacepenguin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A secure, lightweight, and usable browser written in Qt"
+arch=('x86_64' 'aarch64')
+url="https://github.com/developer1-vd/SpacePenguin"
+license=('GPL-3.0-or-later')
+depends=('qt6-base' 'qt6-webengine' 'hicolor-icon-theme')
+makedepends=('cmake' 'ninja' 'git')
+checkdepends=()
+provides=('spacepenguin')
+
+if [[ -n "${SPACEPENGUIN_SOURCE:-}" ]]; then
+    source=("spacepenguin::git+file://${SPACEPENGUIN_SOURCE}")
+    sha256sums=('SKIP')
+else
+    source=("spacepenguin-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
+    sha256sums=('SKIP')
+fi
+
+_srcdir() {
+    if [[ -n "${SPACEPENGUIN_SOURCE:-}" ]]; then
+        echo "${srcdir}/spacepenguin"
+    else
+        echo "${srcdir}/SpacePenguin-${pkgver}"
+    fi
+}
+
+build() {
+    cmake -S "$(_srcdir)" -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DSPACEPENGUIN_INSTALL_QT_CONF=OFF \
+        -DSPACEPENGUIN_USE_LOCAL_QT=OFF \
+        -DSPACEPENGUIN_BUILD_TESTS=ON
+    cmake --build build
+}
+
+check() {
+    QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install build
+    install -Dm644 "$(_srcdir)/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

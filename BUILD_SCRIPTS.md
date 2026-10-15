@@ -1,79 +1,181 @@
 # Build scripts for SpacePenguin
 
-Every package is built on the platform it is for. All three scripts build with
-CMake into their own directory (override with `BUILD_DIR=…` / `-BuildDir …`) and
-then run `cmake --install`, so they package exactly what a normal install
-produces. `.github/workflows/build.yml` runs them on every push.
+| Script | Runs on | Makes |
+| ------ | ------- | ----- |
+| `install-deps.sh` | Linux, macOS | a machine ready to build: toolchain, libraries, Qt 6.8 with QtWebEngine |
+| `install-deps.ps1` | Windows | the same for Windows: Visual Studio Build Tools, CMake, Ninja, NSIS, Qt for MSVC |
+| `build-appimage.sh` | Linux | `dist/SpacePenguin-<version>-<arch>.AppImage` |
+| `build-linux-packages.sh` | Linux | `dist/*.deb` and/or `dist/*.rpm` for the distribution it runs on |
+| `packaging/arch/PKGBUILD` | Arch and derivatives | `spacepenguin-<version>-1-<arch>.pkg.tar.zst` |
+| `packaging/flatpak/…yml` | any Linux with flatpak-builder | `SpacePenguin.flatpak` |
+| `build-dmg.sh` | macOS | `dist/SpacePenguin-<version>-macos.dmg` and `.zip` of the `.app` |
+| `build-windows.ps1` | Windows | `dist/SpacePenguin-<version>-windows-x64-setup.exe` and `.zip` |
+| `build-all.sh` | any | whichever of the above this machine can make |
 
-`./build-all.sh <version>` runs whichever script matches the current machine.
+Every packaging script reads the version from `CMakeLists.txt` unless given one,
+finds Qt in `.qt/` (from `install-deps`) before `CMAKE_PREFIX_PATH`, launches the
+finished app with `--version` to check that it starts, and writes a `.sha256`
+checksum next to the package. All of them take `--help` (`-Help` on Windows).
 
-## Linux AppImage — `build-appimage.sh`
-
-```bash
-CMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/gcc_64 ./build-appimage.sh 0.1.0
-```
-
-1. Configures with `CMAKE_INSTALL_PREFIX=/usr` and without the `qt.conf` a normal
-   Linux install gets (the AppImage carries its own Qt).
-2. Installs into `build-appimage/AppDir`, which brings the desktop entry,
-   AppStream metadata and icons from `packaging/linux` and `packaging/icons`.
-3. Downloads `linuxdeploy` and `linuxdeploy-plugin-qt` into `.cache/linuxdeploy`
-   the first time, then bundles Qt, QtWebEngine (helper process, resources,
-   locales) and the libraries they need.
-
-Qt is found through `qmake`: the script uses `QMAKE` if set, then
-`$CMAKE_PREFIX_PATH/bin/qmake`, then `qmake6`/`qmake` on `PATH`. The Qt install
-needs the QtWebEngine, QtWebChannel, QtPositioning and QtSerialPort modules (the
-last one because the positioning plugins link against it).
-
-Output: `SpacePenguin-<version>-<arch>.AppImage`.
-
-## macOS DMG — `build-dmg.sh`
+## install-deps.sh
 
 ```bash
-CMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/macos ./build-dmg.sh 0.1.0
+./install-deps.sh               # everything, asking before it installs packages
+./install-deps.sh --yes         # no questions (CI)
+./install-deps.sh --dry-run     # show the commands only
+./install-deps.sh --qt system   # use the distribution's Qt (must be 6.8+)
+./install-deps.sh --qt bundled  # always use Qt from the Qt mirrors, in .qt/
 ```
 
-1. Builds `SpacePenguin.app` (icon, `Info.plist` with the `http`/`https` URL
-   types) and installs it into `build-macos/dist`; the install step runs
-   `macdeployqt`, which copies the Qt frameworks and QtWebEngine's helper app
-   into the bundle.
-2. Signs the bundle: with `CODESIGN_IDENTITY="Developer ID Application: …"` it
-   uses the hardened runtime and `packaging/macos/entitlements.plist` (QtWebEngine
-   needs JIT), ready for `xcrun notarytool`; without it, ad-hoc.
-3. Wraps the app and an `/Applications` link in a compressed DMG.
+1. Identifies the system from `/etc/os-release` (or macOS) and picks its package
+   manager: apt, dnf/yum, pacman, zypper, apk, xbps, emerge or Homebrew. On RHEL,
+   Rocky and AlmaLinux it enables CodeReady Builder and EPEL first. NixOS is
+   pointed at `shell.nix`.
+2. With `--qt auto` (the default), asks the package manager which QtWebEngine it
+   offers. 6.8 or newer: the system Qt is installed and used. Older, or none: Qt
+   6.8.3 comes from the Qt mirrors instead. musl systems (Alpine, Void musl) and
+   CPUs Qt does not build for always use the system Qt.
+3. Installs the compiler, CMake, Ninja, Git, Python, the OpenGL, xkbcommon,
+   xcb-util, NSS, ALSA and fontconfig libraries QtWebEngine needs, and the
+   packaging checkers (`desktop-file-utils`, `appstream`, `dpkg-dev`/`rpm-build`).
+4. For the bundled Qt: creates a Python virtual environment in `.qt/.venv`,
+   installs `aqtinstall` there, and installs Qt with the QtWebEngine,
+   QtWebChannel, QtPositioning, QtPdf and QtSerialPort modules into `.qt/`.
+5. Checks CMake is 3.21+ and the Qt is 6.8+, and prints the build commands.
 
-Set `CMAKE_OSX_ARCHITECTURES="arm64;x86_64"` with a universal Qt for a universal
-app.
+The script needs bash: on Alpine run `apk add bash`, on Void `xbps-install bash`.
 
-Output: `SpacePenguin-<version>-macos.dmg`.
-
-## Windows installer and zip — `build-windows.ps1`
+## install-deps.ps1
 
 ```powershell
-# From a "Developer PowerShell for VS 2022", with Qt's bin directory on PATH
-powershell -ExecutionPolicy Bypass -File build-windows.ps1 -Version 0.1.0
+powershell -ExecutionPolicy Bypass -File install-deps.ps1 [-QtVersion 6.8.3] [-SkipVisualStudio] [-NoPackaging] [-DryRun]
+```
+
+Uses winget, or Chocolatey where winget is missing (Windows Server). Installs Visual
+Studio 2022 Build Tools with the C++ workload when `vswhere` finds no MSVC, then
+CMake, Ninja, Python 3 and NSIS when they are missing, then Qt for MSVC 2022 into
+`.qt\` through `aqtinstall`. Open a new terminal afterwards so the new tools are on
+`PATH`.
+
+## build-appimage.sh
+
+```bash
+./build-appimage.sh [--version x.y.z] [--qt <prefix>] [--update-info <info>] [--sign] [--skip-build]
+```
+
+1. Builds with `CMAKE_INSTALL_PREFIX=/usr` and installs into an AppDir, which
+   brings the desktop entry, AppStream metadata and icons.
+2. Downloads `linuxdeploy` and `linuxdeploy-plugin-qt` into `.cache/linuxdeploy`
+   the first time.
+3. Bundles Qt and QtWebEngine (helper process, resources, locales) and the
+   libraries they need, with the X11, native Wayland and offscreen platform
+   plugins, and writes the AppImage. `--update-info` embeds AppImageUpdate data
+   and writes a `.zsync`; `--sign` signs with your GPG key.
+4. Launches the AppImage with a scrubbed environment to check it starts.
+
+An AppImage runs on distributions whose glibc is at least as new as the build
+machine's, which is why CI builds it on Ubuntu 22.04.
+
+## build-linux-packages.sh
+
+```bash
+./build-linux-packages.sh [deb|rpm|tgz|auto]...
+```
+
+Builds against the distribution's own Qt (it refuses a Qt from `.qt/`, which a
+package cannot depend on), installs to `/usr`, and runs CPack. The `.deb` gets its
+dependencies from `dpkg-shlibdeps` plus the Qt platform plugins and the
+QtWebEngine helper; the `.rpm` from RPM's automatic dependency scan. The
+distribution must ship Qt 6.8+: Debian 13, Ubuntu 25.04, Fedora 41, openSUSE
+Tumbleweed and newer. Elsewhere use the AppImage or the Flatpak.
+
+## packaging/arch/PKGBUILD
+
+```bash
+cd packaging/arch && makepkg -si                       # from the v<version> release tarball
+SPACEPENGUIN_SOURCE="$(git rev-parse --show-toplevel)" makepkg -si   # from this checkout
+```
+
+Builds against Arch's `qt6-webengine`, runs the tests in `check()`, and installs
+the license as Arch requires.
+
+## packaging/flatpak
+
+```bash
+flatpak install --user flathub org.kde.Platform//6.8 org.kde.Sdk//6.8 io.qt.qtwebengine.BaseApp//6.8
+flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/org.spacepenguin.SpacePenguin.yml
+flatpak run org.spacepenguin.SpacePenguin
+```
+
+Built on the KDE 6.8 runtime with the QtWebEngine base app. The app may use the
+network, the display (Wayland, or X11 as a fallback), sound, the GPU and the
+Downloads folder, and nothing else.
+
+## build-dmg.sh
+
+```bash
+./build-dmg.sh [--universal | --arch arm64] [--sign "Developer ID Application: …" [--notarize]] [--app-only]
+```
+
+1. Builds `SpacePenguin.app` (universal with `--universal`; the Qt from
+   install-deps is universal) and installs it, which runs `macdeployqt` to copy
+   the Qt frameworks and QtWebEngine's helper app into the bundle.
+2. Signs from the inside out: libraries and plugins, the nested
+   `QtWebEngineProcess.app`, the frameworks, then the app. With a Developer ID it
+   uses the hardened runtime and `packaging/macos/entitlements.plist` (QtWebEngine
+   needs JIT); without one it signs ad-hoc. Then verifies the signature.
+3. Launches the app to check it starts.
+4. Zips the `.app` with `ditto` and makes a compressed DMG with an
+   `/Applications` link, then verifies it.
+5. `--notarize` submits the DMG with `notarytool` (credentials from
+   `NOTARY_PROFILE`, or `APPLE_ID`, `APPLE_TEAM_ID` and `APPLE_APP_PASSWORD`),
+   staples the ticket and checks it with Gatekeeper.
+
+## build-windows.ps1
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build-windows.ps1 [-Version x.y.z] [-CertificateThumbprint <hash>] [-NoInstaller] [-NoZip]
 ```
 
 1. Builds with MSVC and installs into `build-windows\dist`; the install step runs
-   `windeployqt`, so that directory is a complete portable copy.
-2. Zips it as `SpacePenguin-<version>-windows-x64.zip`.
-3. If `makensis` (NSIS 3) is on `PATH`, builds
-   `SpacePenguin-<version>-windows-x64-setup.exe` from `installer.nsi`.
+   `windeployqt`.
+2. Copies the MSVC runtime DLLs beside the executable (app-local deployment), so
+   the app runs on a clean Windows without the VC++ redistributable.
+3. Checks every file the browser needs is present, then launches it with
+   `--version`.
+4. Signs the executable with `signtool` when given a certificate.
+5. Zips the folder as a portable copy and builds the installer from
+   `installer.nsi`, then signs the installer.
 
-The installer puts SpacePenguin in its own folder under Program Files, adds Start
-menu entries (including a private-window one), and optionally a desktop shortcut
-and a "default browser" registration. That registration only lists SpacePenguin
-in Settings › Apps › Default apps; Windows asks the user before it becomes the
-default. The uninstaller removes all of it.
+### installer.nsi
 
-`installer.nsi` can also be built by hand:
-`makensis /DVERSION=0.1.0 /DSOURCE_DIR=<install dir> installer.nsi`.
+- Install for the current user (no administrator rights, into
+  `%LOCALAPPDATA%`) or for everyone (into Program Files), chosen on a page or
+  with `/CurrentUser` / `/AllUsers`; `/S` installs silently.
+- Upgrades in place: an existing installation is removed first, keeping the
+  user's browsing data.
+- Start menu entries, including one for a private window; optional desktop
+  shortcut; optional registration in Settings › Apps › Default apps (Windows asks
+  the user before it becomes the default — nothing is taken over silently).
+- An Apps & features entry with icon, version, size and a quiet uninstall string.
+- The uninstaller removes the program and its registration, and only deletes
+  history, bookmarks, settings and cache when "Remove browsing data" is ticked.
+- Always installs into a folder of its own, so the uninstaller's recursive
+  delete can never reach anything else.
 
 ## Continuous integration
 
-`.github/workflows/build.yml` runs on Linux, Windows and macOS for every push and
-pull request: configure, build, run the tests offscreen, package with the script
-above, check that the package contains QtWebEngine, and upload it as an artifact.
-Pushing a tag such as `v0.1.0` also creates a GitHub release with the three
-packages attached.
+`.github/workflows/build.yml`, on every push and pull request:
+
+- **Linux AppImage, Windows, macOS** — `install-deps`, build, all tests, the
+  packages above, and checks that launch them: the AppImage, both architectures
+  of the macOS app from inside the mounted DMG, and on Windows a silent per-user
+  install, launch and silent uninstall.
+- **Distributions** (in containers) — Debian 13, Ubuntu 24.04, Fedora,
+  openSUSE Tumbleweed, Arch, Alpine and Void each run
+  `.github/scripts/distro.sh`: `install-deps`, build, tests, then the native
+  package (`.deb`, `.rpm`, Arch package) installed with the distribution's own
+  package manager and launched.
+- **Flatpak** — built with `flatpak-builder` into a bundle.
+
+A tag such as `v0.1.0` also publishes every package as a GitHub release.
