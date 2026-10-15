@@ -148,7 +148,9 @@ codesign --verify --deep --strict --verbose=1 "${APP}"
 
 if [[ ${SMOKE_TEST} -eq 1 ]]; then
     step "Smoke test: launching the app"
-    reported="$(env -i HOME="$(mktemp -d)" PATH=/usr/bin:/bin QT_QPA_PLATFORM=offscreen \
+    # The bundle carries the cocoa platform plugin only, which is what users get;
+    # --version exits before any window opens.
+    reported="$(env -i HOME="$(mktemp -d)" PATH=/usr/bin:/bin \
         "${APP}/Contents/MacOS/SpacePenguin" --version 2>&1 | tail -n1)"
     echo "    ${reported}"
     [[ "${reported}" == *"SpacePenguin ${VERSION}"* ]] ||

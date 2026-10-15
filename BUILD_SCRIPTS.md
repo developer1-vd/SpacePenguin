@@ -174,7 +174,7 @@ powershell -ExecutionPolicy Bypass -File build-windows.ps1 [-Version x.y.z] [-Ce
 ### installer.nsi
 
 - Install for the current user (no administrator rights, into
-  `%LOCALAPPDATA%`) or for everyone (into Program Files), chosen on a page or
+  `%LOCALAPPDATA%\Programs`) or for everyone (into Program Files), chosen on a page or
   with `/CurrentUser` / `/AllUsers`; `/S` installs silently.
 - Upgrades in place: an existing installation is removed first, keeping the
   user's browsing data.

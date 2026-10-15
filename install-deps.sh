@@ -150,6 +150,10 @@ detect_linux() {
 
 QT_FROM_SYSTEM=0
 
+apt_installable() {
+    apt-cache policy "$1" 2>/dev/null | grep -q '^ *Candidate: *[0-9]'
+}
+
 packages_apt() {
     PKGS=(build-essential cmake ninja-build git curl ca-certificates python3 python3-venv
           libgl1-mesa-dev libegl1 libxkbcommon-dev libxkbcommon-x11-0 libfontconfig1
@@ -159,10 +163,11 @@ packages_apt() {
     # Libraries Qt's prebuilt binaries link against that minimal systems lack.
     PKGS+=(libgssapi-krb5-2 libgbm1 libxshmfence1 libfreetype6 libdrm2 libx11-6 libx11-xcb1
            libxext6 libxfixes3 libxi6 libxrender1 libexpat1)
-    # Renamed for the 64-bit time_t transition (Ubuntu 24.04+, Debian 13+).
+    # Renamed for the 64-bit time_t transition (Ubuntu 24.04+, Debian 13+). Older
+    # releases still know the new names, as references without a candidate.
     local library
     for library in libasound2 libglib2.0-0; do
-        if apt-cache show "${library}t64" >/dev/null 2>&1; then PKGS+=("${library}t64"); else PKGS+=("${library}"); fi
+        if apt_installable "${library}t64"; then PKGS+=("${library}t64"); else PKGS+=("${library}"); fi
     done
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file dpkg-dev)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-dev qt6-webengine-dev qt6-tools-dev

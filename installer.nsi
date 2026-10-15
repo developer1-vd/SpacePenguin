@@ -9,7 +9,7 @@
 ; QtWebEngineProcess.exe, its resources and the MSVC runtime beside it.
 ;
 ; The installer offers a per-user install (no administrator rights, into
-; %LOCALAPPDATA%) or an install for everyone (into Program Files). It upgrades an
+; %LOCALAPPDATA%\Programs) or an install for everyone (into Program Files). It upgrades an
 ; existing installation in place and keeps browsing data unless the uninstaller is
 ; told to remove it. Command line:
 ;   setup.exe /S                     silent install (per-user unless run elevated)
@@ -230,7 +230,13 @@ Function .onInit
         Abort
     ${EndIf}
     SetRegView 64
+    ; MULTIUSER_INIT picks the default folder for the install mode and would
+    ; overwrite a folder given with /D=, so keep that one.
+    StrCpy $0 $INSTDIR
     !insertmacro MULTIUSER_INIT
+    ${If} $0 != ""
+        StrCpy $INSTDIR $0
+    ${EndIf}
 FunctionEnd
 
 Function un.onInit

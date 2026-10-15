@@ -99,7 +99,7 @@ jobs:
           app="$mount/SpacePenguin.app"
           lipo -archs "$app/Contents/MacOS/SpacePenguin" | tee /dev/stderr | grep -q arm64
           lipo -archs "$app/Contents/MacOS/SpacePenguin" | grep -q x86_64
-          QT_QPA_PLATFORM=offscreen "$app/Contents/MacOS/SpacePenguin" --version
+          "$app/Contents/MacOS/SpacePenguin" --version
           hdiutil detach "$mount"
 
       - name: Package installer and zip
