@@ -77,4 +77,13 @@ bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, 
     return isAllowedScheme(url.scheme());
 }
 
+void BrowserPage::javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
+                                           const QString &message, int lineNumber,
+                                           const QString &sourceID)
+{
+    static const bool forward = qEnvironmentVariableIntValue("SPACEPENGUIN_JS_CONSOLE") != 0;
+    if (forward)
+        QWebEnginePage::javaScriptConsoleMessage(level, message, lineNumber, sourceID);
+}
+
 }

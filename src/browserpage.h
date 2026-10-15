@@ -21,6 +21,10 @@ signals:
 
 protected:
     bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override;
+    /** Page console output stays out of the terminal, as in other browsers, unless
+     *  SPACEPENGUIN_JS_CONSOLE=1 asks for it (it is in the developer tools anyway). */
+    void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level, const QString &message,
+                                  int lineNumber, const QString &sourceID) override;
 
     static bool isAllowedScheme(const QString &scheme);
     static bool isAboutPage(const QUrl &url);

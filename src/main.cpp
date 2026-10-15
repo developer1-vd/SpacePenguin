@@ -3,6 +3,7 @@
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFileOpenEvent>
+#include <QLoggingCategory>
 #include <QTimer>
 #include <QWebEngineProfile>
 #include <QWebEngineUrlScheme>
@@ -41,6 +42,11 @@ int main(int argc, char *argv[])
     QWebEngineUrlScheme::registerScheme(startScheme);
 
     spacepenguin::StartupTrace::mark("sandbox and device checks done");
+
+    // Qt reports that the desktop portal already knows this app when it was started
+    // from a terminal that registered itself; nothing is wrong. QT_LOGGING_RULES
+    // still overrides this.
+    QLoggingCategory::setFilterRules(QStringLiteral("qt.qpa.services.warning=false"));
     QApplication app(argc, argv);
     spacepenguin::StartupTrace::mark("Qt application created");
     // Fusion draws the same everywhere, which the chrome stylesheet relies on.

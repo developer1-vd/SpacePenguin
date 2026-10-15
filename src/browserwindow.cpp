@@ -458,9 +458,14 @@ void BrowserWindow::createChrome()
         dismiss->setIcon(Icons::icon(Icons::Close));
         dismiss->setAutoRaise(true);
         dismiss->setToolTip(tr("Hide until next start"));
-        connect(dismiss, &QToolButton::clicked, banner, &QWidget::hide);
         bannerLayout->addWidget(dismiss, 0, Qt::AlignTop);
-        layout->addWidget(banner);
+        // A rounded card, so it keeps clear of the window's edges.
+        auto *bannerHolder = new QWidget;
+        auto *holderLayout = new QVBoxLayout(bannerHolder);
+        holderLayout->setContentsMargins(8, 6, 8, 2);
+        holderLayout->addWidget(banner);
+        connect(dismiss, &QToolButton::clicked, bannerHolder, &QWidget::hide);
+        layout->addWidget(bannerHolder);
     }
 
     m_progressBar = new QProgressBar;
@@ -511,7 +516,7 @@ QWidget *BrowserWindow::createTabStrip()
     auto *newTabButton = chromeButton(m_newTabAction);
     newTabButton->setToolTip(tr("New tab (%1)")
                                  .arg(m_newTabAction->shortcut().toString(QKeySequence::NativeText)));
-    layout->addWidget(newTabButton, 0, Qt::AlignBottom);
+    layout->addWidget(newTabButton, 0, Qt::AlignVCenter);
 
     if (m_isPrivate) {
         auto *badgeIcon = new QLabel;

@@ -540,6 +540,10 @@ not only ChromeOS):
 bash packaging/chromeos/install.sh dist/SpacePenguin-*.AppImage   # then start it from the app menu
 ```
 
+**Errors from websites in the terminal.** Page console messages (`js: …`) are not
+printed by default, since they come from the sites themselves; set
+`SPACEPENGUIN_JS_CONSOLE=1` to see them, or use the developer tools.
+
 **It still quits at start-up.** Run it from a terminal and keep the output:
 `./build/SpacePenguin 2>&1 | tail -40`. If graphics are the problem, try
 `QTWEBENGINE_CHROMIUM_FLAGS=--disable-gpu ./build/SpacePenguin`.

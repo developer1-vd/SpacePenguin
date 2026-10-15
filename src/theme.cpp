@@ -4,6 +4,7 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QPalette>
+#include <QMenu>
 #include <QProxyStyle>
 #include <QSettings>
 #include <QStyleFactory>
@@ -68,6 +69,20 @@ public:
             return QProxyStyle::styleHint(hint, option, widget, returnData);
         }
     }
+
+    void polish(QWidget *widget) override
+    {
+        // Popup menus are windows of their own: without a see-through window behind
+        // them, their rounded border shows square corners. The window system's
+        // shadow would also be square, so the menus go without it.
+        if (qobject_cast<QMenu *>(widget) && !widget->testAttribute(Qt::WA_WState_Created)) {
+            widget->setAttribute(Qt::WA_TranslucentBackground);
+            widget->setWindowFlag(Qt::FramelessWindowHint);
+            widget->setWindowFlag(Qt::NoDropShadowWindowHint);
+        }
+        QProxyStyle::polish(widget);
+    }
+    using QProxyStyle::polish;
 };
 
 } // namespace
@@ -261,10 +276,10 @@ QPalette Theme::palette(const Colors &c)
 QString Theme::styleSheet(const Colors &c)
 {
     QString qss = QStringLiteral(R"(
-QToolTip { color: @text; background: @surface; border: 1px solid @border; padding: 4px 6px; border-radius: 6px; }
+QToolTip { color: @text; background: @surface; border: 1px solid @border; padding: 5px 10px; border-radius: 10px; }
 
-QMenu { background: @surface; color: @text; border: 1px solid @border; border-radius: 8px; padding: 6px; }
-QMenu::item { padding: 6px 28px 6px 12px; border-radius: 6px; }
+QMenu { background: @surface; color: @text; border: 1px solid @border; border-radius: 14px; padding: 6px; }
+QMenu::item { padding: 7px 28px 7px 12px; border-radius: 9px; }
 QMenu::item:selected { background: @hover; }
 QMenu::item:disabled { color: @muted; }
 QMenu::separator { height: 1px; background: @border; margin: 5px 8px; }
@@ -272,14 +287,14 @@ QMenu::icon { padding-left: 8px; }
 QMenu::right-arrow { width: 10px; height: 10px; }
 
 QMenuBar { background: @tabStrip; color: @text; border: none; }
-QMenuBar::item { padding: 4px 10px; background: transparent; border-radius: 4px; }
+QMenuBar::item { padding: 4px 10px; background: transparent; border-radius: 10px; }
 QMenuBar::item:selected { background: @hover; }
 
-QLineEdit { background: @surface; color: @text; border: 1px solid @border; border-radius: 8px; padding: 5px 8px; selection-background-color: @accent; selection-color: @accentText; }
+QLineEdit { background: @surface; color: @text; border: 1px solid @border; border-radius: 14px; padding: 5px 12px; selection-background-color: @accent; selection-color: @accentText; }
 QLineEdit:focus { border: 1px solid @accent; }
 QLineEdit:read-only { background: @window; }
 
-QPushButton { background: @surface; color: @text; border: 1px solid @border; border-radius: 8px; padding: 6px 14px; }
+QPushButton { background: @surface; color: @text; border: 1px solid @border; border-radius: 15px; padding: 6px 16px; }
 QPushButton:hover { background: @hover; }
 QPushButton:pressed { background: @pressed; }
 QPushButton:disabled { color: @muted; }
@@ -287,14 +302,14 @@ QPushButton[accent="true"] { background: @accent; color: @accentText; border-col
 QPushButton[accent="true"]:disabled { background: @raised; color: @muted; border-color: @border; }
 QPushButton[danger="true"] { color: @danger; }
 
-QComboBox { background: @surface; color: @text; border: 1px solid @border; border-radius: 8px; padding: 5px 10px; }
+QComboBox { background: @surface; color: @text; border: 1px solid @border; border-radius: 14px; padding: 5px 12px; }
 QComboBox:hover { border-color: @muted; }
 QComboBox QAbstractItemView { background: @surface; color: @text; border: 1px solid @border; selection-background-color: @hover; selection-color: @text; outline: none; }
 
 QCheckBox, QRadioButton { color: @text; spacing: 8px; }
 
-QTreeView, QListView, QTreeWidget, QListWidget { background: @surface; color: @text; border: 1px solid @border; border-radius: 8px; outline: none; }
-QTreeView::item, QListView::item { padding: 4px 2px; }
+QTreeView, QListView, QTreeWidget, QListWidget { background: @surface; color: @text; border: 1px solid @border; border-radius: 14px; padding: 4px; outline: none; }
+QTreeView::item, QListView::item { padding: 5px 4px; border-radius: 8px; }
 QTreeView::item:selected, QListView::item:selected { background: @selection; color: @text; }
 QTreeView::item:hover, QListView::item:hover { background: @hover; }
 QHeaderView::section { background: @window; color: @muted; border: none; border-bottom: 1px solid @border; padding: 6px 8px; font-weight: 600; }
@@ -309,7 +324,7 @@ QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
 QProgressBar { background: @raised; border: none; border-radius: 3px; max-height: 6px; text-align: center; }
 QProgressBar::chunk { background: @accent; border-radius: 3px; }
 
-QGroupBox { color: @text; border: 1px solid @border; border-radius: 10px; margin-top: 14px; padding: 12px 10px 10px 10px; font-weight: 600; }
+QGroupBox { color: @text; border: 1px solid @border; border-radius: 16px; margin-top: 14px; padding: 12px 10px 10px 10px; font-weight: 600; }
 QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }
 
 /* ---- Browser chrome --------------------------------------------------- */
@@ -317,7 +332,7 @@ QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }
 #tabStrip { background: @tabStrip; }
 /* Drawing its own title bar, the window keeps a thin border to resize it by. */
 QMainWindow#browserWindow[customFrame="true"] { background: @tabStrip; }
-#windowControls QToolButton { padding: 6px 10px; border-radius: 6px; }
+#windowControls QToolButton { padding: 6px; border-radius: 14px; }
 #windowControls QToolButton#windowClose:hover { background: #d93a3a; }
 #windowControls QToolButton#windowClose:pressed { background: #b52d2d; }
 #tabStrip[private="true"] { background: @privateStrip; }
@@ -325,34 +340,34 @@ QMainWindow#browserWindow[customFrame="true"] { background: @tabStrip; }
 QTabBar#tabBar { background: transparent; border: none; qproperty-drawBase: 0; }
 QTabBar#tabBar::tab {
     background: transparent; color: @muted; border: none;
-    padding: 7px 8px 7px 10px; margin: 6px 1px 0 1px;
-    border-top-left-radius: 9px; border-top-right-radius: 9px;
+    padding: 6px 8px 6px 12px; margin: 6px 2px 6px 2px;
+    border-radius: 13px;
 }
 QTabBar#tabBar::tab:hover { background: @tabHover; color: @text; }
-QTabBar#tabBar::tab:selected { background: @window; color: @text; }
-QTabBar#tabBar QToolButton { background: @tabStrip; border: none; border-radius: 6px; margin: 6px 0 0 0; }
+QTabBar#tabBar::tab:selected { background: @window; color: @text; border: 1px solid @border; }
+QTabBar#tabBar QToolButton { background: @tabStrip; border: none; border-radius: 13px; margin: 6px 0; }
 QTabBar#tabBar QToolButton:hover { background: @hover; }
-QTabBar#tabBar QToolButton#tabClose { background: transparent; margin: 0; padding: 2px; border-radius: 9px; }
+QTabBar#tabBar QToolButton#tabClose { background: transparent; margin: 0; padding: 2px; border-radius: 10px; }
 QTabBar#tabBar QToolButton#tabClose:hover { background: @pressed; }
 
 #navBar { background: @window; border-bottom: 1px solid @border; }
 #navBar QToolButton, #tabStrip QToolButton, #findBar QToolButton, #bookmarksBar QToolButton {
-    background: transparent; color: @text; border: none; border-radius: 8px; padding: 5px;
+    background: transparent; color: @text; border: none; border-radius: 14px; padding: 5px;
 }
 #navBar QToolButton:hover, #tabStrip QToolButton:hover, #findBar QToolButton:hover, #bookmarksBar QToolButton:hover { background: @hover; }
 #navBar QToolButton:pressed, #tabStrip QToolButton:pressed, #findBar QToolButton:pressed, #bookmarksBar QToolButton:pressed { background: @pressed; }
 #navBar QToolButton:disabled { color: @muted; }
 #navBar QToolButton::menu-indicator { image: none; width: 0; }
-#navBar QToolButton#shieldButton { padding: 5px 8px; font-weight: 600; color: @muted; }
+#navBar QToolButton#shieldButton { padding: 5px 10px; font-weight: 600; color: @muted; }
 #navBar QToolButton#shieldButton[active="true"] { color: @success; }
-#navBar QToolButton#zoomButton { padding: 4px 8px; border: 1px solid @border; border-radius: 12px; color: @muted; }
+#navBar QToolButton#zoomButton { padding: 4px 10px; border: 1px solid @border; border-radius: 13px; color: @muted; }
 
-#omnibox { background: @omnibox; border: 1px solid transparent; border-radius: 15px; padding: 6px 10px; font-size: 14px; }
+#omnibox { background: @omnibox; border: 1px solid transparent; border-radius: 17px; padding: 6px 10px; font-size: 14px; }
 #omnibox:hover { border-color: @border; }
 #omnibox:focus { background: @surface; border: 2px solid @accent; padding: 5px 9px; }
 
 #bookmarksBar { background: @window; border: none; border-bottom: 1px solid @border; padding: 2px 6px; spacing: 2px; }
-#bookmarksBar QToolButton { padding: 3px 8px; color: @text; }
+#bookmarksBar QToolButton { padding: 3px 10px; color: @text; border-radius: 12px; }
 #bookmarksBar QLabel { color: @muted; padding: 3px 8px; }
 
 #loadProgress { background: transparent; border: none; border-radius: 0; max-height: 2px; min-height: 2px; }
@@ -360,23 +375,23 @@ QTabBar#tabBar QToolButton#tabClose:hover { background: @pressed; }
 
 #findBar { background: @window; border-top: 1px solid @border; }
 #findBar QLabel#findStatus { color: @muted; padding: 0 6px; }
-#findBar QLineEdit { border-radius: 8px; min-width: 260px; }
+#findBar QLineEdit { border-radius: 14px; min-width: 260px; }
 
-#sandboxBanner { background: @warningBg; border-bottom: 1px solid @border; }
+#sandboxBanner { background: @warningBg; border: 1px solid @border; border-radius: 14px; }
 #sandboxBanner QLabel { color: @text; }
-#linkPreview { background: @surface; color: @muted; border: 1px solid @border; border-radius: 6px; padding: 3px 8px; }
+#linkPreview { background: @surface; color: @muted; border: 1px solid @border; border-radius: 12px; padding: 3px 10px; }
 
 #privateBadge { color: @privateAccent; font-weight: 600; padding: 0 8px; }
 
 /* ---- Dialogs ----------------------------------------------------------- */
 
 #settingsNav { background: transparent; border: none; padding: 6px; font-size: 14px; }
-#settingsNav::item { padding: 8px 10px; border-radius: 8px; margin: 1px 0; }
+#settingsNav::item { padding: 8px 12px; border-radius: 12px; margin: 1px 0; }
 #settingsNav::item:selected { background: @selection; color: @text; }
 #pageTitle { font-size: 20px; font-weight: 700; color: @text; }
 #pageSubtitle, QLabel[muted="true"] { color: @muted; }
 #sectionTitle { font-size: 13px; font-weight: 700; color: @text; margin-top: 8px; }
-#card { background: @surface; border: 1px solid @border; border-radius: 12px; }
+#card { background: @surface; border: 1px solid @border; border-radius: 18px; }
 #downloadRow { background: @surface; border-bottom: 1px solid @border; }
 #downloadName { font-weight: 600; color: @text; }
 #heroTitle { font-size: 24px; font-weight: 800; color: @text; }
