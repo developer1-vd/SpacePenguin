@@ -165,7 +165,7 @@ packages_apt() {
     # Libraries Qt's prebuilt binaries link against that minimal systems lack.
     PKGS+=(libgssapi-krb5-2 libgbm1 libxshmfence1 libfreetype6 libdrm2 libx11-6 libx11-xcb1
            libxext6 libxfixes3 libxi6 libxrender1 libexpat1
-           libwayland-client0 libwayland-cursor0 libwayland-egl1)
+           libwayland-client0 libwayland-cursor0 libwayland-egl1 libcups2)
     # Renamed for the 64-bit time_t transition (Ubuntu 24.04+, Debian 13+). Older
     # releases still know the new names, as references without a candidate.
     local library
@@ -193,7 +193,7 @@ packages_dnf() {
           xcb-util-keysyms xcb-util-renderutil xcb-util-image nss libXcomposite libXdamage
           libXrandr libXtst libxkbfile alsa-lib glib2 krb5-libs mesa-libgbm libxshmfence
           freetype libdrm libX11 libX11-xcb libXext libXfixes libXi libXrender expat
-          libwayland-client libwayland-cursor libwayland-egl)
+          libwayland-client libwayland-cursor libwayland-egl cups-libs)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file rpm-build)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-qtbase-devel qt6-qtwebengine-devel qt6-qttools-devel)
     return 0
@@ -219,7 +219,7 @@ packages_pacman() {
     PKGS=(base-devel cmake ninja git curl python mesa libxkbcommon libxkbcommon-x11 fontconfig
           dbus xcb-util-cursor xcb-util-wm xcb-util-keysyms xcb-util-renderutil xcb-util-image
           nss libxcomposite libxdamage libxrandr libxtst libxkbfile alsa-lib glib2 krb5
-          libxshmfence freetype2 libdrm libx11 libxext libxfixes libxi libxrender expat wayland)
+          libxshmfence freetype2 libdrm libx11 libxext libxfixes libxi libxrender expat wayland libcups)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base qt6-webengine qt6-tools)
     return 0
@@ -239,7 +239,7 @@ packages_zypper() {
           libxcb-keysyms1 libxcb-render-util0 libxcb-image0 mozilla-nss libXcomposite1
           libXdamage1 libXrandr2 libXtst6 libxkbfile1 alsa libglib-2_0-0 libgthread-2_0-0 krb5
           libgbm1 libxshmfence1 libfreetype6 libdrm2 libX11-6 libX11-xcb1 libXext6 libXfixes3 libXi6
-          libXrender1 libexpat1 libwayland-client0 libwayland-cursor0 libwayland-egl1)
+          libXrender1 libexpat1 libwayland-client0 libwayland-cursor0 libwayland-egl1 libcups2)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils AppStream file rpm-build)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-devel qt6-webenginewidgets-devel qt6-tools-devel)
     return 0
@@ -258,7 +258,7 @@ packages_apk() {
     PKGS=(build-base cmake samurai git curl python3 bash mesa-dev libxkbcommon-dev fontconfig
           dbus-libs xcb-util-cursor xcb-util-wm xcb-util-keysyms xcb-util-renderutil
           xcb-util-image nss libxcomposite libxdamage libxrandr libxtst libxkbfile alsa-lib
-          wayland-libs-client wayland-libs-cursor wayland-libs-egl)
+          wayland-libs-client wayland-libs-cursor wayland-libs-egl cups-libs)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-qtbase-dev qt6-qtwebengine-dev qt6-qttools-dev)
     return 0
@@ -276,7 +276,7 @@ packages_xbps() {
           dbus-libs xcb-util-cursor xcb-util-wm xcb-util-keysyms xcb-util-renderutil
           xcb-util-image nss libXcomposite libXdamage libXrandr libXtst libxkbfile alsa-lib glib
           mit-krb5-libs libgbm libxshmfence freetype libdrm libX11 libXext libXfixes libXi
-          libXrender expat wayland)
+          libXrender expat wayland libcups)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils AppStream file)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-devel qt6-webengine-devel qt6-tools-devel)
     return 0
@@ -297,7 +297,7 @@ packages_emerge() {
           x11-libs/xcb-util-renderutil x11-libs/xcb-util-image dev-libs/nss
           x11-libs/libXcomposite x11-libs/libXdamage x11-libs/libXrandr x11-libs/libXtst
           x11-libs/libxkbfile media-libs/alsa-lib dev-libs/glib app-crypt/mit-krb5
-          dev-libs/wayland)
+          dev-libs/wayland net-print/cups)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(dev-util/desktop-file-utils dev-libs/appstream sys-apps/file)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(dev-qt/qtbase:6 dev-qt/qtwebengine:6 dev-qt/qttools:6)
     return 0
