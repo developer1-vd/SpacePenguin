@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QIcon>
+#include <QImage>
 
 namespace spacepenguin {
 
@@ -43,8 +44,16 @@ public:
         Trash,
     };
 
+    enum class AppIconShape {
+        Round,  // the disc used in the app, on Windows and on Linux
+        MacOS,  // Apple's rounded square, as macOS 26 Tahoe requires
+    };
+
     static QIcon icon(Glyph glyph);
     static QIcon appIcon();
+
+    /** The app mark at @p size pixels, for the icon files (tools/generate-icons.cpp). */
+    static QImage appIconImage(int size, AppIconShape shape = AppIconShape::Round);
 };
 
 }

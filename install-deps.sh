@@ -110,7 +110,9 @@ detect_linux() {
     DISTRO_NAME="${PRETTY_NAME:-${ID:-Linux}}"
     local family=" ${ID:-} ${ID_LIKE:-} "
 
-    if command -v ldd >/dev/null && ldd --version 2>&1 | grep -qi musl; then
+    # grep without -q reads all its input: with pipefail, an early exit would
+    # fail the writer with SIGPIPE and make the whole test false.
+    if command -v ldd >/dev/null && ldd --version 2>&1 | grep -i musl >/dev/null; then
         IS_MUSL=1
     elif [[ -e /lib/ld-musl-x86_64.so.1 || -e /lib/ld-musl-aarch64.so.1 ]]; then
         IS_MUSL=1
@@ -151,7 +153,7 @@ detect_linux() {
 QT_FROM_SYSTEM=0
 
 apt_installable() {
-    apt-cache policy "$1" 2>/dev/null | grep -q '^ *Candidate: *[0-9]'
+    apt-cache policy "$1" 2>/dev/null | grep '^ *Candidate: *[0-9]' >/dev/null
 }
 
 packages_apt() {

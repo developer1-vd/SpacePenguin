@@ -258,8 +258,14 @@ on each of them for every push.
 | Platform | Built with | Packages | Notes |
 | -------- | ---------- | -------- | ----- |
 | Linux (X11 and Wayland), any distribution | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
-| Windows 10/11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
-| macOS 12+, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | icon, registered for `http`/`https`; ready to notarise |
+| Windows 10 and 11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
+| macOS 12 Monterey to 26 Tahoe, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | Tahoe-style icon, registered for `http`/`https`; ready to notarise |
+
+Tested in CI on every push: Ubuntu 22.04 (AppImage), Ubuntu 24.04 and **Ubuntu
+26.04 LTS "Resolute Raccoon"** (native `.deb` against its Qt 6.10), Debian 13,
+Fedora, openSUSE Tumbleweed, Arch, Alpine, Void, Nix and Flatpak; **Windows 11**
+(the Windows Server 2025 runner, which shares Windows 11 24H2's core) and Windows
+10 (Server 2022); **macOS 26 Tahoe** and macOS 14 Sonoma.
 
 What is handled per platform:
 
@@ -284,6 +290,10 @@ What is handled per platform:
   bundles Qt with `linuxdeploy`
 - **Source encoding** — MSVC builds with `/utf-8`, so strings such as "…" and
   "—" come out right
+- **Icons** — one drawing (`src/icons.cpp`) produces every icon file through
+  `tools/generate-icons.cpp`: the round mark for Linux and Windows, and for macOS
+  Apple's rounded-square shape, which macOS 26 Tahoe requires (icons that do not
+  fill it are shown inside a grey tile there)
 - `about:version` reports the running Qt platform plugin (`xcb`, `wayland`,
   `windows`, `cocoa`)
 
@@ -313,7 +323,7 @@ Alpine and Void install `bash` first.
 Most distributions ship a Qt older than 6.8, so by default (`--qt auto`) the script
 asks the package manager which Qt it has and:
 
-- uses the distribution's Qt when it is 6.8 or newer (Debian 13, Ubuntu 25.04,
+- uses the distribution's Qt when it is 6.8 or newer (Debian 13, Ubuntu 26.04,
   Fedora 41, openSUSE Tumbleweed, Arch, Alpine, …) or when the system uses musl,
   which cannot run Qt's prebuilt binaries;
 - otherwise downloads Qt from the official Qt mirrors (through `aqtinstall`) into
@@ -422,7 +432,7 @@ it is on; CI builds them all and, for a `v*` tag, attaches them to a GitHub rele
 | ------- | ------- | ------ | ------- |
 | AppImage | `./build-appimage.sh` | `SpacePenguin-<v>-x86_64.AppImage` (or `aarch64`) | any Linux distribution with glibc at least as new as the build machine's (CI: Ubuntu 22.04 and newer, Debian 12+, Fedora 36+, RHEL 9+) |
 | Flatpak | `flatpak-builder` with `packaging/flatpak/org.spacepenguin.SpacePenguin.yml` | `SpacePenguin.flatpak` | any distribution with Flatpak |
-| `.deb` / `.rpm` | `./build-linux-packages.sh` | `spacepenguin_<v>_amd64.deb`, `spacepenguin-<v>-1.x86_64.rpm` | the distribution it was built on; needs that distribution's Qt 6.8+ (Debian 13, Ubuntu 25.04, Fedora 41, openSUSE Tumbleweed, …) |
+| `.deb` / `.rpm` | `./build-linux-packages.sh` | `spacepenguin_<v>_amd64.deb`, `spacepenguin-<v>-1.x86_64.rpm` | the distribution it was built on; needs that distribution's Qt 6.8+ (Debian 13, Ubuntu 26.04 LTS, Fedora 41, openSUSE Tumbleweed, …) |
 | Nix | `nix build` | `result/` (a Nix store path) | NixOS and any Linux or macOS with Nix |
 | Arch package | `makepkg -si` in `packaging/arch` | `spacepenguin-<v>-1-x86_64.pkg.tar.zst` | Arch, Manjaro, EndeavourOS, … |
 | macOS | `./build-dmg.sh --universal` | `SpacePenguin-<v>-macos.dmg` and `.zip` of the `.app` | macOS 12+, Apple silicon and Intel |
@@ -486,6 +496,7 @@ filters/default.txt   built-in starter filter list
 cmake/                Info.plist and qt.conf templates
 flake.nix, package.nix, default.nix, shell.nix
                       Nix package, dev shell, overlay and NixOS module
+tools/                generate-icons.cpp, which redraws the icon files in packaging/
 packaging/            icons, Linux desktop entry and metadata, Flatpak manifest, Arch PKGBUILD,
                       Windows resource, macOS icon and entitlements
 tests/                unit tests

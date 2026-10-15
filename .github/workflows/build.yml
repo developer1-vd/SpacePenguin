@@ -36,12 +36,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `release` marks the job whose packages are published.
           - name: Linux AppImage
             os: ubuntu-22.04      # glibc 2.35: the AppImage runs on this and anything newer
-          - name: Windows
+            release: true
+          - name: Windows 10 (Server 2022)
             os: windows-2022
-          - name: macOS
+          - name: Windows 11 (Server 2025, 24H2 core)
+            os: windows-2025
+            release: true
+          - name: macOS 14 Sonoma
             os: macos-14
+          - name: macOS 26 Tahoe
+            os: macos-26
+            release: true
     defaults:
       run:
         shell: bash
@@ -135,6 +143,7 @@ jobs:
           if (Test-Path $key) { throw "uninstall left the Apps & features entry" }
 
       - uses: actions/upload-artifact@v4
+        if: matrix.release
         with:
           name: SpacePenguin-${{ runner.os }}
           if-no-files-found: error
@@ -155,6 +164,9 @@ jobs:
         include:
           - name: Debian 13 (.deb)
             image: debian:trixie
+            package: deb
+          - name: Ubuntu 26.04 Resolute Raccoon (.deb)
+            image: ubuntu:26.04
             package: deb
           - name: Ubuntu 24.04 (bundled Qt)
             image: ubuntu:24.04
@@ -202,7 +214,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14]
+        os: [ubuntu-24.04, macos-26]
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31

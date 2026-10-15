@@ -28,6 +28,8 @@ QPainterPath star(qreal cx, qreal cy, qreal outer, qreal inner)
     return path;
 }
 
+void drawPenguinFigure(QPainter *p);
+
 void drawPenguin(QPainter *p)
 {
     // 24x24 design grid. A penguin in a space-blue disc with a couple of stars.
@@ -39,6 +41,58 @@ void drawPenguin(QPainter *p)
     p->setBrush(sky);
     p->drawEllipse(QRectF(0.5, 0.5, 23, 23));
 
+    drawPenguinFigure(p);
+}
+
+/**
+ * The macOS shape: since Big Sur, and enforced by macOS 26 Tahoe, an app icon is a
+ * rounded square filling 824 of 1024 units, centred, with a soft shadow below.
+ * Icons that leave the shape empty are shown inside a grey tile by Tahoe.
+ */
+void drawMacPenguin(QPainter *p)
+{
+    // Work on Apple's 1024 grid, then draw the 24-unit penguin scaled into it.
+    p->save();
+    p->scale(24.0 / 1024.0, 24.0 / 1024.0);
+    p->setPen(Qt::NoPen);
+
+    const QRectF tile(100, 100, 824, 824);
+    const qreal radius = 185.4;
+
+    // Shadow: a few soft layers offset downwards.
+    for (int i = 6; i >= 1; --i) {
+        p->setBrush(QColor(0, 0, 0, 10));
+        p->drawRoundedRect(tile.adjusted(-i * 1.5, -i * 1.0 + 12, i * 1.5, i * 2.5 + 12),
+                           radius + i * 2, radius + i * 2);
+    }
+
+    QLinearGradient sky(tile.topLeft(), tile.bottomRight());
+    sky.setColorAt(0, QColor(0x45, 0x63, 0xe0));
+    sky.setColorAt(0.55, QColor(0x22, 0x2c, 0x7a));
+    sky.setColorAt(1, QColor(0x10, 0x14, 0x38));
+    p->setBrush(sky);
+    p->drawRoundedRect(tile, radius, radius);
+
+    // A faint highlight along the top edge, as on system icons.
+    QLinearGradient sheen(tile.topLeft(), QPointF(tile.left(), tile.top() + 300));
+    sheen.setColorAt(0, QColor(255, 255, 255, 46));
+    sheen.setColorAt(1, QColor(255, 255, 255, 0));
+    p->setBrush(sheen);
+    p->drawRoundedRect(tile, radius, radius);
+    p->restore();
+
+    // The penguin, a little larger than in the disc version.
+    p->save();
+    p->translate(12, 12.6);
+    p->scale(0.9, 0.9);
+    p->translate(-12, -12);
+    drawPenguinFigure(p);
+    p->restore();
+}
+
+void drawPenguinFigure(QPainter *p)
+{
+    p->setPen(Qt::NoPen);
     p->setBrush(QColor(255, 255, 255, 220));
     p->drawPath(star(5.2, 6.2, 1.3, 0.5));
     p->drawPath(star(19.2, 5.0, 0.9, 0.35));
@@ -306,6 +360,21 @@ private:
 QIcon Icons::icon(Glyph glyph)
 {
     return QIcon(new GlyphEngine(glyph));
+}
+
+QImage Icons::appIconImage(int size, AppIconShape shape)
+{
+    QImage image(size, size, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.scale(size / 24.0, size / 24.0);
+    if (shape == AppIconShape::MacOS)
+        drawMacPenguin(&painter);
+    else
+        drawPenguin(&painter);
+    painter.end();
+    return image;
 }
 
 QIcon Icons::appIcon()

@@ -284,6 +284,21 @@ if(SPACEPENGUIN_BUILD_TESTS)
     endif()
 endif()
 
+# ---- Tools ---------------------------------------------------------------------
+
+option(SPACEPENGUIN_BUILD_TOOLS "Build the icon generator (tools/generate-icons.cpp)" OFF)
+if(SPACEPENGUIN_BUILD_TOOLS)
+    qt_add_executable(spacepenguin-generate-icons
+        tools/generate-icons.cpp
+        src/icons.cpp
+        src/icons.h
+        src/theme.cpp
+        src/theme.h
+    )
+    target_link_libraries(spacepenguin-generate-icons PRIVATE Qt6::Widgets)
+    target_include_directories(spacepenguin-generate-icons PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+endif()
+
 # ---- Install and deploy -----------------------------------------------------
 
 install(TARGETS spacepenguin
