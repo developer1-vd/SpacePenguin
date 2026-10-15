@@ -12,6 +12,8 @@
 | `build-dmg.sh` | macOS | `dist/SpacePenguin-<version>-macos.dmg` and `.zip` of the `.app` |
 | `build-windows.ps1` | Windows | `dist/SpacePenguin-<version>-windows-x64-setup.exe` and `.zip` |
 | `build-all.sh` | any | whichever of the above this machine can make |
+| `packaging/chromeos/install.sh` | ChromeOS Linux, Debian, Ubuntu | the AppImage installed per user, with a launcher entry |
+| `tools/build-jobs.sh` | Linux, macOS | the number of compiler jobs this machine has memory for |
 
 Every packaging script reads the version from `CMakeLists.txt` unless given one,
 finds Qt in `.qt/` (from `install-deps`) before `CMAKE_PREFIX_PATH`, launches the
@@ -46,6 +48,14 @@ checksum next to the package. All of them take `--help` (`-Help` on Windows).
 
 The script needs bash: on Alpine run `apk add bash`, on Void `xbps-install bash`.
 
+## Build parallelism
+
+Compiling one SpacePenguin source file takes about 500 MB. Every script builds
+with `--parallel "$(tools/build-jobs.sh)"` — one job per GB of free memory, at
+most one per CPU — and `CMakeLists.txt` sets Ninja job pools to the same number
+(`SPACEPENGUIN_BUILD_JOBS` overrides both). An unlimited `make -j` can otherwise
+start a job per file and freeze a laptop.
+
 ## install-deps.ps1
 
 ```powershell
@@ -76,6 +86,21 @@ CMake, Ninja, Python 3 and NSIS when they are missing, then Qt for MSVC 2022 int
 
 An AppImage runs on distributions whose glibc is at least as new as the build
 machine's, which is why CI builds it on Ubuntu 22.04.
+
+## packaging/chromeos/install.sh
+
+```bash
+bash install.sh [--yes] [SpacePenguin-<version>-<arch>.AppImage]
+bash install.sh --uninstall
+```
+
+For Chromebooks (and any Debian or Ubuntu user without root for the rest):
+installs the libraries the AppImage takes from the system with apt, downloads the
+newest release's AppImage for this CPU (checking its `.sha256`) unless given one,
+unpacks it into `~/.local/opt/spacepenguin`, links `~/.local/bin/spacepenguin`,
+installs the launcher entry and icon — which ChromeOS copies into its own
+launcher — and checks it starts. CI runs it in a stock Debian 12 container, the
+base of ChromeOS's Linux environment.
 
 ## build-linux-packages.sh
 
@@ -191,8 +216,9 @@ powershell -ExecutionPolicy Bypass -File build-windows.ps1 [-Version x.y.z] [-Ce
 
 `.github/workflows/build.yml`, on every push and pull request:
 
-- **Linux AppImage, Windows, macOS** — `install-deps`, build, all tests, the
-  packages above, and checks that launch them: the AppImage, both architectures
+- **Linux AppImage (x86-64 and ARM64), Windows, macOS** — `install-deps`, build,
+  all tests, the packages above, the AppImage installed on Debian 12 with the
+  Chromebook script, and checks that launch them: the AppImage, both architectures
   of the macOS app from inside the mounted DMG, and on Windows a silent per-user
   install, launch and silent uninstall.
 - **Distributions** (in containers) — Debian 13, Ubuntu 24.04, Fedora,

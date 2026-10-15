@@ -107,7 +107,7 @@ if [[ ${SKIP_BUILD} -eq 0 ]]; then
         -DCMAKE_PREFIX_PATH="${QT_PREFIX}" \
         -DSPACEPENGUIN_BUILD_TESTS=OFF \
         ${ARCHS:+-DCMAKE_OSX_ARCHITECTURES="${ARCHS}"}
-    cmake --build "${BUILD_DIR}" --parallel
+    cmake --build "${BUILD_DIR}" --parallel "$("${ROOT}/tools/build-jobs.sh")"
 fi
 
 step "Installing and deploying Qt into the bundle (macdeployqt)"

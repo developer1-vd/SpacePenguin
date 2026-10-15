@@ -7,6 +7,7 @@
 #include <QWebEngineUrlScheme>
 
 #include "browserwindow.h"
+#include "devicetuning.h"
 #include "icons.h"
 #include "profiles.h"
 #include "sandbox.h"
@@ -26,6 +27,9 @@ int main(int argc, char *argv[])
     // Before Chromium starts: fall back cleanly where its sandbox cannot run
     // (Ubuntu 23.10+ without an AppArmor profile) instead of aborting.
     spacepenguin::Sandbox::prepare();
+    // Small machines, school Chromebooks above all: fewer renderer processes and,
+    // where Linux apps get no GPU, software drawing instead of black pages.
+    spacepenguin::DeviceTuning::prepare();
 
     // The start page scheme must be known to Chromium before the first profile exists.
     QWebEngineUrlScheme startScheme(QByteArrayLiteral("sp"));

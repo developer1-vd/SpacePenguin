@@ -112,7 +112,7 @@ if [[ ${SKIP_BUILD} -eq 0 ]]; then
         -DSPACEPENGUIN_BUILD_TESTS=OFF \
         -DSPACEPENGUIN_INSTALL_QT_CONF=OFF \
         -DSPACEPENGUIN_INSTALL_APPARMOR_PROFILE=OFF
-    cmake --build "${BUILD_DIR}" --parallel
+    cmake --build "${BUILD_DIR}" --parallel "$("${ROOT}/tools/build-jobs.sh")"
 fi
 
 step "Installing into ${APPDIR}"

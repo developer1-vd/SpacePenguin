@@ -20,7 +20,7 @@ step "Dependencies"
 step "Build and test"
 rm -rf build-ci
 cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build-ci --parallel
+cmake --build build-ci --parallel "$(tools/build-jobs.sh)"
 ctest --test-dir build-ci --output-on-failure
 
 launch() {

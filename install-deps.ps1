@@ -135,12 +135,14 @@ if ($env:GITHUB_PATH -and $QtPrefix) {
 }
 
 Step "Done"
+$jobs = [math]::Max(1, [math]::Min([Environment]::ProcessorCount,
+    [math]::Floor((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB)))
 Write-Host @"
 Qt is in $QtPrefix. CMake picks up Qt from .qt\ by itself. In a new
 terminal (so the freshly installed tools are on PATH):
 
     cmake -B build
-    cmake --build build --config Release --parallel
+    cmake --build build --config Release --parallel $jobs
 
 To run the browser or the tests from the build tree, put Qt on PATH first:
 

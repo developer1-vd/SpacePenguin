@@ -72,13 +72,21 @@ $BaseName = "SpacePenguin-$Version-windows-x64"
 
 Write-Host "SpacePenguin $Version, Qt from $Qt"
 
+# Compiler jobs this machine has memory for: each needs about 500 MB, so allow
+# one per GB free, at most one per CPU. SPACEPENGUIN_BUILD_JOBS overrides it.
+function Get-BuildJobs {
+    if ($env:SPACEPENGUIN_BUILD_JOBS) { return [int]$env:SPACEPENGUIN_BUILD_JOBS }
+    $freeGB = [math]::Floor((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB)
+    return [math]::Max(1, [math]::Min([Environment]::ProcessorCount, $freeGB))
+}
+
 # ---- Build and deploy -----------------------------------------------------------------
 
 if (-not $SkipBuild) {
     Step "Building"
     cmake -S . -B $BuildDir -A x64 -DCMAKE_PREFIX_PATH="$Qt" -DSPACEPENGUIN_BUILD_TESTS=OFF
     Check "Configuring"
-    cmake --build $BuildDir --config Release --parallel
+    cmake --build $BuildDir --config Release --parallel (Get-BuildJobs)
     Check "Building"
 }
 

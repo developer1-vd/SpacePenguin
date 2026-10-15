@@ -106,7 +106,7 @@ windows that write nothing to disk, session restore, and multiple profiles.</p>
 <h2>Build</h2>
 <p>SpacePenguin needs Qt 6.4 or newer with QtWebEngine, CMake 3.21+, and a C++20 compiler.</p>
 <pre><code>cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel "$(tools/build-jobs.sh)"
 ctest --test-dir build</code></pre>
 <p>On Nix, the exact set used for development:</p>
 <pre><code>nix-shell -p 'qt6.qtbase' 'qt6.qtdeclarative' 'qt6.qtwebengine' \

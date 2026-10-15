@@ -14,6 +14,7 @@
 #include "historymanager.h"
 #include "icons.h"
 #include "preferences.h"
+#include "devicetuning.h"
 #include "sandbox.h"
 #include "settingsdialog.h"
 #include "shortcuts.h"
@@ -1623,6 +1624,8 @@ AboutPageContext BrowserWindow::aboutContext() const
     context.sandbox = Sandbox::isEnabled()
         ? QStringLiteral("On")
         : QStringLiteral("Off — %1").arg(Sandbox::disabledReason());
+    context.device = DeviceTuning::current().device;
+    context.deviceAdjustments = DeviceTuning::current().adjustments;
 
     if (m_services.historyManager && !m_isPrivate) {
         const QLocale locale;

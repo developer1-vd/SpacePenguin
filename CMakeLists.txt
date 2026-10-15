@@ -10,6 +10,31 @@ project(SpacePenguin
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Compiling one source file takes about 500 MB (the QtWebEngine headers are large),
+# so one job per CPU, or `make -j` with no limit, can run a 4 or 8 GB machine out
+# of memory and freeze it. Ninja honours these pools whatever -j says; for other
+# generators the configure step prints a safe --parallel value.
+# tools/build-jobs.sh makes the same estimate for scripts.
+cmake_host_system_information(RESULT _spacepenguin_free_mib QUERY AVAILABLE_PHYSICAL_MEMORY)
+cmake_host_system_information(RESULT _spacepenguin_cpus QUERY NUMBER_OF_LOGICAL_CORES)
+math(EXPR _spacepenguin_jobs "${_spacepenguin_free_mib} / 1024")
+if(_spacepenguin_jobs GREATER _spacepenguin_cpus)
+    set(_spacepenguin_jobs ${_spacepenguin_cpus})
+endif()
+if(_spacepenguin_jobs LESS 1)
+    set(_spacepenguin_jobs 1)
+endif()
+set(SPACEPENGUIN_BUILD_JOBS "${_spacepenguin_jobs}" CACHE STRING
+    "Compiler jobs to run at once (default: 1 per GB of free memory, at most 1 per CPU)")
+set_property(GLOBAL APPEND PROPERTY JOB_POOLS
+    spacepenguin_compile=${SPACEPENGUIN_BUILD_JOBS} spacepenguin_link=1)
+set(CMAKE_JOB_POOL_COMPILE spacepenguin_compile)
+set(CMAKE_JOB_POOL_LINK spacepenguin_link)
+if(NOT CMAKE_GENERATOR MATCHES "Ninja")
+    message(STATUS "Build with: cmake --build ${CMAKE_BINARY_DIR} --parallel ${SPACEPENGUIN_BUILD_JOBS}"
+                   "  (more jobs than that may run this machine out of memory)")
+endif()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
@@ -57,6 +82,18 @@ endif()
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network Widgets WebEngineWidgets)
 
+# macOS 26 SDKs no longer have the long-deprecated AGL framework, but Qt 6.8's
+# CMake files still link it into everything that uses Qt GUI ("framework 'AGL'
+# not found"). Nothing calls it, so drop it.
+if(APPLE AND TARGET WrapOpenGL::WrapOpenGL)
+    get_target_property(_spacepenguin_gl_libs WrapOpenGL::WrapOpenGL INTERFACE_LINK_LIBRARIES)
+    if(_spacepenguin_gl_libs)
+        list(FILTER _spacepenguin_gl_libs EXCLUDE REGEX "AGL")
+        set_target_properties(WrapOpenGL::WrapOpenGL PROPERTIES
+            INTERFACE_LINK_LIBRARIES "${_spacepenguin_gl_libs}")
+    endif()
+endif()
+
 qt_add_executable(spacepenguin
     src/main.cpp
     src/aboutpages.cpp
@@ -93,6 +130,8 @@ qt_add_executable(spacepenguin
     src/historymanager.h
     src/settingsdialog.cpp
     src/settingsdialog.h
+    src/devicetuning.cpp
+    src/devicetuning.h
     src/sandbox.cpp
     src/sandbox.h
     src/shortcuts.cpp
@@ -296,6 +335,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_singleinstance PRIVATE Qt6::Test Qt6::Network)
         target_include_directories(tst_singleinstance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME singleinstance COMMAND tst_singleinstance)
+
+        qt_add_executable(tst_devicetuning
+            tests/tst_devicetuning.cpp
+            src/devicetuning.cpp
+            src/devicetuning.h
+        )
+        target_link_libraries(tst_devicetuning PRIVATE Qt6::Test Qt6::Core)
+        target_include_directories(tst_devicetuning PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME devicetuning COMMAND tst_devicetuning)
     endif()
 endif()
 

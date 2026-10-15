@@ -40,6 +40,10 @@ jobs:
           - name: Linux AppImage
             os: ubuntu-22.04      # glibc 2.35: the AppImage runs on this and anything newer
             release: true
+          # ARM Chromebooks (MediaTek, Snapdragon), Raspberry Pi 5, ARM laptops.
+          - name: Linux AppImage (ARM64)
+            os: ubuntu-22.04-arm
+            release: true
           - name: Windows 10 (Server 2022)
             os: windows-2022
           - name: Windows 11 (Server 2025, 24H2 core)
@@ -87,13 +91,26 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get install -y --no-install-recommends shellcheck
-          shellcheck install-deps.sh build-*.sh .github/scripts/*.sh
+          shellcheck install-deps.sh build-*.sh .github/scripts/*.sh packaging/chromeos/*.sh tools/*.sh
           desktop-file-validate packaging/linux/org.spacepenguin.SpacePenguin.desktop
           appstreamcli validate --no-net build/org.spacepenguin.SpacePenguin.metainfo.xml
 
       - name: Package AppImage
         if: runner.os == 'Linux'
         run: ./build-appimage.sh
+
+      # Debian 12 is what ChromeOS's Linux environment runs: install the AppImage
+      # the way a Chromebook user does, in a stock container, and launch it.
+      - name: Check the AppImage on Debian 12 (Chromebook Linux)
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -v "$PWD:/src:ro" debian:bookworm sh -c '
+            set -e
+            apt-get update -qq && apt-get install -y -qq sudo >/dev/null
+            useradd -m student && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student
+            su student -c "bash /src/packaging/chromeos/install.sh --yes /src/dist/*.AppImage"
+            su student -c "QT_QPA_PLATFORM=offscreen ~/.local/bin/spacepenguin --version" | tee /dev/stderr | grep -q SpacePenguin
+            su student -c "bash /src/packaging/chromeos/install.sh --uninstall"'
 
       - name: Package .app and DMG
         if: runner.os == 'macOS'
@@ -145,7 +162,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: matrix.release
         with:
-          name: SpacePenguin-${{ runner.os }}
+          name: SpacePenguin-${{ runner.os }}-${{ runner.arch }}
           if-no-files-found: error
           path: |
             dist/*.AppImage

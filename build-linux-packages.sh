@@ -57,7 +57,7 @@ case "${QT_DIR}" in
 esac
 
 step "Building"
-cmake --build "${BUILD_DIR}" --parallel
+cmake --build "${BUILD_DIR}" --parallel "$("${ROOT}/tools/build-jobs.sh")"
 
 mkdir -p "${OUTPUT_DIR}"
 for generator in "${GENERATORS[@]}"; do

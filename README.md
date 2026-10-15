@@ -260,7 +260,8 @@ on each of them for every push.
 
 | Platform | Built with | Packages | Notes |
 | -------- | ---------- | -------- | ----- |
-| Linux (X11 and Wayland), any distribution | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
+| Linux (X11 and Wayland), any distribution, x86-64 and ARM64 | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
+| ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `packaging/chromeos/install.sh` | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
 | Windows 10 and 11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
 | macOS 12 Monterey to 26 Tahoe, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | Tahoe-style icon, registered for `http`/`https`; ready to notarise |
 
@@ -299,6 +300,50 @@ What is handled per platform:
   fill it are shown inside a grey tile there)
 - `about:version` reports the running Qt platform plugin (`xcb`, `wayland`,
   `windows`, `cocoa`)
+
+### Chromebooks
+
+SpacePenguin runs in ChromeOS's Linux development environment, which every
+Chromebook from 2019 on has (it is a Debian 12 container). A native browser
+cannot run on ChromeOS without it.
+
+1. Turn on Linux: **Settings › About ChromeOS › Developers › Linux development
+   environment › Turn on**. On a **school-managed Chromebook** the school's admin
+   decides whether this is allowed; if the setting is missing or greyed out, ask
+   them to enable "Linux development environment" for your account — there is no
+   way around that from the Chromebook.
+2. In the Terminal app that opens:
+
+   ```sh
+   curl -fsSLO https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/packaging/chromeos/install.sh
+   bash install.sh
+   ```
+
+   or, with an AppImage you downloaded yourself (share it with Linux in the Files
+   app first): `bash install.sh SpacePenguin-0.1.0-x86_64.AppImage`.
+3. Open SpacePenguin from the launcher, under **Linux apps**.
+
+The script installs the few system libraries the AppImage cannot carry, unpacks
+it into `~/.local/opt/spacepenguin` (no FUSE needed) and adds the launcher entry;
+`bash install.sh --uninstall` removes it. It picks the x86-64 or ARM64 build to
+match the Chromebook (Celeron/Pentium/Core/Ryzen or MediaTek/Snapdragon).
+
+Typical school Chromebooks have 4 GB of memory, of which Linux gets a share, and
+often no GPU acceleration for Linux apps. At start-up SpacePenguin checks both:
+
+- with 4.5 GB or less it limits Chromium to three renderer processes shared
+  between tabs and turns on Chromium's low-end-device mode, which is what Chrome
+  itself does on such machines;
+- in ChromeOS's Linux without a GPU device it draws in software rather than
+  letting the GPU process fail into black pages.
+
+`about:version` shows the device and what was adjusted. `SPACEPENGUIN_LOW_MEMORY=0`
+or `=1` overrides the memory check, and anything set in
+`QTWEBENGINE_CHROMIUM_FLAGS` wins over these defaults.
+
+Don't build SpacePenguin on a Chromebook unless you have to: compiling
+QtWebEngine code takes about 500 MB per compiler job. If you do,
+`tools/build-jobs.sh` picks a job count that fits (usually 1 or 2 there).
 
 Platform data locations come from `QStandardPaths`, so the profile lands in
 `~/.local/share/SpacePenguin` on Linux, `~/Library/Application Support` on
@@ -379,8 +424,14 @@ or use the overlay, `nixpkgs.overlays = [ spacepenguin.overlays.default ];`, to 
 
 ```sh
 cmake -B build
-cmake --build build --config Release --parallel
+cmake --build build --config Release --parallel "$(tools/build-jobs.sh)"
 ```
+
+Each compiler job needs about 500 MB, so `tools/build-jobs.sh` picks as many as
+the free memory allows (1 per GB, at most 1 per CPU). A bare `--parallel` or
+`make -j` starts far more and can freeze a 4–8 GB laptop or Chromebook. On
+Windows, use `--parallel 2` on machines with 8 GB or less. With Ninja
+(`cmake -B build -G Ninja`) the limit is built in.
 
 Qt from `.qt/` or the system is found automatically; to use another Qt, pass
 `-DCMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/<gcc_64|msvc2022_64|macos>`. The toolchain
@@ -465,6 +516,12 @@ checkout's builds, its `.qt/` QtWebEngine helper, `/usr/local/bin/SpacePenguin` 
 AppImages, and nothing else; `--remove` takes it out again. The `.deb` and `.rpm`
 install and load their own profile for `/usr/bin/SpacePenguin`. Running
 SpacePenguin with `sudo` also turns the sandbox off; run it as your normal user.
+
+**The computer freezes or the build is killed while compiling.** Each compiler job
+needs about 500 MB, and `make -j` or a bare `--parallel` with Makefiles starts one
+per source file — around 15 GB at once. Build with
+`cmake --build build --parallel "$(tools/build-jobs.sh)"`, or configure with
+`-G Ninja`, where CMake limits the jobs to what the free memory allows.
 
 **It still quits at start-up.** Run it from a terminal and keep the output:
 `./build/SpacePenguin 2>&1 | tail -40`. If graphics are the problem, try

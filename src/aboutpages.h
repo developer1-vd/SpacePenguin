@@ -33,6 +33,9 @@ struct AboutPageContext {
     int extensionCount = 0;
     /** Renderer sandbox state, e.g. "On" or "Off — <reason>". */
     QString sandbox;
+    /** The machine as start-up saw it, and what was adjusted for it. */
+    QString device;
+    QString deviceAdjustments;
     QList<AboutPageEntry> history;
     QList<AboutPageEntry> downloads;
     /** Shortcut text by command name ("history", "downloads", "extensions",

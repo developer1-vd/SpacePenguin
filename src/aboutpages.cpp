@@ -138,6 +138,11 @@ QString versionBody(const AboutPageContext &context)
         row(QStringLiteral("Renderer"), QStringLiteral("Chromium via QtWebEngine")),
         row(QStringLiteral("Sandbox"),
             context.sandbox.isEmpty() ? QStringLiteral("Unknown") : context.sandbox),
+        row(QStringLiteral("Device"),
+            context.device.isEmpty() ? QStringLiteral("Unknown") : context.device),
+        row(QStringLiteral("Tuning"), context.deviceAdjustments.isEmpty()
+                                          ? QStringLiteral("None — Chromium's defaults")
+                                          : context.deviceAdjustments),
     };
 
     return QStringLiteral("<h1>SpacePenguin %1</h1>"
