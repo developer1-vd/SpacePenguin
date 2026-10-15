@@ -149,20 +149,20 @@ export QMAKE
 export LD_LIBRARY_PATH="${QT_LIBS}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 export EXTRA_QT_MODULES="webenginecore;webenginewidgets"
 # xcb is always bundled; add native Wayland, and offscreen for headless use, when
-# this Qt has them. A distribution's Qt keeps Wayland in a separate package
-# (qt6-wayland on Debian and Ubuntu), and linuxdeploy fails on a missing plugin.
+# this Qt has them (linuxdeploy fails on a plugin that does not exist). Qt 6.10
+# has one libqwayland.so; earlier versions split it into -egl and -generic, which
+# distributions ship separately (qt6-wayland on Debian and Ubuntu).
 QT_PLUGINS="$("${QMAKE}" -query QT_INSTALL_PLUGINS)"
 extra_plugins=()
-for plugin in libqwayland-egl.so libqwayland-generic.so libqoffscreen.so; do
-    if [[ -f "${QT_PLUGINS}/platforms/${plugin}" ]]; then
-        extra_plugins+=("${plugin}")
-    else
-        echo "warning: ${QT_PLUGINS}/platforms/${plugin} is missing; the AppImage will lack it" >&2
-    fi
+for plugin in libqwayland.so libqwayland-egl.so libqwayland-generic.so libqoffscreen.so; do
+    [[ -f "${QT_PLUGINS}/platforms/${plugin}" ]] && extra_plugins+=("${plugin}")
 done
-if [[ ! -f "${QT_PLUGINS}/platforms/libqwayland-egl.so" ]]; then
-    echo "         (it then runs through XWayland on Wayland desktops; install qt6-wayland to bundle native Wayland)" >&2
+if ! compgen -G "${QT_PLUGINS}/platforms/libqwayland*.so" >/dev/null; then
+    echo "warning: this Qt has no Wayland platform plugin, so the AppImage will use XWayland" >&2
+    echo "         on Wayland desktops; install qt6-wayland (or your distribution's equivalent) to bundle it" >&2
 fi
+[[ -f "${QT_PLUGINS}/platforms/libqoffscreen.so" ]] ||
+    echo "warning: this Qt has no offscreen platform plugin" >&2
 EXTRA_PLATFORM_PLUGINS="$(IFS=';'; echo "${extra_plugins[*]}")"
 export EXTRA_PLATFORM_PLUGINS
 export LDAI_OUTPUT="${OUTPUT}"
