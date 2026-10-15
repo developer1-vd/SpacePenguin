@@ -104,6 +104,10 @@ qt_add_executable(spacepenguin
     src/browserpage.h
     src/webview.cpp
     src/webview.h
+    src/startuptrace.cpp
+    src/startuptrace.h
+    src/windowframe.cpp
+    src/windowframe.h
     src/icons.cpp
     src/icons.h
     src/preferences.cpp

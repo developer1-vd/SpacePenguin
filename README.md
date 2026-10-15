@@ -276,6 +276,12 @@ What is handled per platform:
 - **Look** — every platform uses the Fusion style with SpacePenguin's own palette,
   stylesheet and painted icons, so the window is the same everywhere and follows
   the system light/dark setting (including the dark title bar on Windows 11)
+- **Title bar** — on Linux and Windows the tabs share one row with the minimize,
+  maximize and close buttons, as in Chrome: drag the empty part of the row to move
+  the window, double-click it to maximize, and resize from the edges. Moving and
+  resizing go through the window system, so snapping and tiling work, on Wayland
+  too. "Use the system title bar and borders" in Settings brings the
+  system's back. macOS keeps its own title bar and traffic lights
 - **Menus** — on macOS the menu bar is the system's, with Quit, About and Settings
   in the application menu; on Windows and Linux it is off by default and
   everything is in the ☰ menu
@@ -522,6 +528,17 @@ needs about 500 MB, and `make -j` or a bare `--parallel` with Makefiles starts o
 per source file — around 15 GB at once. Build with
 `cmake --build build --parallel "$(tools/build-jobs.sh)"`, or configure with
 `-G Ninja`, where CMake limits the jobs to what the free memory allows.
+
+**It takes long to start.** Run it with `SPACEPENGUIN_TRACE_STARTUP=1` from a
+terminal; it prints how long each stage took (process start, Qt, profile and
+filters, window, first page). The browser itself is normally ready in under half a
+second. An AppImage adds the time to mount and decompress itself on every launch;
+to avoid that, unpack it once and install it for your user (any Debian or Ubuntu,
+not only ChromeOS):
+
+```sh
+bash packaging/chromeos/install.sh dist/SpacePenguin-*.AppImage   # then start it from the app menu
+```
 
 **It still quits at start-up.** Run it from a terminal and keep the output:
 `./build/SpacePenguin 2>&1 | tail -40`. If graphics are the problem, try

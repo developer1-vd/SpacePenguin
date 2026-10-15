@@ -42,6 +42,10 @@ public:
     bool showMenuBar() const;
     void setShowMenuBar(bool show);
 
+    /** Use the system's title bar instead of putting the window buttons in the tab strip. */
+    bool useSystemTitleBar() const;
+    void setUseSystemTitleBar(bool use);
+
     QString downloadDirectory() const;
     void setDownloadDirectory(const QString &path);
 

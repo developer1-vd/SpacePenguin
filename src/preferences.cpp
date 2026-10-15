@@ -15,6 +15,7 @@ const QString kRestore = QStringLiteral("browser/restoreSession");
 const QString kHomeButton = QStringLiteral("appearance/showHomeButton");
 const QString kBookmarksBar = QStringLiteral("appearance/showBookmarksBar");
 const QString kMenuBar = QStringLiteral("appearance/showMenuBar");
+const QString kSystemTitleBar = QStringLiteral("appearance/systemTitleBar");
 const QString kDownloads = QStringLiteral("downloads/directory");
 const QString kBlocking = QStringLiteral("adblock/enabled");
 
@@ -119,6 +120,16 @@ bool Preferences::showMenuBar() const
 void Preferences::setShowMenuBar(bool show)
 {
     write(kMenuBar, show);
+}
+
+bool Preferences::useSystemTitleBar() const
+{
+    return QSettings().value(kSystemTitleBar, false).toBool();
+}
+
+void Preferences::setUseSystemTitleBar(bool use)
+{
+    write(kSystemTitleBar, use);
 }
 
 QString Preferences::downloadDirectory() const

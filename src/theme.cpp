@@ -315,6 +315,11 @@ QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }
 /* ---- Browser chrome --------------------------------------------------- */
 
 #tabStrip { background: @tabStrip; }
+/* Drawing its own title bar, the window keeps a thin border to resize it by. */
+QMainWindow#browserWindow[customFrame="true"] { background: @tabStrip; }
+#windowControls QToolButton { padding: 6px 10px; border-radius: 6px; }
+#windowControls QToolButton#windowClose:hover { background: #d93a3a; }
+#windowControls QToolButton#windowClose:pressed { background: #b52d2d; }
 #tabStrip[private="true"] { background: @privateStrip; }
 
 QTabBar#tabBar { background: transparent; border: none; qproperty-drawBase: 0; }

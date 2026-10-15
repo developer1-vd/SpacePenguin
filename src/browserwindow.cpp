@@ -18,8 +18,10 @@
 #include "sandbox.h"
 #include "settingsdialog.h"
 #include "shortcuts.h"
+#include "startuptrace.h"
 #include "userextensions.h"
 #include "webview.h"
+#include "windowframe.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -190,7 +192,9 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
     }
 
     setWindowTitle(QStringLiteral("SpacePenguin"));
+    setObjectName(QStringLiteral("browserWindow"));
     resize(1200, 780);
+    m_frame = new WindowFrame(this);
 
     Theme::apply(Theme::storedMode());
 
@@ -519,6 +523,14 @@ QWidget *BrowserWindow::createTabStrip()
         layout->addWidget(badgeIcon);
         layout->addWidget(badge);
     }
+
+    // The window's own title bar: the empty part of this row moves the window, and
+    // the window buttons sit at its end (unless the system title bar is wanted).
+    layout->addWidget(m_frame->controls());
+    m_frame->addDragArea(m_tabStrip);
+    m_frame->addDragArea(m_tabBar, [this](const QPoint &position) {
+        return m_tabBar->tabAt(position) < 0;
+    });
 
     connect(m_tabBar, &QTabBar::currentChanged, this, &BrowserWindow::onCurrentTabChanged);
     connect(m_tabBar, &QTabBar::customContextMenuRequested, this,
@@ -917,6 +929,7 @@ void BrowserWindow::applyPreferences()
     menuBar()->setVisible(preferences->showMenuBar());
     m_menuBarAction->setChecked(preferences->showMenuBar());
 #endif
+    m_frame->setCustomTitleBar(!preferences->useSystemTitleBar());
 
     syncThemeMenu();
     updateBlockingIndicator();
@@ -1950,7 +1963,10 @@ void BrowserWindow::connectView(WebView *view)
     connect(view, &QWebEngineView::loadProgress, this,
             [this, view](int progress) { onLoadProgress(view, progress); });
     connect(view, &QWebEngineView::loadFinished, this,
-            [this, view](bool ok) { onLoadFinished(view, ok); });
+            [this, view](bool ok) {
+                StartupTrace::markOnce("first page loaded");
+                onLoadFinished(view, ok);
+            });
     connect(view->page(), &QWebEnginePage::linkHovered, this, [this, view](const QString &url) {
         if (view == currentView())
             onLinkHovered(url);

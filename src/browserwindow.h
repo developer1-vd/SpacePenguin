@@ -26,6 +26,8 @@ class QWebEngineView;
 
 namespace spacepenguin {
 
+class WindowFrame;
+
 class DownloadsDialog;
 class HistoryDialog;
 class WebView;
@@ -167,6 +169,7 @@ private:
 
     // Chrome.
     QWidget *m_tabStrip = nullptr;
+    WindowFrame *m_frame = nullptr;
     TabBar *m_tabBar = nullptr;
     QStackedWidget *m_stack = nullptr;
     QWidget *m_navBar = nullptr;

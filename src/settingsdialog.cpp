@@ -317,6 +317,16 @@ QWidget *SettingsDialog::createAppearanceTab()
     layout->addWidget(menuBar);
     auto *menuBarHint = mutedLabel(tr("Everything in the menu bar is also in the ☰ menu."));
     layout->addWidget(menuBarHint);
+#ifndef Q_OS_MACOS
+    auto *systemTitleBar = new QCheckBox(tr("Use the system title bar and borders"));
+    systemTitleBar->setChecked(preferences->useSystemTitleBar());
+    connect(systemTitleBar, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setUseSystemTitleBar(checked); });
+    layout->addWidget(systemTitleBar);
+    layout->addWidget(mutedLabel(tr("Off: the tabs share one row with the minimize, maximize "
+                                    "and close buttons, and dragging the empty part of that "
+                                    "row moves the window.")));
+#endif
 #ifdef Q_OS_MACOS
     // The macOS menu bar is the system's and is always shown.
     menuBar->hide();

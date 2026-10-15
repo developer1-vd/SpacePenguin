@@ -3,6 +3,7 @@
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFileOpenEvent>
+#include <QTimer>
 #include <QWebEngineProfile>
 #include <QWebEngineUrlScheme>
 
@@ -12,6 +13,7 @@
 #include "profiles.h"
 #include "sandbox.h"
 #include "singleinstance.h"
+#include "startuptrace.h"
 #include "theme.h"
 
 #include <functional>
@@ -22,6 +24,7 @@
 
 int main(int argc, char *argv[])
 {
+    spacepenguin::StartupTrace::mark("process started");
     QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
     // Before Chromium starts: fall back cleanly where its sandbox cannot run
@@ -37,7 +40,9 @@ int main(int argc, char *argv[])
     startScheme.setFlags(QWebEngineUrlScheme::SecureScheme);
     QWebEngineUrlScheme::registerScheme(startScheme);
 
+    spacepenguin::StartupTrace::mark("sandbox and device checks done");
     QApplication app(argc, argv);
+    spacepenguin::StartupTrace::mark("Qt application created");
     // Fusion draws the same everywhere, which the chrome stylesheet relies on.
     QApplication::setStyle(spacepenguin::Theme::createStyle());
     QApplication::setWindowIcon(spacepenguin::Icons::appIcon());
@@ -92,8 +97,10 @@ int main(int argc, char *argv[])
     if (instance.sendToRunningInstance(handOff))
         return 0;
 
+    spacepenguin::StartupTrace::mark("single-instance check done");
     spacepenguin::ProfileServices services = spacepenguin::createProfileServices(
         &app, isPrivate, parser.value(filterListOption));
+    spacepenguin::StartupTrace::mark("browser profile, history and filters loaded");
 
     if (parser.isSet(userDataOption)) {
         QDir().mkpath(dataDirectory);
@@ -102,7 +109,9 @@ int main(int argc, char *argv[])
     }
 
     spacepenguin::BrowserWindow window(std::move(services));
+    spacepenguin::StartupTrace::mark("window built");
     window.show();
+    QTimer::singleShot(0, [] { spacepenguin::StartupTrace::mark("window shown"); });
 
     for (const QString &url : urls)
         window.openInNewTab(url);

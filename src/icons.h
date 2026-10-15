@@ -42,6 +42,9 @@ public:
         Folder,
         Open,
         Trash,
+        WindowMinimize, // window controls, for the merged title bar
+        WindowMaximize,
+        WindowRestore,
     };
 
     enum class AppIconShape {

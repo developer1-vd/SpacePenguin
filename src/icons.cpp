@@ -159,6 +159,17 @@ void drawGlyph(QPainter *p, Icons::Glyph glyph, const QColor &color, const QColo
         p->drawPolyline(QPolygonF({QPointF(10.2, 19.5), QPointF(10.2, 14.5), QPointF(13.8, 14.5),
                                    QPointF(13.8, 19.5)}));
         break;
+    case Icons::WindowMinimize:
+        p->drawLine(QPointF(7, 12.5), QPointF(17, 12.5));
+        break;
+    case Icons::WindowMaximize:
+        p->drawRect(QRectF(7, 7, 10, 10));
+        break;
+    case Icons::WindowRestore:
+        p->drawRect(QRectF(6.5, 9, 8.5, 8.5));
+        p->drawPolyline(QPolygonF({QPointF(9, 9), QPointF(9, 6.5), QPointF(17.5, 6.5),
+                                   QPointF(17.5, 15), QPointF(15, 15)}));
+        break;
     case Icons::Plus:
         p->drawLine(QPointF(12, 5), QPointF(12, 19));
         p->drawLine(QPointF(5, 12), QPointF(19, 12));
