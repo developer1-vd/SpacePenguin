@@ -140,7 +140,8 @@ fetch "linuxdeploy-plugin-qt-${ARCH}.AppImage" \
 # ---- Bundle --------------------------------------------------------------------------
 
 mkdir -p "${OUTPUT_DIR}"
-OUTPUT="${ROOT}/${OUTPUT_DIR}/SpacePenguin-${VERSION}-${ARCH}.AppImage"
+OUTPUT_DIR="$(cd "${OUTPUT_DIR}" && pwd)"   # absolute, whether given relative or not
+OUTPUT="${OUTPUT_DIR}/SpacePenguin-${VERSION}-${ARCH}.AppImage"
 rm -f "${OUTPUT}" "${OUTPUT}.zsync"
 
 QT_LIBS="$("${QMAKE}" -query QT_INSTALL_LIBS)"
