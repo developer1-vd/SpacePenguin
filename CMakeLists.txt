@@ -93,6 +93,8 @@ qt_add_executable(spacepenguin
     src/historymanager.h
     src/settingsdialog.cpp
     src/settingsdialog.h
+    src/sandbox.cpp
+    src/sandbox.h
     src/shortcuts.cpp
     src/shortcuts.h
     src/singleinstance.cpp
@@ -181,6 +183,19 @@ if(UNIX AND NOT APPLE)
         message(WARNING
             "Qt install layout unknown; skipping qt.conf generation. "
             "Installed copies will not find QtWebEngineProcess.")
+    endif()
+
+    # AppArmor profile that lets Chromium's sandbox create user namespaces where
+    # AppArmor restricts them (Ubuntu 23.10+). Lands in /etc/apparmor.d for a /usr
+    # install; packages load it in their post-install script.
+    option(SPACEPENGUIN_INSTALL_APPARMOR_PROFILE
+        "Install an AppArmor profile so Chromium's sandbox works on Ubuntu 23.10+" ON)
+    if(SPACEPENGUIN_INSTALL_APPARMOR_PROFILE)
+        set(SPACEPENGUIN_APPARMOR_BINARY "${CMAKE_INSTALL_FULL_BINDIR}/SpacePenguin")
+        configure_file(packaging/linux/apparmor/spacepenguin.in
+            "${CMAKE_CURRENT_BINARY_DIR}/apparmor/spacepenguin" @ONLY)
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/apparmor/spacepenguin"
+            DESTINATION "${CMAKE_INSTALL_FULL_SYSCONFDIR}/apparmor.d")
     endif()
 
     # Desktop integration: launcher entry, AppStream metadata and icons.
@@ -344,6 +359,15 @@ if(UNIX AND NOT APPLE)
     set(CPACK_DEBIAN_PACKAGE_PROVIDES "www-browser")
     # Loaded at run time, so the shared-library scan cannot see them.
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins, libqt6webenginecore6-bin")
+    # Load and unload the AppArmor profile; it is a conffile, so local edits survive.
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/debian/conffiles" "/etc/apparmor.d/spacepenguin\n")
+    configure_file(packaging/linux/package-scripts/postinst "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst" COPYONLY)
+    configure_file(packaging/linux/package-scripts/postrm "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm" COPYONLY)
+    if(SPACEPENGUIN_INSTALL_APPARMOR_PROFILE)
+        set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+            "${CMAKE_CURRENT_BINARY_DIR}/debian/conffiles;${CMAKE_CURRENT_BINARY_DIR}/debian/postinst;${CMAKE_CURRENT_BINARY_DIR}/debian/postrm")
+        set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION ON)
+    endif()
 
     # Fedora / openSUSE / RHEL
     set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
@@ -351,6 +375,11 @@ if(UNIX AND NOT APPLE)
     set(CPACK_RPM_PACKAGE_GROUP "Applications/Internet")
     set(CPACK_RPM_PACKAGE_AUTOREQ ON)
     set(CPACK_RPM_PACKAGE_PROVIDES "webclient")
+    if(SPACEPENGUIN_INSTALL_APPARMOR_PROFILE)
+        set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/package-scripts/postinst")
+        set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/package-scripts/postrm")
+        set(CPACK_RPM_USER_FILELIST "%config(noreplace) /etc/apparmor.d/spacepenguin")
+    endif()
     set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
         /usr/share/applications /usr/share/metainfo /usr/share/icons
         /usr/share/icons/hicolor /usr/share/icons/hicolor/16x16 /usr/share/icons/hicolor/16x16/apps
@@ -359,7 +388,8 @@ if(UNIX AND NOT APPLE)
         /usr/share/icons/hicolor/64x64 /usr/share/icons/hicolor/64x64/apps
         /usr/share/icons/hicolor/128x128 /usr/share/icons/hicolor/128x128/apps
         /usr/share/icons/hicolor/256x256 /usr/share/icons/hicolor/256x256/apps
-        /usr/share/icons/hicolor/512x512 /usr/share/icons/hicolor/512x512/apps)
+        /usr/share/icons/hicolor/512x512 /usr/share/icons/hicolor/512x512/apps
+        /etc /etc/apparmor.d)
 
     include(CPack)
 endif()

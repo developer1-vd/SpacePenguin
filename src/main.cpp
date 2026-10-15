@@ -9,6 +9,7 @@
 #include "browserwindow.h"
 #include "icons.h"
 #include "profiles.h"
+#include "sandbox.h"
 #include "singleinstance.h"
 #include "theme.h"
 
@@ -21,6 +22,10 @@
 int main(int argc, char *argv[])
 {
     QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+
+    // Before Chromium starts: fall back cleanly where its sandbox cannot run
+    // (Ubuntu 23.10+ without an AppArmor profile) instead of aborting.
+    spacepenguin::Sandbox::prepare();
 
     // The start page scheme must be known to Chromium before the first profile exists.
     QWebEngineUrlScheme startScheme(QByteArrayLiteral("sp"));

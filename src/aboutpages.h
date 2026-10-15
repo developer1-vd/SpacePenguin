@@ -31,6 +31,8 @@ struct AboutPageContext {
     bool blockingEnabled = false;
     int blockedRequests = 0;
     int extensionCount = 0;
+    /** Renderer sandbox state, e.g. "On" or "Off — <reason>". */
+    QString sandbox;
     QList<AboutPageEntry> history;
     QList<AboutPageEntry> downloads;
     /** Shortcut text by command name ("history", "downloads", "extensions",

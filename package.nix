@@ -48,6 +48,7 @@ stdenv.mkDerivation {
     (lib.cmakeBool "SPACEPENGUIN_INSTALL_QT_CONF" false)
     (lib.cmakeBool "SPACEPENGUIN_USE_LOCAL_QT" false)
     (lib.cmakeBool "SPACEPENGUIN_DEPLOY_QT" false)
+    (lib.cmakeBool "SPACEPENGUIN_INSTALL_APPARMOR_PROFILE" false)
   ];
 
   doCheck = true;

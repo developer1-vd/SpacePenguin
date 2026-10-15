@@ -357,6 +357,8 @@ QTabBar#tabBar QToolButton#tabClose:hover { background: @pressed; }
 #findBar QLabel#findStatus { color: @muted; padding: 0 6px; }
 #findBar QLineEdit { border-radius: 8px; min-width: 260px; }
 
+#sandboxBanner { background: @warningBg; border-bottom: 1px solid @border; }
+#sandboxBanner QLabel { color: @text; }
 #linkPreview { background: @surface; color: @muted; border: 1px solid @border; border-radius: 6px; padding: 3px 8px; }
 
 #privateBadge { color: @privateAccent; font-weight: 600; padding: 0 8px; }
@@ -381,11 +383,13 @@ QTabBar#tabBar QToolButton#tabClose:hover { background: @pressed; }
     const QColor selection = withAlpha(c.accent, c.dark ? 0.28 : 0.16);
     const QColor scroll = withAlpha(c.mutedText, 0.45);
     const QColor omnibox = c.dark ? c.tabStrip : c.raised;
+    const QColor warningBg = c.dark ? QColor(0x4a, 0x3a, 0x12) : QColor(0xff, 0xf1, 0xc7);
     const QColor privateStrip = c.dark ? QColor(0x23, 0x18, 0x3a) : QColor(0xe6, 0xdc, 0xf7);
 
     // Longest names first so that @tabStrip is not eaten by a shorter token.
     const QList<std::pair<QString, QString>> tokens = {
         {QStringLiteral("@privateAccent"), rgba(c.privateAccent)},
+        {QStringLiteral("@warningBg"), rgba(warningBg)},
         {QStringLiteral("@privateStrip"), rgba(privateStrip)},
         {QStringLiteral("@accentText"), rgba(c.accentText)},
         {QStringLiteral("@selection"), rgba(selection)},

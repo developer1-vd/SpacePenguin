@@ -206,6 +206,9 @@ These are deliberate choices, not defaults we inherited:
   dialogs are still refused.
 - No telemetry, no background services, no auto-updater, no remote
   configuration. The browser does not phone home.
+- Web pages run in Chromium's renderer sandbox. Where the system makes that
+  impossible (see Troubleshooting), the browser starts without it rather than
+  crashing, and says so in every window and in `about:version`.
 
 ## Keyboard
 
@@ -443,6 +446,29 @@ Every script takes `--help` (`-Help` on Windows). Signing is optional:
 --notarize`, and `build-windows.ps1 -CertificateThumbprint <hash>`.
 
 See `BUILD_SCRIPTS.md` for what each script does step by step.
+
+## Troubleshooting
+
+**"Web pages are not sandboxed" on Ubuntu 23.10, 24.04, 26.04 and similar.** Chromium's
+renderer sandbox needs unprivileged user namespaces, and these releases only allow
+them for programs with an AppArmor profile that permits it. Without one, Chromium
+aborts at start-up (`No usable sandbox`). SpacePenguin checks before Chromium
+starts: if the sandbox cannot work it runs without it and shows that banner, and
+`about:version` reports `Sandbox: Off` with the reason. To get the sandbox back:
+
+```sh
+sudo packaging/linux/install-apparmor-profile.sh   # then restart SpacePenguin
+```
+
+It writes `/etc/apparmor.d/spacepenguin-local`, which grants `userns` to this
+checkout's builds, its `.qt/` QtWebEngine helper, `/usr/local/bin/SpacePenguin` and
+AppImages, and nothing else; `--remove` takes it out again. The `.deb` and `.rpm`
+install and load their own profile for `/usr/bin/SpacePenguin`. Running
+SpacePenguin with `sudo` also turns the sandbox off; run it as your normal user.
+
+**It still quits at start-up.** Run it from a terminal and keep the output:
+`./build/SpacePenguin 2>&1 | tail -40`. If graphics are the problem, try
+`QTWEBENGINE_CHROMIUM_FLAGS=--disable-gpu ./build/SpacePenguin`.
 
 ## Known limitations
 

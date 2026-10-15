@@ -14,6 +14,7 @@
 #include "historymanager.h"
 #include "icons.h"
 #include "preferences.h"
+#include "sandbox.h"
 #include "settingsdialog.h"
 #include "shortcuts.h"
 #include "userextensions.h"
@@ -430,6 +431,32 @@ void BrowserWindow::createChrome()
     layout->addWidget(createNavigationBar());
     createBookmarksBar();
     layout->addWidget(m_bookmarksBar);
+
+    // Said plainly in every window: pages are running without Chromium's sandbox.
+    if (!Sandbox::isEnabled()) {
+        auto *banner = new QWidget;
+        banner->setObjectName(QStringLiteral("sandboxBanner"));
+        banner->setAttribute(Qt::WA_StyledBackground);
+        auto *bannerLayout = new QHBoxLayout(banner);
+        bannerLayout->setContentsMargins(12, 6, 6, 6);
+        auto *icon = new QLabel;
+        icon->setPixmap(Icons::icon(Icons::Warning).pixmap(18, 18));
+        bannerLayout->addWidget(icon);
+        QString text = tr("<b>Web pages are not sandboxed:</b> %1.").arg(Sandbox::disabledReason().toHtmlEscaped());
+        if (!Sandbox::fix().isEmpty())
+            text += QLatin1Char(' ') + Sandbox::fix().toHtmlEscaped();
+        auto *message = new QLabel(text);
+        message->setWordWrap(true);
+        message->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        bannerLayout->addWidget(message, 1);
+        auto *dismiss = new QToolButton;
+        dismiss->setIcon(Icons::icon(Icons::Close));
+        dismiss->setAutoRaise(true);
+        dismiss->setToolTip(tr("Hide until next start"));
+        connect(dismiss, &QToolButton::clicked, banner, &QWidget::hide);
+        bannerLayout->addWidget(dismiss, 0, Qt::AlignTop);
+        layout->addWidget(banner);
+    }
 
     m_progressBar = new QProgressBar;
     m_progressBar->setObjectName(QStringLiteral("loadProgress"));
@@ -1593,6 +1620,9 @@ AboutPageContext BrowserWindow::aboutContext() const
     context.shortcuts.insert(QStringLiteral("downloads"), Shortcuts::text(Shortcuts::Downloads));
     context.shortcuts.insert(QStringLiteral("extensions"), Shortcuts::text(Shortcuts::Extensions));
     context.shortcuts.insert(QStringLiteral("settings"), Shortcuts::text(Shortcuts::Settings));
+    context.sandbox = Sandbox::isEnabled()
+        ? QStringLiteral("On")
+        : QStringLiteral("Off — %1").arg(Sandbox::disabledReason());
 
     if (m_services.historyManager && !m_isPrivate) {
         const QLocale locale;

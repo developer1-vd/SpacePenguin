@@ -136,6 +136,8 @@ QString versionBody(const AboutPageContext &context)
         row(QStringLiteral("Extensions"),
             QStringLiteral("%1 installed").arg(context.extensionCount)),
         row(QStringLiteral("Renderer"), QStringLiteral("Chromium via QtWebEngine")),
+        row(QStringLiteral("Sandbox"),
+            context.sandbox.isEmpty() ? QStringLiteral("Unknown") : context.sandbox),
     };
 
     return QStringLiteral("<h1>SpacePenguin %1</h1>"

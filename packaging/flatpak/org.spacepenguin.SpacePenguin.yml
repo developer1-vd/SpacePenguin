@@ -38,6 +38,7 @@ modules:
       - -DSPACEPENGUIN_BUILD_TESTS=OFF
       - -DSPACEPENGUIN_INSTALL_QT_CONF=OFF
       - -DSPACEPENGUIN_USE_LOCAL_QT=OFF
+      - -DSPACEPENGUIN_INSTALL_APPARMOR_PROFILE=OFF
     sources:
       - type: dir
         path: ../..
