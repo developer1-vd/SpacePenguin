@@ -8,6 +8,7 @@
 | `build-linux-packages.sh` | Linux | `dist/*.deb` and/or `dist/*.rpm` for the distribution it runs on |
 | `packaging/arch/PKGBUILD` | Arch and derivatives | `spacepenguin-<version>-1-<arch>.pkg.tar.zst` |
 | `packaging/flatpak/…yml` | any Linux with flatpak-builder | `SpacePenguin.flatpak` |
+| `flake.nix` / `default.nix` | NixOS, any Linux or macOS with Nix | the browser in the Nix store (`./result`) |
 | `build-dmg.sh` | macOS | `dist/SpacePenguin-<version>-macos.dmg` and `.zip` of the `.app` |
 | `build-windows.ps1` | Windows | `dist/SpacePenguin-<version>-windows-x64-setup.exe` and `.zip` |
 | `build-all.sh` | any | whichever of the above this machine can make |
@@ -111,6 +112,29 @@ Built on the KDE 6.8 runtime with the QtWebEngine base app. The app may use the
 network, the display (Wayland, or X11 as a fallback), sound, the GPU and the
 Downloads folder, and nothing else.
 
+## Nix: flake.nix, package.nix, default.nix, shell.nix
+
+```bash
+nix build          # or nix-build
+nix run            # build and start it
+nix develop        # or nix-shell: the toolchain and Qt, for cmake -B build
+nix flake check    # build and run the tests
+```
+
+`package.nix` is the derivation: CMake and Ninja with `wrapQtAppsHook`, Qt and
+QtWebEngine from nixpkgs, the tests run in `checkPhase` with the offscreen
+platform, and the version read from `CMakeLists.txt`. It turns off the qt.conf,
+`.qt/` lookup and Qt deployment, which Nix does not need. On macOS the app bundle
+goes to `$out/Applications` with a `bin/SpacePenguin` link.
+
+`flake.nix` exposes it as `packages.default`, `apps.default`, `checks`, an
+overlay (`pkgs.spacepenguin`) and a NixOS module (`programs.spacepenguin.enable`,
+with `defaultBrowser` to register it for web links). Its nixpkgs input is the
+NixOS channel tarball rather than `github:`, which needs no GitHub API calls and
+so is not rate limited. `shell.nix` is the development shell; it also sets
+`QT_PLUGIN_PATH` and `QTWEBENGINEPROCESS_PATH` so a binary run straight from the
+build tree finds Qt.
+
 ## build-dmg.sh
 
 ```bash
@@ -176,6 +200,8 @@ powershell -ExecutionPolicy Bypass -File build-windows.ps1 [-Version x.y.z] [-Ce
   `.github/scripts/distro.sh`: `install-deps`, build, tests, then the native
   package (`.deb`, `.rpm`, Arch package) installed with the distribution's own
   package manager and launched.
+- **Nix** — `nix flake check`, `nix build` with a launch check, `nix-build`, and a
+  build from source in `nix develop`, on Linux and macOS.
 - **Flatpak** — built with `flatpak-builder` into a bundle.
 
 A tag such as `v0.1.0` also publishes every package as a GitHub release.

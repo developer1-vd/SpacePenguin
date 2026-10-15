@@ -293,7 +293,9 @@ install(TARGETS spacepenguin
 # On Windows and macOS, `cmake --install` also runs windeployqt / macdeployqt, so
 # the install prefix holds a self-contained app: Qt libraries, plugins,
 # QtWebEngineProcess and its resources. Linux uses the system Qt (see qt.conf).
-if((WIN32 OR APPLE) AND COMMAND qt_generate_deploy_app_script)
+option(SPACEPENGUIN_DEPLOY_QT
+    "Copy Qt into the install prefix on Windows and macOS (off for Nix and other package managers)" ON)
+if((WIN32 OR APPLE) AND SPACEPENGUIN_DEPLOY_QT AND COMMAND qt_generate_deploy_app_script)
     qt_generate_deploy_app_script(
         TARGET spacepenguin
         OUTPUT_SCRIPT SPACEPENGUIN_DEPLOY_SCRIPT

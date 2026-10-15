@@ -50,13 +50,15 @@ case "${PACKAGE}" in
         ;;
     pkg)
         step "Building the Arch package with makepkg"
-        # makepkg refuses to run as root.
+        # makepkg refuses to run as root, and the unprivileged user it runs as
+        # cannot necessarily read /src, so it gets a clone of its own.
         useradd -m builder
         git config --system --add safe.directory '*'
-        mkdir -p /tmp/makepkg && cp packaging/arch/PKGBUILD /tmp/makepkg/
-        chown -R builder /tmp/makepkg
-        su builder -c "cd /tmp/makepkg && SPACEPENGUIN_SOURCE=/src makepkg --nodeps --noconfirm"
-        mkdir -p dist && cp /tmp/makepkg/spacepenguin-*.pkg.tar.zst dist/
+        git clone --quiet /src /home/builder/spacepenguin
+        mkdir -p /home/builder/makepkg && cp packaging/arch/PKGBUILD /home/builder/makepkg/
+        chown -R builder /home/builder
+        su builder -c "cd ~/makepkg && SPACEPENGUIN_SOURCE=/home/builder/spacepenguin makepkg --nodeps --noconfirm"
+        mkdir -p dist && cp /home/builder/makepkg/spacepenguin-*.pkg.tar.zst dist/
         step "Installing the package"
         pacman -U --noconfirm dist/spacepenguin-*.pkg.tar.zst
         launch /usr/bin/SpacePenguin

@@ -1,28 +1,42 @@
-# Development shell for NixOS and other Nix users:
+# Development shell, for `nix develop` (through flake.nix) or `nix-shell`:
 #
-#   nix-shell --run 'cmake -B build && cmake --build build --parallel'
+#   nix develop        # or: nix-shell
+#   cmake -B build && cmake --build build --parallel
+#   ./build/SpacePenguin
 #
-# Provides the toolchain and Qt 6 with QtWebEngine from nixpkgs (Qt 6.8 or newer
-# is in nixpkgs 24.11 and later).
-{ pkgs ? import <nixpkgs> { } }:
+# It has everything the package build uses (CMake, Ninja, Qt 6 with QtWebEngine
+# from nixpkgs) plus the tools for checking the packaging files.
+{
+  pkgs ? import <nixpkgs> { },
+}:
 
+let
+  spacepenguin = pkgs.callPackage ./package.nix { };
+  qtPlugins = pkgs.qt6.qtbase.qtPluginPrefix;
+in
 pkgs.mkShell {
+  inputsFrom = [ spacepenguin ];
+
   packages = with pkgs; [
-    cmake
-    ninja
     git
-    qt6.qtbase
-    qt6.qtwebengine
-    qt6.qttools
-    qt6.wrapQtAppsHook
+    gdb
     desktop-file-utils
     appstream
+    shellcheck
   ];
 
-  # Lets the browser find Qt's plugins and QtWebEngineProcess when run from the
-  # build tree inside the shell.
-  shellHook = ''
-    export QT_PLUGIN_PATH="${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}:${pkgs.qt6.qtwebengine}/${pkgs.qt6.qtbase.qtPluginPrefix}"
-    export QTWEBENGINEPROCESS_PATH="${pkgs.qt6.qtwebengine}/libexec/QtWebEngineProcess"
-  '';
+  # A binary run straight from the build tree is not wrapped by wrapQtAppsHook,
+  # so point it at Qt's plugins and QtWebEngine's helper process.
+  shellHook =
+    if pkgs.stdenv.hostPlatform.isLinux then
+      ''
+        export QT_PLUGIN_PATH="${pkgs.qt6.qtbase}/${qtPlugins}:${pkgs.qt6.qtwayland}/${qtPlugins}:${pkgs.qt6.qtwebengine}/${qtPlugins}"
+        export QTWEBENGINEPROCESS_PATH="${pkgs.qt6.qtwebengine}/libexec/QtWebEngineProcess"
+        echo "SpacePenguin dev shell: cmake -B build && cmake --build build --parallel"
+      ''
+    else
+      ''
+        export QT_PLUGIN_PATH="${pkgs.qt6.qtbase}/${qtPlugins}"
+        echo "SpacePenguin dev shell: cmake -B build && cmake --build build --parallel"
+      '';
 }

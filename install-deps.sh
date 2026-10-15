@@ -157,7 +157,8 @@ packages_apt() {
           libxcb-render-util0 libxcb-image0 libnss3 libxcomposite1 libxdamage1 libxrandr2
           libxtst6 libxkbfile1)
     # Libraries Qt's prebuilt binaries link against that minimal systems lack.
-    PKGS+=(libgssapi-krb5-2 libgbm1 libxshmfence1 libfreetype6 libdrm2 libx11-xcb1)
+    PKGS+=(libgssapi-krb5-2 libgbm1 libxshmfence1 libfreetype6 libdrm2 libx11-6 libx11-xcb1
+           libxext6 libxfixes3 libxi6 libxrender1 libexpat1)
     # Renamed for the 64-bit time_t transition (Ubuntu 24.04+, Debian 13+).
     local library
     for library in libasound2 libglib2.0-0; do
@@ -169,7 +170,8 @@ packages_apt() {
     return 0
 }
 system_qt_version_apt() {
-    apt-cache policy qt6-webengine-dev 2>/dev/null | awk '/Candidate:/ {print $2}' | sed 's/^[0-9]*://; s/[+~-].*//'
+    apt-cache policy qt6-webengine-dev 2>/dev/null |
+        sed -n 's/^ *Candidate: *\([0-9]*:\)\{0,1\}\([0-9][0-9.]*\).*/\2/p'
 }
 install_apt() {
     run ${SUDO[@]+"${SUDO[@]}"} apt-get update
@@ -182,7 +184,7 @@ packages_dnf() {
           libxkbcommon-devel libxkbcommon-x11 fontconfig dbus-libs xcb-util-cursor xcb-util-wm
           xcb-util-keysyms xcb-util-renderutil xcb-util-image nss libXcomposite libXdamage
           libXrandr libXtst libxkbfile alsa-lib glib2 krb5-libs mesa-libgbm libxshmfence
-          freetype libdrm)
+          freetype libdrm libX11 libX11-xcb libXext libXfixes libXi libXrender expat)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file rpm-build)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-qtbase-devel qt6-qtwebengine-devel qt6-qttools-devel)
     return 0
@@ -208,13 +210,13 @@ packages_pacman() {
     PKGS=(base-devel cmake ninja git curl python mesa libxkbcommon libxkbcommon-x11 fontconfig
           dbus xcb-util-cursor xcb-util-wm xcb-util-keysyms xcb-util-renderutil xcb-util-image
           nss libxcomposite libxdamage libxrandr libxtst libxkbfile alsa-lib glib2 krb5
-          libxshmfence freetype2 libdrm)
+          libxshmfence freetype2 libdrm libx11 libxext libxfixes libxi libxrender expat)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base qt6-webengine qt6-tools)
     return 0
 }
 system_qt_version_pacman() {
-    pacman -Si qt6-webengine 2>/dev/null | awk '/^Version/ {print $3}' | sed 's/-.*//'
+    pacman -Si qt6-webengine 2>/dev/null | sed -n 's/^Version *: *\([0-9][0-9.]*\).*/\1/p'
 }
 install_pacman() {
     packages_pacman
@@ -227,14 +229,15 @@ packages_zypper() {
           libxkbcommon-devel libxkbcommon-x11-0 fontconfig dbus-1 libxcb-cursor0 libxcb-icccm4
           libxcb-keysyms1 libxcb-render-util0 libxcb-image0 mozilla-nss libXcomposite1
           libXdamage1 libXrandr2 libXtst6 libxkbfile1 alsa libglib-2_0-0 libgthread-2_0-0 krb5
-          libgbm1 libxshmfence1 libfreetype6 libdrm2)
+          libgbm1 libxshmfence1 libfreetype6 libdrm2 libX11-6 libX11-xcb1 libXext6 libXfixes3 libXi6
+          libXrender1 libexpat1)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils AppStream file rpm-build)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-devel qt6-webenginewidgets-devel qt6-tools-devel)
     return 0
 }
 system_qt_version_zypper() {
     zypper --non-interactive --quiet info qt6-webenginewidgets-devel 2>/dev/null |
-        awk -F': *' '/^Version/ {print $2}' | sed 's/-.*//'
+        sed -n 's/^Version *: *\([0-9][0-9.]*\).*/\1/p'
 }
 install_zypper() {
     packages_zypper
@@ -251,7 +254,7 @@ packages_apk() {
     return 0
 }
 system_qt_version_apk() {
-    apk policy qt6-qtwebengine-dev 2>/dev/null | awk 'NR==2 {print $1}' | sed 's/:$//; s/-r[0-9]*$//'
+    apk policy qt6-qtwebengine-dev 2>/dev/null | sed -n '2s/^ *\([0-9][0-9.]*\).*/\1/p'
 }
 install_apk() {
     packages_apk
@@ -262,7 +265,8 @@ packages_xbps() {
     PKGS=(base-devel cmake ninja git curl python3 MesaLib-devel libxkbcommon-devel fontconfig
           dbus-libs xcb-util-cursor xcb-util-wm xcb-util-keysyms xcb-util-renderutil
           xcb-util-image nss libXcomposite libXdamage libXrandr libXtst libxkbfile alsa-lib glib
-          mit-krb5-libs libgbm libxshmfence freetype libdrm)
+          mit-krb5-libs libgbm libxshmfence freetype libdrm libX11 libXext libXfixes libXi
+          libXrender expat)
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils AppStream file)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-devel qt6-webengine-devel qt6-tools-devel)
     return 0
@@ -329,8 +333,10 @@ esac
 
 if [[ "${MANAGER}" == nix ]]; then
     step "NixOS detected"
-    note "Everything comes from shell.nix in the repository:"
-    note "    nix-shell --run 'cmake -B build && cmake --build build --parallel'"
+    note "Nix provides everything; nothing needs installing. In the repository:"
+    note "    nix build        # the browser, in ./result/bin/SpacePenguin"
+    note "    nix develop      # a shell with the toolchain and Qt, then: cmake -B build"
+    note "Without flakes: nix-build and nix-shell do the same."
     exit 0
 fi
 
@@ -387,7 +393,7 @@ else
 fi
 
 if [[ ${DRY_RUN} -eq 0 ]]; then
-    CMAKE_VERSION="$(cmake --version | head -n1 | awk '{print $3}')"
+    CMAKE_VERSION="$(cmake --version | sed -n '1s/^cmake version \([0-9][0-9.]*\).*/\1/p')"
     version_ge "${CMAKE_VERSION}" "${MIN_CMAKE}" ||
         die "CMake ${CMAKE_VERSION} is too old (need ${MIN_CMAKE}); 'pip install cmake' or https://cmake.org/download/ has a newer one"
 fi

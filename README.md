@@ -257,7 +257,7 @@ on each of them for every push.
 
 | Platform | Built with | Packages | Notes |
 | -------- | ---------- | -------- | ----- |
-| Linux (X11 and Wayland), any distribution | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package | desktop entry, AppStream metadata and icons installed under `share/` |
+| Linux (X11 and Wayland), any distribution | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
 | Windows 10/11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
 | macOS 12+, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | icon, registered for `http`/`https`; ready to notarise |
 
@@ -302,7 +302,7 @@ QtWebEngine needs, and Qt 6.8 with QtWebEngine.
 | ------ | ------- |
 | Linux, macOS | `./install-deps.sh` |
 | Windows | `powershell -ExecutionPolicy Bypass -File install-deps.ps1` |
-| NixOS / Nix | `nix-shell` (uses `shell.nix`) |
+| NixOS / Nix | nothing to install: `nix develop` (or `nix-shell`) gives a shell with everything |
 
 `install-deps.sh` knows apt (Debian, Ubuntu, Mint, Pop!_OS, elementary, …),
 dnf/yum (Fedora, RHEL, CentOS Stream, Rocky, AlmaLinux, with CRB and EPEL
@@ -324,6 +324,43 @@ asks the package manager which Qt it has and:
 run; `--help` lists the rest. `install-deps.ps1` installs Visual Studio 2022 Build
 Tools with C++ (unless MSVC is already there), CMake, Ninja, Python and NSIS with
 winget or Chocolatey, and Qt for MSVC into `.qt\`.
+
+### Nix and NixOS
+
+The repository is a flake, built against Qt from nixpkgs (Linux and macOS):
+
+```sh
+nix run github:developer1-vd/SpacePenguin     # try it without installing
+nix build                                      # ./result/bin/SpacePenguin
+nix profile install .                          # install for your user
+nix develop                                    # dev shell: cmake -B build && cmake --build build
+nix flake check                                # build and run the tests
+```
+
+Without flakes, `nix-build` (`default.nix`) and `nix-shell` (`shell.nix`) do the
+same. `package.nix` is the derivation all of them share; it runs the tests during
+the build and installs the desktop entry and icons.
+
+On NixOS, add the flake to your configuration:
+
+```nix
+{
+  inputs.spacepenguin.url = "github:developer1-vd/SpacePenguin";
+
+  outputs = { nixpkgs, spacepenguin, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        spacepenguin.nixosModules.default
+        { programs.spacepenguin.enable = true;
+          programs.spacepenguin.defaultBrowser = true; }   # optional
+      ];
+    };
+  };
+}
+```
+
+or use the overlay, `nixpkgs.overlays = [ spacepenguin.overlays.default ];`, to get
+`pkgs.spacepenguin`.
 
 ### 2. Build and run
 
@@ -386,6 +423,7 @@ it is on; CI builds them all and, for a `v*` tag, attaches them to a GitHub rele
 | AppImage | `./build-appimage.sh` | `SpacePenguin-<v>-x86_64.AppImage` (or `aarch64`) | any Linux distribution with glibc at least as new as the build machine's (CI: Ubuntu 22.04 and newer, Debian 12+, Fedora 36+, RHEL 9+) |
 | Flatpak | `flatpak-builder` with `packaging/flatpak/org.spacepenguin.SpacePenguin.yml` | `SpacePenguin.flatpak` | any distribution with Flatpak |
 | `.deb` / `.rpm` | `./build-linux-packages.sh` | `spacepenguin_<v>_amd64.deb`, `spacepenguin-<v>-1.x86_64.rpm` | the distribution it was built on; needs that distribution's Qt 6.8+ (Debian 13, Ubuntu 25.04, Fedora 41, openSUSE Tumbleweed, …) |
+| Nix | `nix build` | `result/` (a Nix store path) | NixOS and any Linux or macOS with Nix |
 | Arch package | `makepkg -si` in `packaging/arch` | `spacepenguin-<v>-1-x86_64.pkg.tar.zst` | Arch, Manjaro, EndeavourOS, … |
 | macOS | `./build-dmg.sh --universal` | `SpacePenguin-<v>-macos.dmg` and `.zip` of the `.app` | macOS 12+, Apple silicon and Intel |
 | Windows | `powershell -ExecutionPolicy Bypass -File build-windows.ps1` | `SpacePenguin-<v>-windows-x64-setup.exe` and `-windows-x64.zip` | Windows 10/11 x64, nothing else needed |
@@ -446,6 +484,8 @@ src/main.cpp          profile setup, command line, entry point
 html/start.html       built-in start page
 filters/default.txt   built-in starter filter list
 cmake/                Info.plist and qt.conf templates
+flake.nix, package.nix, default.nix, shell.nix
+                      Nix package, dev shell, overlay and NixOS module
 packaging/            icons, Linux desktop entry and metadata, Flatpak manifest, Arch PKGBUILD,
                       Windows resource, macOS icon and entitlements
 tests/                unit tests
