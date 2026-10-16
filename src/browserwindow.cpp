@@ -194,6 +194,7 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
     setWindowTitle(QStringLiteral("SpacePenguin"));
     setObjectName(QStringLiteral("browserWindow"));
     resize(1200, 780);
+    WindowFrame::prepareWindow(this);
     m_frame = new WindowFrame(this);
 
     Theme::apply(Theme::storedMode());

@@ -2,13 +2,23 @@
 
 #include "icons.h"
 
+#include <cmath>
+
 #include <QApplication>
+#include <QGuiApplication>
+#include <QPainterPath>
+#include <QRegion>
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QStyle>
 #include <QToolButton>
 #include <QWidget>
 #include <QWindow>
+
+#ifdef Q_OS_WIN
+#    include <qt_windows.h>
+#    include <dwmapi.h>
+#endif
 
 namespace spacepenguin {
 
@@ -19,6 +29,38 @@ bool WindowFrame::isSupported()
 #else
     return true;
 #endif
+}
+
+namespace {
+
+bool isWayland()
+{
+    return QGuiApplication::platformName().startsWith(QLatin1String("wayland"));
+}
+
+/** A rounded rectangle as a region. Regions are made of whole pixels, so the
+ *  curve is approximated by one horizontal run per row. */
+QRegion roundedRegion(const QSize &size, int radius)
+{
+    QRegion region(0, radius, size.width(), size.height() - 2 * radius);
+    for (int y = 0; y < radius; ++y) {
+        // Inset of row y from the side, on a circle of the given radius.
+        const qreal dy = radius - y - 0.5;
+        const int inset = qRound(radius - std::sqrt(qMax<qreal>(0, radius * radius - dy * dy)));
+        region += QRegion(inset, y, size.width() - 2 * inset, 1);
+        region += QRegion(inset, size.height() - 1 - y, size.width() - 2 * inset, 1);
+    }
+    return region;
+}
+
+} // namespace
+
+void WindowFrame::prepareWindow(QWidget *window)
+{
+    // On Wayland the parts a mask cuts away must be see-through, or the
+    // compositor shows them black: the window needs an alpha channel.
+    if (isSupported() && isWayland())
+        window->setAttribute(Qt::WA_TranslucentBackground);
 }
 
 WindowFrame::WindowFrame(QWidget *window)
@@ -99,11 +141,33 @@ void WindowFrame::updateFrame()
     m_window->style()->unpolish(m_window);
     m_window->style()->polish(m_window);
 
+    updateCorners();
+
     if (m_maximizeButton) {
         m_maximizeButton->setIcon(
             Icons::icon(m_window->isMaximized() ? Icons::WindowRestore : Icons::WindowMaximize));
         m_maximizeButton->setToolTip(m_window->isMaximized() ? tr("Restore") : tr("Maximize"));
     }
+}
+
+void WindowFrame::updateCorners()
+{
+    const bool round = m_custom && !m_window->isMaximized() && !m_window->isFullScreen();
+#ifdef Q_OS_WIN
+    // Windows 11 rounds the corners itself, smoothly and with its shadow, when
+    // asked; earlier versions ignore the request and stay square.
+    if (m_window->testAttribute(Qt::WA_WState_Created)) {
+        const DWORD preference = round ? 2 /* DWMWCP_ROUND */ : 1 /* DWMWCP_DONOTROUND */;
+        DwmSetWindowAttribute(reinterpret_cast<HWND>(m_window->winId()),
+                              33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &preference,
+                              sizeof(preference));
+    }
+#else
+    if (round)
+        m_window->setMask(roundedRegion(m_window->size(), CornerRadius));
+    else
+        m_window->clearMask();
+#endif
 }
 
 void WindowFrame::toggleMaximized()
@@ -138,6 +202,15 @@ bool WindowFrame::eventFilter(QObject *watched, QEvent *event)
         switch (event->type()) {
         case QEvent::WindowStateChange:
             updateFrame();
+            break;
+        case QEvent::Resize:
+#ifndef Q_OS_WIN
+            updateCorners();
+#endif
+            break;
+        case QEvent::Show:
+            // On Windows the native window exists only now.
+            updateCorners();
             break;
         case QEvent::MouseMove: {
             const Qt::Edges edges = edgesAt(static_cast<QMouseEvent *>(event)->position().toPoint());

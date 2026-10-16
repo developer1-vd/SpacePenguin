@@ -330,8 +330,9 @@ QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }
 /* ---- Browser chrome --------------------------------------------------- */
 
 #tabStrip { background: @tabStrip; }
-/* Drawing its own title bar, the window keeps a thin border to resize it by. */
-QMainWindow#browserWindow[customFrame="true"] { background: @tabStrip; }
+/* Behind everything: the thin resize border of the window's own frame, and on
+   Wayland, where the window is see-through so its corners can be rounded, any gap. */
+QMainWindow#browserWindow { background: @tabStrip; }
 #windowControls QToolButton { padding: 6px; border-radius: 14px; }
 #windowControls QToolButton#windowClose:hover { background: #d93a3a; }
 #windowControls QToolButton#windowClose:pressed { background: #b52d2d; }

@@ -33,6 +33,14 @@ public:
 
     /** Width of the resize border, in device-independent pixels. */
     static constexpr int ResizeBorder = 4;
+    /** Radius of the window's corners while it is not maximized. */
+    static constexpr int CornerRadius = 10;
+
+    /**
+     * Call before the window is first shown. Where the corners can only be cut out
+     * of a see-through window (Wayland), makes the window see-through.
+     */
+    static void prepareWindow(QWidget *window);
 
     explicit WindowFrame(QWidget *window);
 
@@ -52,6 +60,7 @@ protected:
 private:
     Qt::Edges edgesAt(const QPoint &position) const;
     void updateFrame();
+    void updateCorners();
     void toggleMaximized();
 
     QWidget *m_window;

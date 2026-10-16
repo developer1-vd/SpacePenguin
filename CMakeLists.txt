@@ -178,6 +178,8 @@ if(WIN32)
     # Launch as a GUI application so no console window appears behind the browser,
     # and embed the icon and version information Explorer shows.
     set_target_properties(spacepenguin PROPERTIES WIN32_EXECUTABLE TRUE)
+    # DwmSetWindowAttribute, for Windows 11's rounded corners on our own frame.
+    target_link_libraries(spacepenguin PRIVATE dwmapi)
     set(SPACEPENGUIN_ICO "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/spacepenguin.ico")
     file(TO_CMAKE_PATH "${SPACEPENGUIN_ICO}" SPACEPENGUIN_ICO)
     configure_file(packaging/windows/spacepenguin.rc.in
