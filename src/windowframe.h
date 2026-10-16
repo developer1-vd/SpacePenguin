@@ -68,6 +68,7 @@ private:
     QToolButton *m_maximizeButton = nullptr;
     QList<QPair<QWidget *, std::function<bool(const QPoint &)>>> m_dragAreas;
     bool m_custom = false;
+    bool m_round = false;
     QPoint m_pressPosition;
     bool m_pressed = false;
 };

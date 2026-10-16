@@ -1,11 +1,13 @@
 #include "windowframe.h"
 
 #include "icons.h"
+#include "theme.h"
 
 #include <cmath>
 
 #include <QApplication>
 #include <QGuiApplication>
+#include <QPainter>
 #include <QPainterPath>
 #include <QRegion>
 #include <QHBoxLayout>
@@ -163,10 +165,23 @@ void WindowFrame::updateCorners()
                               sizeof(preference));
     }
 #else
-    if (round)
+    if (isWayland()) {
+        // Wayland uses a window's mask only for input, not to cut its picture.
+        // The window is see-through there (prepareWindow), and Qt paints no
+        // background for such a window, so the Paint handler below draws it as
+        // a smooth rounded rectangle and the corners stay clear. Everything
+        // inside sits within the resize border, which keeps it inside the curve
+        // (radius <= border * 3.4).
+        static_assert(CornerRadius <= ResizeBorder * 3.4, "content would poke into the corners");
+        if (m_round != round) {
+            m_round = round;
+            m_window->update();
+        }
+    } else if (round) {
         m_window->setMask(roundedRegion(m_window->size(), CornerRadius));
-    else
+    } else {
         m_window->clearMask();
+    }
 #endif
 }
 
@@ -202,6 +217,17 @@ bool WindowFrame::eventFilter(QObject *watched, QEvent *event)
         switch (event->type()) {
         case QEvent::WindowStateChange:
             updateFrame();
+            break;
+        case QEvent::Paint:
+            if (m_window->testAttribute(Qt::WA_TranslucentBackground)) {
+                // See prepareWindow() and updateCorners().
+                QPainter painter(m_window);
+                painter.setRenderHint(QPainter::Antialiasing);
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(Theme::currentColors().tabStrip);
+                const qreal radius = m_round ? CornerRadius : 0;
+                painter.drawRoundedRect(QRectF(m_window->rect()), radius, radius);
+            }
             break;
         case QEvent::Resize:
 #ifndef Q_OS_WIN

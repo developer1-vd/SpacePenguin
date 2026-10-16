@@ -282,7 +282,7 @@ What is handled per platform:
   resizing go through the window system, so snapping and tiling work, on Wayland
   too. "Use the system title bar and borders" in Settings brings the
   system's back. The window's corners are rounded (except maximized or full
-  screen): natively on Windows 11, by a window shape on Linux. macOS keeps its own
+  screen): natively on Windows 11, by a window shape on X11, and painted smooth on Wayland. macOS keeps its own
   title bar and traffic lights
 - **Menus** — on macOS the menu bar is the system's, with Quit, About and Settings
   in the application menu; on Windows and Linux it is off by default and
