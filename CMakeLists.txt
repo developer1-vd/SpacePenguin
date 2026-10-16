@@ -106,6 +106,8 @@ qt_add_executable(spacepenguin
     src/webview.h
     src/startuptrace.cpp
     src/startuptrace.h
+    src/youtube.cpp
+    src/youtube.h
     src/windowframe.cpp
     src/windowframe.h
     src/icons.cpp
@@ -350,6 +352,21 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_devicetuning PRIVATE Qt6::Test Qt6::Core)
         target_include_directories(tst_devicetuning PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME devicetuning COMMAND tst_devicetuning)
+
+        qt_add_executable(tst_youtube
+            tests/tst_youtube.cpp
+            src/youtube.cpp
+            src/youtube.h
+            src/preferences.cpp
+            src/preferences.h
+            src/userextensions.cpp
+            src/userextensions.h
+            src/urlresolver.cpp
+            src/urlresolver.h
+        )
+        target_link_libraries(tst_youtube PRIVATE Qt6::Test Qt6::Network Qt6::WebEngineWidgets)
+        target_include_directories(tst_youtube PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME youtube COMMAND tst_youtube)
     endif()
 endif()
 

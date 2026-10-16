@@ -22,6 +22,7 @@
 #include "userextensions.h"
 #include "webview.h"
 #include "windowframe.h"
+#include "youtube.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -1983,6 +1984,7 @@ void BrowserWindow::connectView(WebView *view)
             [this, view](const QUrl &url) { loadAboutPage(view, url.toString()); });
 
     view->setTabFactory([this](bool background) { return addTab(background); });
+    YouTube::attach(view);
 }
 
 void BrowserWindow::onCurrentTabChanged(int index)

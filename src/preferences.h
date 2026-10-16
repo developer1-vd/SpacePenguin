@@ -52,6 +52,10 @@ public:
     bool blockingEnabled() const;
     void setBlockingEnabled(bool enabled);
 
+    /** Skip sponsor segments in YouTube videos, with SponsorBlock's data. */
+    bool skipSponsors() const;
+    void setSkipSponsors(bool skip);
+
     /** Announces a change made outside the setters, such as the theme. */
     void notifyChanged();
 

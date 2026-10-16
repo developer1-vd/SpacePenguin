@@ -99,6 +99,7 @@ signals:
     void blockedCountChanged(int count);
     void enabledChanged(bool enabled);
     void filtersChanged();
+    void pausedHostsChanged();
 
 private:
     QList<NetworkRule> m_rules;

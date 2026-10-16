@@ -97,6 +97,25 @@ requests from `www.youtube.com` itself, so a network rule can only target the ad
 `/youtubei/v1/player/ad_break`. The visible ad, the overlay and the pop-out
 player are elements in the page, and only cosmetic filtering touches those.
 
+Even that is not enough for video ads, which YouTube schedules inside the
+player's own data. So `src/youtube.cpp` adds what an extension like uBlock Origin
+does there:
+
+- **Ad data removed.** Before YouTube's scripts run, the ad entries
+  (`adPlacements`, `playerAds`, `adSlots`) are deleted from the player data as
+  it arrives (the inline `ytInitialPlayerResponse`, `JSON.parse` and
+  `fetch().json()`), so the player has no ads to play.
+- **Fallback.** An ad that still starts is muted, run to its end and skipped.
+- **Ad boxes hidden** in the home feed, the sidebar and search results.
+- **Sponsor segments skipped**, with [SponsorBlock](https://sponsor.ajay.app)'s
+  community timestamps (sponsors, self-promotion, subscribe reminders), with a
+  short "Skipped sponsor" note. Only the first four hex digits of the SHA-256 of
+  the video ID are sent — a prefix shared by dozens of videos — so SponsorBlock
+  cannot tell which one is playing. Settings › Privacy & Security turns it off.
+
+Pausing blocking for youtube.com, or turning blocking off, turns the ad part off
+too.
+
 ### Rule syntax supported
 
 | Form | Meaning |

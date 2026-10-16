@@ -10,6 +10,7 @@
 #include "preferences.h"
 #include "startpageschemehandler.h"
 #include "userextensions.h"
+#include "youtube.h"
 
 #include <QDir>
 #include <QFile>
@@ -154,6 +155,17 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     };
     QObject::connect(preferences, &Preferences::changed, blocker, applyPreferences);
     applyPreferences();
+
+    // YouTube's ads and sponsor segments need page scripts, not request rules.
+    const auto installYouTube = [profile, blocker, preferences] {
+        const bool blockAds = blocker->isEnabled()
+            && !blocker->isPausedFor(QStringLiteral("www.youtube.com"));
+        YouTube::installScripts(profile, blockAds, preferences->skipSponsors());
+    };
+    QObject::connect(blocker, &AdBlocker::enabledChanged, blocker, installYouTube);
+    QObject::connect(blocker, &AdBlocker::pausedHostsChanged, blocker, installYouTube);
+    QObject::connect(preferences, &Preferences::changed, blocker, installYouTube);
+    installYouTube();
 
     services.userScripts = new UserScripts(services.profile, parent);
     if (!isPrivate)

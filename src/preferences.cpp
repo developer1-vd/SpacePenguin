@@ -18,6 +18,7 @@ const QString kMenuBar = QStringLiteral("appearance/showMenuBar");
 const QString kSystemTitleBar = QStringLiteral("appearance/systemTitleBar");
 const QString kDownloads = QStringLiteral("downloads/directory");
 const QString kBlocking = QStringLiteral("adblock/enabled");
+const QString kSponsors = QStringLiteral("adblock/skipSponsors");
 
 } // namespace
 
@@ -143,6 +144,16 @@ QString Preferences::downloadDirectory() const
 void Preferences::setDownloadDirectory(const QString &path)
 {
     write(kDownloads, path);
+}
+
+bool Preferences::skipSponsors() const
+{
+    return QSettings().value(kSponsors, true).toBool();
+}
+
+void Preferences::setSkipSponsors(bool skip)
+{
+    write(kSponsors, skip);
 }
 
 bool Preferences::blockingEnabled() const

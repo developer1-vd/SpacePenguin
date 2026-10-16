@@ -361,6 +361,15 @@ QWidget *SettingsDialog::createPrivacyTab()
     });
     layout->addWidget(blocking);
 
+    auto *sponsors = new QCheckBox(tr("Skip sponsor segments in YouTube videos"));
+    sponsors->setChecked(Preferences::instance()->skipSponsors());
+    connect(sponsors, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setSkipSponsors(checked); });
+    layout->addWidget(sponsors);
+    layout->addWidget(mutedLabel(tr("Uses SponsorBlock's community timestamps. Only a short "
+                                    "fragment of a hash of the video's ID is sent, never the ID "
+                                    "itself, so SponsorBlock cannot tell which video you watch.")));
+
     m_blockingSummary = mutedLabel(QString());
     m_blockingSummary->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(m_blockingSummary);
