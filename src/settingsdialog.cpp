@@ -363,6 +363,24 @@ QWidget *SettingsDialog::createPrivacyTab()
     QWidget *page = pageShell(tr("Privacy & Security"),
                               tr("Content blocking, data use and your browsing data."), &layout);
 
+    layout->addWidget(sectionTitle(tr("Logins and permissions")));
+    auto *offerLogins = new QCheckBox(tr("Offer to save logins"));
+    offerLogins->setChecked(Preferences::instance()->offerToSaveLogins());
+    connect(offerLogins, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setOfferToSaveLogins(checked); });
+    layout->addWidget(offerLogins);
+    auto *loginButtons = new QHBoxLayout;
+    auto *savedLogins = new QPushButton(Icons::icon(Icons::Key), tr("Saved logins…"));
+    connect(savedLogins, &QPushButton::clicked, this, &SettingsDialog::savedLoginsRequested);
+    auto *permissions = new QPushButton(Icons::icon(Icons::Shield), tr("Site permissions…"));
+    connect(permissions, &QPushButton::clicked, this, &SettingsDialog::sitePermissionsRequested);
+    loginButtons->addWidget(savedLogins);
+    loginButtons->addWidget(permissions);
+    loginButtons->addStretch(1);
+    layout->addLayout(loginButtons);
+    layout->addWidget(mutedLabel(tr("Sites ask before using your camera, microphone, location "
+                                    "or notifications; your answers are kept per site.")));
+
     layout->addWidget(sectionTitle(tr("Ad blocking")));
     auto *blocking = new QCheckBox(tr("Block ads and trackers"));
     blocking->setChecked(Preferences::instance()->blockingEnabled());

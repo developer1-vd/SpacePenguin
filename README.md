@@ -23,6 +23,17 @@ checkbox list.
   it to rename, recolour, add a tab, ungroup or close it. Dragging a tab between
   two of a group's tabs adds it; dragging it away takes it out. Groups are saved
   with the session
+- **Saved logins** — after you sign in, a bar offers to save the login; on the site
+  again, the key in the address bar fills it in (only when you pick it, so a page
+  never gets it unasked). *Settings › Privacy › Saved logins* shows, copies and
+  deletes them. On Windows they are encrypted with your Windows account; elsewhere
+  they are in a file only your account can read
+- **Site permissions** — a site that wants your camera, microphone, location,
+  notifications, clipboard or screen asks in a bar above the page; answers are kept
+  per site (in private windows, until they close) and can be reset from the address
+  bar's site menu or *Settings › Privacy › Site permissions*
+- **Notifications** — from sites you allowed, shown as desktop notifications;
+  clicking one brings its tab forward
 - **Address bar** — takes URLs, `about:` pages and plain-language queries; anything
   that isn't a URL becomes a search on the chosen engine (DuckDuckGo by default).
   Suggests matching bookmarks and history as you type; shows a lock, warning or info

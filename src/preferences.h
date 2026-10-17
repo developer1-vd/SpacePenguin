@@ -60,6 +60,10 @@ public:
     bool blockingEnabled() const;
     void setBlockingEnabled(bool enabled);
 
+    /** Offer to save a login when one is used to sign in to a site. */
+    bool offerToSaveLogins() const;
+    void setOfferToSaveLogins(bool offer);
+
     /** Skip sponsor segments in YouTube videos, with SponsorBlock's data. */
     bool skipSponsors() const;
     void setSkipSponsors(bool skip);

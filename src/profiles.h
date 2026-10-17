@@ -12,6 +12,7 @@ class CookieManager;
 class DataSaverManager;
 class DownloadManager;
 class HistoryManager;
+class LoginStore;
 class UserScripts;
 
 struct ProfileServices {
@@ -22,6 +23,7 @@ struct ProfileServices {
     DataSaverManager *dataSaverManager = nullptr;
     DownloadManager *downloadManager = nullptr;
     HistoryManager *historyManager = nullptr;
+    LoginStore *logins = nullptr; // shared by every profile
     UserScripts *userScripts = nullptr;
 };
 

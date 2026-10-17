@@ -275,6 +275,12 @@ void drawGlyph(QPainter *p, Icons::Glyph glyph, const QColor &color, const QColo
     case Icons::ChevronRight:
         p->drawPolyline(QPolygonF({QPointF(9, 6), QPointF(15, 12), QPointF(9, 18)}));
         break;
+    case Icons::Key:
+        p->drawEllipse(QPointF(8, 12), 3.8, 3.8);
+        p->drawLine(QPointF(11.8, 12), QPointF(20.5, 12));
+        p->drawLine(QPointF(17.5, 12), QPointF(17.5, 15));
+        p->drawLine(QPointF(20.5, 12), QPointF(20.5, 14.5));
+        break;
     case Icons::SideTabs:
         p->drawRoundedRect(QRectF(3.5, 5, 17, 14), 2.5, 2.5);
         p->drawLine(QPointF(9.5, 5), QPointF(9.5, 19));

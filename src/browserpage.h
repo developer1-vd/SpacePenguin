@@ -18,6 +18,8 @@ signals:
      * render those itself, so the window does it instead.
      */
     void internalPageRequested(const QUrl &url);
+    /** Someone signed in on the page; see LoginStore::captureScript. */
+    void loginSubmitted(const QString &username, const QString &password);
 
 protected:
     bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override;

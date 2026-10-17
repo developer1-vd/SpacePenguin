@@ -1,5 +1,8 @@
 #include "profiles.h"
 
+#include "logins.h"
+#include "notifications.h"
+
 #include "adblocker.h"
 #include "bookmarkmanager.h"
 #include "cookiemanager.h"
@@ -16,6 +19,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
+#include <QCoreApplication>
+#include <QWebEngineNotification>
 #include <QWebEngineProfile>
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
@@ -106,6 +111,29 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
         services.profile = new QWebEngineProfile(QStringLiteral("default"), parent);
         services.profile->setPersistentStoragePath(dataDirectory);
         services.profile->setCachePath(dataDirectory + QStringLiteral("/cache"));
+    }
+
+    // Answers to "allow this site to …?" are kept; in private windows only until they close.
+    services.profile->setPersistentPermissionsPolicy(
+        isPrivate ? QWebEngineProfile::PersistentPermissionsPolicy::StoreInMemory
+                  : QWebEngineProfile::PersistentPermissionsPolicy::StoreOnDisk);
+    services.profile->setNotificationPresenter(
+        [](std::unique_ptr<QWebEngineNotification> notification) {
+            Notifications::instance()->present(std::move(notification));
+        });
+
+    // One store of saved logins; private windows can fill from it but do not add to it.
+    static LoginStore *logins = new LoginStore(defaultDataDirectory(), qApp);
+    services.logins = logins;
+    if (!isPrivate) {
+        QWebEngineScript capture;
+        // Browser-owned: the extensions loader keeps scripts with this prefix.
+        capture.setName(UserScripts::reservedPrefix() + QStringLiteral("login-capture"));
+        capture.setSourceCode(LoginStore::captureScript(LoginStore::captureToken()));
+        capture.setInjectionPoint(QWebEngineScript::DocumentReady);
+        capture.setWorldId(QWebEngineScript::ApplicationWorld);
+        capture.setRunsOnSubFrames(false);
+        services.profile->scripts()->insert(capture);
     }
 
     services.adBlocker = new AdBlocker(parent);

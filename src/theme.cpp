@@ -387,6 +387,8 @@ QTabBar#tabBar QToolButton#tabClose:hover { background: @pressed; }
 #findBar QLineEdit { border-radius: 14px; min-width: 260px; }
 
 #sandboxBanner { background: @warningBg; border: 1px solid @border; border-radius: 14px; }
+#promptBar { background: @surface; border: 1px solid @border; border-radius: 14px; }
+#promptBar QLabel { color: @text; }
 #sandboxBanner QLabel { color: @text; }
 #linkPreview { background: @surface; color: @muted; border: 1px solid @border; border-radius: 12px; padding: 3px 10px; }
 

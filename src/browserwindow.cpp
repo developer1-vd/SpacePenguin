@@ -12,6 +12,8 @@
 #include "extensionsdialog.h"
 #include "historydialog.h"
 #include "historymanager.h"
+#include "logins.h"
+#include "notifications.h"
 #include "icons.h"
 #include "preferences.h"
 #include "devicetuning.h"
@@ -19,6 +21,7 @@
 #include "settingsdialog.h"
 #include "shortcuts.h"
 #include "sidetabs.h"
+#include "sitepermissions.h"
 #include "startuptrace.h"
 #include "tabgroups.h"
 #include "userextensions.h"
@@ -52,6 +55,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QProgressBar>
+#include <QPushButton>
 #include <QSet>
 #include <QSettings>
 #include <QShortcut>
@@ -66,6 +70,9 @@
 #include <QWebEngineFindTextResult>
 #include <QWebEngineHistory>
 #include <QWebEnginePage>
+#include <QWebEnginePermission>
+#include <QWebEngineProfile>
+#include <QWebEngineScript>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
 #include <QWidgetAction>
@@ -211,6 +218,28 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
         connect(m_services.historyManager, &HistoryManager::visitRemoved, this, historyChanged);
         connect(m_services.historyManager, &HistoryManager::historyCleared, this, historyChanged);
     }
+
+    if (m_services.logins)
+        connect(m_services.logins, &LoginStore::changed, this, &BrowserWindow::updateLoginsAction);
+
+    // A clicked notification brings its site's tab forward.
+    connect(Notifications::instance(), &Notifications::clicked, this, [this](const QUrl &origin) {
+        for (int i = 0; i < m_tabBar->count(); ++i) {
+            const WebView *view = viewAt(i);
+            if (view && view->url().host() == origin.host() && view->url().scheme() == origin.scheme()) {
+                m_tabBar->setCurrentIndex(i);
+                showNormal();
+                raise();
+                activateWindow();
+                return;
+            }
+        }
+    });
+    connect(Notifications::instance(), &Notifications::shownInWindow, this,
+            [this](const QString &title, const QString &message) {
+                if (isActiveWindow())
+                    showToast(message.isEmpty() ? title : QStringLiteral("%1 — %2").arg(title, message), 6000);
+            });
 
     if (m_services.downloadManager) {
         connect(m_services.downloadManager, &DownloadManager::downloadStarted, this,
@@ -453,6 +482,8 @@ void BrowserWindow::createChrome()
         layout->addWidget(bannerHolder);
     }
 
+    layout->addWidget(createPromptBar());
+
     m_progressBar = new QProgressBar;
     m_progressBar->setObjectName(QStringLiteral("loadProgress"));
     m_progressBar->setTextVisible(false);
@@ -611,6 +642,25 @@ QWidget *BrowserWindow::createNavigationBar()
                 });
             }
         }
+        if (WebView *view = currentView(); view && m_services.profile) {
+            const QUrl origin = view->url().adjusted(QUrl::RemovePath | QUrl::RemoveQuery
+                                                     | QUrl::RemoveFragment);
+            bool first = true;
+            for (const QWebEnginePermission &permission : m_services.profile->listPermissionsForOrigin(origin)) {
+                if (permission.state() == QWebEnginePermission::State::Ask)
+                    continue;
+                if (first)
+                    menu.addSeparator();
+                first = false;
+                QAction *reset = menu.addAction(tr("%1: %2 — ask again")
+                                                    .arg(SitePermissions::name(permission.permissionType()),
+                                                         SitePermissions::stateName(permission.state())));
+                connect(reset, &QAction::triggered, this, [permission] { permission.reset(); });
+            }
+            menu.addSeparator();
+            connect(menu.addAction(tr("Site permissions…")), &QAction::triggered, this,
+                    &BrowserWindow::showSitePermissions);
+        }
         menu.exec(m_omnibox->mapToGlobal(QPoint(0, m_omnibox->height())));
     });
 
@@ -625,6 +675,12 @@ QWidget *BrowserWindow::createNavigationBar()
         updateBookmarkStar();
         toggleBookmarkForCurrentPage();
     });
+
+    // Shown when the site has saved logins: pick one to fill it in.
+    m_loginsAction = m_omnibox->addAction(Icons::icon(Icons::Key), QLineEdit::TrailingPosition);
+    m_loginsAction->setToolTip(tr("Fill in a saved login"));
+    m_loginsAction->setVisible(false);
+    connect(m_loginsAction, &QAction::triggered, this, &BrowserWindow::showLoginsMenu);
 
     m_completionModel = new QStandardItemModel(this);
     m_completer = new QCompleter(m_completionModel, this);
@@ -1018,6 +1074,9 @@ void BrowserWindow::showSettings()
     dialog.setProfile(m_services.profile);
     connect(&dialog, &SettingsDialog::extensionsRequested, this,
             &BrowserWindow::showExtensionsDialog);
+    connect(&dialog, &SettingsDialog::savedLoginsRequested, this, &BrowserWindow::showSavedLogins);
+    connect(&dialog, &SettingsDialog::sitePermissionsRequested, this,
+            &BrowserWindow::showSitePermissions);
     dialog.exec();
 }
 
@@ -1715,6 +1774,195 @@ void BrowserWindow::updateTabLabel(WebView *view)
     syncSideTabs();
 }
 
+// ---- Questions above the page --------------------------------------------------------
+
+QWidget *BrowserWindow::createPromptBar()
+{
+    auto *bar = new QWidget;
+    bar->setObjectName(QStringLiteral("promptBar"));
+    bar->setAttribute(Qt::WA_StyledBackground);
+    auto *barLayout = new QHBoxLayout(bar);
+    barLayout->setContentsMargins(12, 6, 6, 6);
+    barLayout->setSpacing(10);
+    m_promptIcon = new QLabel;
+    barLayout->addWidget(m_promptIcon);
+    m_promptText = new QLabel;
+    m_promptText->setWordWrap(true);
+    barLayout->addWidget(m_promptText, 1);
+    m_promptButtons = new QWidget;
+    auto *buttons = new QHBoxLayout(m_promptButtons);
+    buttons->setContentsMargins(0, 0, 0, 0);
+    buttons->setSpacing(6);
+    barLayout->addWidget(m_promptButtons);
+    auto *dismiss = new QToolButton;
+    dismiss->setIcon(Icons::icon(Icons::Close));
+    dismiss->setAutoRaise(true);
+    dismiss->setToolTip(tr("Not now"));
+    connect(dismiss, &QToolButton::clicked, this, [this] { answerPrompt(-1); });
+    barLayout->addWidget(dismiss);
+
+    // A card that keeps clear of the window's edges, like the sandbox notice.
+    m_promptBar = new QWidget;
+    auto *holder = new QVBoxLayout(m_promptBar);
+    holder->setContentsMargins(8, 6, 8, 2);
+    holder->addWidget(bar);
+    m_promptBar->hide();
+    return m_promptBar;
+}
+
+void BrowserWindow::addPrompt(WebView *view, Prompt prompt)
+{
+    QList<Prompt> &queue = m_prompts[view];
+    for (const Prompt &queued : std::as_const(queue)) {
+        if (queued.key == prompt.key)
+            return;
+    }
+    queue.append(std::move(prompt));
+    if (view == currentView())
+        showPrompt();
+}
+
+void BrowserWindow::dropPrompts(WebView *view, const QString &key)
+{
+    auto found = m_prompts.find(view);
+    if (found == m_prompts.end())
+        return;
+    found->removeIf([&key](const Prompt &prompt) { return prompt.key == key; });
+    if (view == currentView())
+        showPrompt();
+}
+
+void BrowserWindow::showPrompt()
+{
+    if (!m_promptBar)
+        return;
+    const QList<Prompt> queue = m_prompts.value(currentView());
+    if (queue.isEmpty()) {
+        m_promptBar->hide();
+        return;
+    }
+    const Prompt &prompt = queue.first();
+    m_promptIcon->setPixmap(Icons::icon(prompt.icon).pixmap(18, 18));
+    m_promptText->setText(prompt.text);
+    QLayout *layout = m_promptButtons->layout();
+    while (QLayoutItem *item = layout->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    for (int i = 0; i < prompt.buttons.size(); ++i) {
+        auto *button = new QPushButton(prompt.buttons.at(i).first);
+        button->setAutoDefault(false);
+        button->setProperty("accent", i == 0);
+        connect(button, &QPushButton::clicked, this, [this, i] { answerPrompt(i); });
+        layout->addWidget(button);
+    }
+    m_promptBar->show();
+}
+
+void BrowserWindow::answerPrompt(int button)
+{
+    auto found = m_prompts.find(currentView());
+    if (found == m_prompts.end() || found->isEmpty())
+        return;
+    const Prompt prompt = found->takeFirst();
+    if (button >= 0 && button < prompt.buttons.size()) {
+        if (prompt.buttons.at(button).second)
+            prompt.buttons.at(button).second();
+    } else if (prompt.dismissed) {
+        prompt.dismissed();
+    }
+    showPrompt();
+}
+
+void BrowserWindow::offerToSaveLogin(WebView *view, const QString &username, const QString &password)
+{
+    LoginStore *logins = m_services.logins;
+    const QString origin = LoginStore::originOf(view->url());
+    if (!logins || m_isPrivate || origin.isEmpty() || !Preferences::instance()->offerToSaveLogins()
+        || logins->isNeverSaved(origin) || logins->contains(origin, username, password)) {
+        return;
+    }
+    bool update = false;
+    for (const Login &login : logins->loginsFor(origin))
+        update = update || login.username == username;
+
+    const QString site = SitePermissions::siteName(QUrl(origin)).toHtmlEscaped();
+    const QString who = username.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(username.toHtmlEscaped());
+    Prompt prompt;
+    prompt.key = QStringLiteral("login:%1:%2").arg(origin, username);
+    prompt.icon = Icons::Key;
+    if (update) {
+        prompt.text = tr("Update the saved password for <b>%1</b>%2?").arg(site, who);
+        prompt.buttons = {{tr("Update"), [logins, origin, username, password] {
+                               logins->save(origin, username, password);
+                           }}};
+    } else {
+        prompt.text = tr("Save your login for <b>%1</b>%2?").arg(site, who);
+        prompt.buttons = {{tr("Save"), [logins, origin, username, password] {
+                               logins->save(origin, username, password);
+                           }},
+                          {tr("Never for this site"), [logins, origin] {
+                               logins->setNeverSave(origin, true);
+                           }}};
+    }
+    // The sign-in usually opens a new page; ask on the tab wherever it went.
+    dropPrompts(view, prompt.key);
+    addPrompt(view, prompt);
+}
+
+void BrowserWindow::updateLoginsAction()
+{
+    if (!m_loginsAction)
+        return;
+    const WebView *view = currentView();
+    const QString origin = view ? LoginStore::originOf(view->url()) : QString();
+    m_loginsAction->setVisible(m_services.logins && !origin.isEmpty()
+                               && !m_services.logins->loginsFor(origin).isEmpty());
+}
+
+void BrowserWindow::showLoginsMenu()
+{
+    WebView *view = currentView();
+    if (!view || !m_services.logins)
+        return;
+    const QString origin = LoginStore::originOf(view->url());
+    QMenu menu(this);
+    menu.addAction(tr("Fill in a saved login"))->setEnabled(false);
+    menu.addSeparator();
+    for (const Login &login : m_services.logins->loginsFor(origin)) {
+        QAction *fill = menu.addAction(Icons::icon(Icons::Key),
+                                       login.username.isEmpty() ? tr("(no username)") : login.username);
+        connect(fill, &QAction::triggered, this, [this, view, login] {
+            if (!m_tabBar || indexOfView(view) < 0)
+                return;
+            // Into the page's sign-in form, from the same isolated world the capture runs in.
+            view->page()->runJavaScript(LoginStore::fillScript(login.username, login.password),
+                                        QWebEngineScript::ApplicationWorld);
+            m_services.logins->markUsed(login.origin, login.username);
+        });
+    }
+    menu.addSeparator();
+    connect(menu.addAction(tr("Manage saved logins…")), &QAction::triggered, this,
+            &BrowserWindow::showSavedLogins);
+    menu.exec(m_omnibox->mapToGlobal(QPoint(m_omnibox->width() - 240, m_omnibox->height())));
+}
+
+void BrowserWindow::showSavedLogins()
+{
+    if (!m_services.logins)
+        return;
+    LoginsDialog dialog(m_services.logins, this);
+    dialog.exec();
+}
+
+void BrowserWindow::showSitePermissions()
+{
+    if (!m_services.profile)
+        return;
+    SitePermissionsDialog dialog(m_services.profile, this);
+    dialog.exec();
+}
+
 // ---- Tabs on the side, and tab groups ---------------------------------------------
 
 void BrowserWindow::setTabsOnSide(bool side)
@@ -2318,6 +2566,41 @@ void BrowserWindow::connectView(WebView *view)
     connect(view->browserPage(), &BrowserPage::internalPageRequested, this,
             [this, view](const QUrl &url) { loadAboutPage(view, url.toString()); });
 
+    connect(view->page(), &QWebEnginePage::permissionRequested, this,
+            [this, view](QWebEnginePermission permission) {
+                const QString site = SitePermissions::siteName(permission.origin());
+                Prompt prompt;
+                prompt.key = QStringLiteral("permission:%1:%2")
+                                 .arg(permission.origin().toString())
+                                 .arg(int(permission.permissionType()));
+                prompt.icon = Icons::Shield;
+                prompt.text = tr("<b>%1</b> wants to %2.")
+                                  .arg(site.toHtmlEscaped(),
+                                       SitePermissions::request(permission.permissionType()));
+                prompt.buttons = {{tr("Allow"), [permission] { permission.grant(); }},
+                                  {tr("Block"), [permission] { permission.deny(); }}};
+                prompt.dismissed = [permission] { permission.deny(); };
+                addPrompt(view, prompt);
+            });
+    connect(view->browserPage(), &BrowserPage::loginSubmitted, this,
+            [this, view](const QString &username, const QString &password) {
+                offerToSaveLogin(view, username, password);
+            });
+    // A question about a page is moot once the tab has gone somewhere else.
+    connect(view, &QWebEngineView::urlChanged, this, [this, view](const QUrl &url) {
+        const QString origin = url.adjusted(QUrl::RemovePath | QUrl::RemoveQuery
+                                            | QUrl::RemoveFragment).toString();
+        for (const Prompt &prompt : m_prompts.value(view)) {
+            if (prompt.key.startsWith(QStringLiteral("permission:"))
+                && !prompt.key.startsWith(QStringLiteral("permission:%1:").arg(origin)))
+                dropPrompts(view, prompt.key);
+        }
+    });
+    connect(view, &QObject::destroyed, this, [this, view] {
+        m_prompts.remove(view);
+        showPrompt();
+    });
+
     view->setTabFactory([this](bool background) { return addTab(background); });
     YouTube::attach(view);
 }
@@ -2348,6 +2631,8 @@ void BrowserWindow::onCurrentTabChanged(int index)
     updateSecurityIndicator();
     updateBookmarkStar();
     updateZoomIndicator();
+    updateLoginsAction();
+    showPrompt();
 
     if (m_findBar->isVisible())
         findNext(false);
@@ -2361,6 +2646,8 @@ void BrowserWindow::onUrlChanged(WebView *view, const QUrl &url)
     updateTabLabel(view);
     if (view != currentView())
         return;
+
+    updateLoginsAction();
 
     syncOmnibox(url);
     updateSecurityIndicator();

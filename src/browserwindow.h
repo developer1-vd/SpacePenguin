@@ -1,11 +1,15 @@
 #pragma once
 
+#include <QHash>
 #include <QList>
 #include <QMainWindow>
 #include <QPointer>
 #include <QUrl>
 
+#include <functional>
+
 #include "aboutpages.h"
+#include "icons.h"
 #include "profiles.h"
 #include "tabbar.h"
 #include "theme.h"
@@ -58,6 +62,16 @@ private:
     struct ClosedTab {
         int index = 0;
         QUrl url;
+    };
+
+    /** A question for the person about one tab: a site asking for a permission, or
+     *  whether to save a login. Shown in the bar above the page while its tab is shown. */
+    struct Prompt {
+        QString key; // the same question is not asked twice at once
+        Icons::Glyph icon = Icons::Info;
+        QString text;
+        QList<std::pair<QString, std::function<void()>>> buttons; // the first is the main one
+        std::function<void()> dismissed;
     };
 
     // Construction.
@@ -114,6 +128,18 @@ private:
     void showTabContextMenu(const QPoint &pos);
     void showTabMenu(int index, const QPoint &globalPosition);
     void updateTabLabel(WebView *view);
+
+    // Questions above the page: site permissions and saving logins.
+    QWidget *createPromptBar();
+    void addPrompt(WebView *view, Prompt prompt);
+    void dropPrompts(WebView *view, const QString &keyPrefix);
+    void showPrompt();
+    void answerPrompt(int button);
+    void offerToSaveLogin(WebView *view, const QString &username, const QString &password);
+    void updateLoginsAction();
+    void showLoginsMenu();
+    void showSavedLogins();
+    void showSitePermissions();
 
     // Tabs on the side, and tab groups.
     void setTabsOnSide(bool side);
@@ -184,6 +210,7 @@ private:
     QLineEdit *m_omnibox = nullptr;
     QAction *m_securityAction = nullptr;
     QAction *m_bookmarkStarAction = nullptr;
+    QAction *m_loginsAction = nullptr;
     QCompleter *m_completer = nullptr;
     QStandardItemModel *m_completionModel = nullptr;
     bool m_completionsDirty = true;
@@ -205,6 +232,12 @@ private:
     QPointer<QWebEngineView> m_findView;
 
     QList<ClosedTab> m_closedTabs;
+
+    QHash<const QObject *, QList<Prompt>> m_prompts;
+    QWidget *m_promptBar = nullptr;
+    QLabel *m_promptIcon = nullptr;
+    QLabel *m_promptText = nullptr;
+    QWidget *m_promptButtons = nullptr;
 
     QPointer<DownloadsDialog> m_downloadsDialog;
     QPointer<HistoryDialog> m_historyDialog;

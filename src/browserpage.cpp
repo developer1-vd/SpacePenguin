@@ -1,5 +1,10 @@
 #include "browserpage.h"
 
+#include "logins.h"
+
+#include <QJsonDocument>
+#include <QJsonObject>
+
 #include <QWebEngineSettings>
 
 namespace spacepenguin {
@@ -81,6 +86,15 @@ void BrowserPage::javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
                                            const QString &message, int lineNumber,
                                            const QString &sourceID)
 {
+    // Logins reported by the capture script, from its isolated world.
+    if (message.startsWith(LoginStore::captureToken())) {
+        const QJsonObject login =
+            QJsonDocument::fromJson(message.mid(LoginStore::captureToken().size()).toUtf8()).object();
+        const QString password = login.value(QStringLiteral("p")).toString();
+        if (!password.isEmpty())
+            emit loginSubmitted(login.value(QStringLiteral("u")).toString(), password);
+        return;
+    }
     static const bool forward = qEnvironmentVariableIntValue("SPACEPENGUIN_JS_CONSOLE") != 0;
     if (forward)
         QWebEnginePage::javaScriptConsoleMessage(level, message, lineNumber, sourceID);

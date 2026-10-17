@@ -100,10 +100,16 @@ qt_add_executable(spacepenguin
     src/aboutpages.h
     src/browserwindow.cpp
     src/browserwindow.h
+    src/logins.cpp
+    src/logins.h
+    src/notifications.cpp
+    src/notifications.h
     src/sidetabs.cpp
     src/sidetabs.h
     src/tabbar.cpp
     src/tabbar.h
+    src/sitepermissions.cpp
+    src/sitepermissions.h
     src/tabgroups.cpp
     src/tabgroups.h
     src/browserpage.cpp
@@ -191,7 +197,7 @@ if(WIN32)
     # and embed the icon and version information Explorer shows.
     set_target_properties(spacepenguin PROPERTIES WIN32_EXECUTABLE TRUE)
     # DwmSetWindowAttribute, for Windows 11's rounded corners on our own frame.
-    target_link_libraries(spacepenguin PRIVATE dwmapi)
+    target_link_libraries(spacepenguin PRIVATE dwmapi crypt32)
     set(SPACEPENGUIN_ICO "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/spacepenguin.ico")
     file(TO_CMAKE_PATH "${SPACEPENGUIN_ICO}" SPACEPENGUIN_ICO)
     configure_file(packaging/windows/spacepenguin.rc.in
