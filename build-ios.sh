@@ -93,7 +93,9 @@ if [[ -z "${TEAM}" ]]; then
     xcodebuild -project "${BUILD_DIR}/SpacePenguinMobile.xcodeproj" -scheme spacepenguin_mobile \
         -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
         -derivedDataPath "${BUILD_DIR}/derived" CODE_SIGNING_ALLOWED=NO build
-    app="$(find "${BUILD_DIR}/derived/Build/Products" -name 'SpacePenguin.app' -path '*iphonesimulator*' | head -n1)"
+    # CMake's Xcode project sets its own products directory (build-ios/Release-iphonesimulator),
+    # so look through the whole build directory rather than the derived data.
+    app="$(find "${BUILD_DIR}" -name 'SpacePenguin.app' -path '*iphonesimulator*' -not -path '*.dSYM*' -type d | head -n1)"
     [[ -n "${app}" ]] || die "no app was produced"
     OUTPUT="${OUTPUT_DIR}/SpacePenguin-${VERSION}-ios-simulator.zip"
     rm -f "${OUTPUT}"
