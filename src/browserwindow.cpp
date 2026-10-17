@@ -2050,12 +2050,19 @@ void BrowserWindow::offerWebStoreExtension(WebView *view)
 {
     ChromeExtensions *extensions = m_services.extensions;
     const QString id = ChromeExtensions::webStoreId(view->url());
+    // An offer for the extension of a page the tab has left goes with it.
+    for (const Prompt &prompt : m_prompts.value(view)) {
+        if (prompt.key.startsWith(QStringLiteral("webstore:")) && prompt.key != QStringLiteral("webstore:%1").arg(id))
+            dropPrompts(view, prompt.key);
+    }
     if (!extensions || !ChromeExtensions::isSupported() || id.isEmpty() || extensions->isInstalled(id))
         return;
-    QString name = view->title();
-    name.remove(QRegularExpression(QStringLiteral("\\s*[-–]\\s*Chrome Web Store\\s*$")));
-    if (name.isEmpty())
-        name = tr("this extension");
+    // Only once the store's page is really there: its title is "<name> - Chrome Web Store".
+    static const QRegularExpression storeTitle(QStringLiteral("^(.+?)\\s*[-–]\\s*Chrome Web Store\\s*$"));
+    const QRegularExpressionMatch match = storeTitle.match(view->title());
+    if (!match.hasMatch())
+        return;
+    const QString name = match.captured(1);
     Prompt prompt;
     prompt.key = QStringLiteral("webstore:%1").arg(id);
     prompt.icon = Icons::Extensions;
@@ -2685,7 +2692,10 @@ void BrowserWindow::connectView(WebView *view)
                 prompt.dismissed = [permission] { permission.deny(); };
                 addPrompt(view, prompt);
             });
+    // The Chrome Web Store moves between pages without loading them, so its
+    // address and title changes count too; the title names the extension.
     connect(view, &QWebEngineView::loadFinished, this, [this, view] { offerWebStoreExtension(view); });
+    connect(view, &QWebEngineView::titleChanged, this, [this, view] { offerWebStoreExtension(view); });
     connect(view->browserPage(), &BrowserPage::loginSubmitted, this,
             [this, view](const QString &username, const QString &password) {
                 offerToSaveLogin(view, username, password);
