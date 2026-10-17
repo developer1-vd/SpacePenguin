@@ -2,6 +2,7 @@
 <RCC version="1.0">
     <qresource prefix="/">
         <file>../html/start.html</file>
+        <file>../html/store.html</file>
         <file>../filters/default.txt</file>
     </qresource>
 </RCC>

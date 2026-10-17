@@ -9,6 +9,8 @@
 
 namespace spacepenguin {
 
+class Store;
+
 struct StartPageTile {
     QString title;
     QString url;
@@ -30,6 +32,8 @@ public:
     ~StartPageSchemeHandler() override;
 
     void setTileProvider(TileProvider provider) { m_tiles = std::move(provider); }
+    /** sp://store is the store's; every other sp:// address is the start page. */
+    void setStore(Store *store) { m_store = store; }
 
     void requestStarted(QWebEngineUrlRequestJob *job) override;
 
@@ -41,6 +45,7 @@ private:
     QByteArray m_template;
     TileProvider m_tiles;
     bool m_isPrivate = false;
+    Store *m_store = nullptr;
 };
 
 }

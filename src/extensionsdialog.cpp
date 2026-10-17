@@ -124,8 +124,9 @@ ExtensionsDialog::ExtensionsDialog(UserScripts *scripts, ChromeExtensions *chrom
     auto *scriptsTitle = new QLabel(tr("User scripts"), this);
     scriptsTitle->setObjectName(QStringLiteral("sectionTitle"));
     layout->addWidget(scriptsTitle);
-    auto *intro = new QLabel(tr("JavaScript files that run in the pages you choose, with "
-                                "Greasemonkey-style headers."),
+    auto *intro = new QLabel(tr("Scripts that change how websites look and work — tens of thousands "
+                                "on Greasy Fork and OpenUserJS. Their Install buttons add them "
+                                "here; SpacePenguin shows which sites a script can change first."),
                              this);
     intro->setWordWrap(true);
     intro->setProperty("muted", true);
@@ -162,6 +163,14 @@ ExtensionsDialog::ExtensionsDialog(UserScripts *scripts, ChromeExtensions *chrom
     connect(m_removeButton, &QPushButton::clicked, this, &ExtensionsDialog::removeSelected);
     buttons->addWidget(m_removeButton);
     buttons->addStretch(1);
+
+    auto *storeButton = new QPushButton(Icons::icon(Icons::Globe), tr("Get more…"), this);
+    storeButton->setToolTip(tr("The SpacePenguin Store: extensions from Greasy Fork and OpenUserJS"));
+    connect(storeButton, &QPushButton::clicked, this, [this] {
+        emit scriptStoreRequested();
+        accept();
+    });
+    buttons->addWidget(storeButton);
 
     auto *folderButton = new QPushButton(Icons::icon(Icons::Folder), tr("Open folder"), this);
     folderButton->setEnabled(m_scripts && !m_scripts->directory().isEmpty());

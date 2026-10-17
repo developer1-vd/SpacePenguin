@@ -201,6 +201,72 @@ bool Theme::isDark()
     return hints && hints->colorScheme() == Qt::ColorScheme::Dark;
 }
 
+QList<Theme::Palette> Theme::palettes()
+{
+    return {
+        {QStringLiteral("penguin"), QObject::tr("Penguin"), QColor(0x2f, 0x5f, 0xe8), QColor(0x82, 0xa0, 0xff), 0.0},
+        {QStringLiteral("aurora"), QObject::tr("Aurora"), QColor(0x0b, 0x7f, 0x82), QColor(0x4f, 0xd1, 0xc5), 0.07},
+        {QStringLiteral("ember"), QObject::tr("Ember"), QColor(0xd9, 0x48, 0x0f), QColor(0xff, 0x9f, 0x66), 0.07},
+        {QStringLiteral("orchid"), QObject::tr("Orchid"), QColor(0x70, 0x48, 0xe8), QColor(0xb1, 0x97, 0xfc), 0.07},
+        {QStringLiteral("forest"), QObject::tr("Forest"), QColor(0x2b, 0x8a, 0x3e), QColor(0x69, 0xdb, 0x7c), 0.07},
+        {QStringLiteral("rose"), QObject::tr("Rose"), QColor(0xc2, 0x25, 0x5c), QColor(0xf7, 0x83, 0xac), 0.07},
+        {QStringLiteral("midnight"), QObject::tr("Midnight"), QColor(0x3b, 0x5b, 0xdb), QColor(0x91, 0xa7, 0xff), 0.16},
+    };
+}
+
+Theme::Palette Theme::palette(const QString &id)
+{
+    const QList<Palette> all = palettes();
+    for (const Palette &palette : all) {
+        if (palette.id == id)
+            return palette;
+    }
+    return all.first();
+}
+
+namespace {
+
+// Read once: the colours are asked for on every repaint.
+QString &paletteChoice()
+{
+    static QString choice =
+        QSettings().value(QStringLiteral("appearance/palette"), QStringLiteral("penguin")).toString();
+    return choice;
+}
+
+} // namespace
+
+QString Theme::storedPalette()
+{
+    return paletteChoice();
+}
+
+QByteArray Theme::accentCss()
+{
+    const Palette theme = palette(storedPalette());
+    return QStringLiteral(":root,:root.light{--accent:%1}:root.dark{--accent:%2}"
+                          "@media (prefers-color-scheme: dark){:root:not(.light){--accent:%2}}")
+        .arg(theme.lightAccent.name(), theme.darkAccent.name())
+        .toUtf8();
+}
+
+void Theme::storePalette(const QString &id)
+{
+    paletteChoice() = palette(id).id;
+    QSettings().setValue(QStringLiteral("appearance/palette"), paletteChoice());
+}
+
+namespace {
+
+QColor mix(const QColor &base, const QColor &tint, qreal amount)
+{
+    return QColor::fromRgbF(base.redF() + (tint.redF() - base.redF()) * amount,
+                            base.greenF() + (tint.greenF() - base.greenF()) * amount,
+                            base.blueF() + (tint.blueF() - base.blueF()) * amount);
+}
+
+} // namespace
+
 Theme::Colors Theme::colors(bool dark)
 {
     Colors c;
@@ -231,6 +297,16 @@ Theme::Colors Theme::colors(bool dark)
         c.privateAccent = QColor(0x7c, 0x4d, 0xdb);
         c.danger = QColor(0xc8, 0x2b, 0x2b);
         c.success = QColor(0x1f, 0x8a, 0x4c);
+    }
+
+    // The colour theme: its accent, and a touch of it in the chrome.
+    const Palette theme = palette(storedPalette());
+    c.accent = dark ? theme.darkAccent : theme.lightAccent;
+    if (theme.tint > 0) {
+        c.tabStrip = mix(c.tabStrip, c.accent, theme.tint);
+        c.window = mix(c.window, c.accent, theme.tint * 0.4);
+        c.raised = mix(c.raised, c.accent, theme.tint * 0.6);
+        c.border = mix(c.border, c.accent, theme.tint * 0.5);
     }
     return c;
 }

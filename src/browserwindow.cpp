@@ -38,6 +38,9 @@
 #include <QCursor>
 #include <QDateTime>
 #include <QDialog>
+#include <QPointer>
+#include <QFile>
+#include <QDir>
 #include <QDialogButtonBox>
 #include <QFocusEvent>
 #include <QGuiApplication>
@@ -55,6 +58,8 @@
 #include <QMenuBar>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QProgressBar>
 #include <QRegularExpression>
 #include <QPushButton>
@@ -139,8 +144,10 @@ bool isWebScheme(const QUrl &url)
 
 bool isStartPage(const QUrl &url)
 {
-    return url.scheme() == QLatin1String("sp");
+    return url.scheme() == QLatin1String("sp") && url.host() != QLatin1String("store");
 }
+
+const QUrl kStoreUrl(QStringLiteral("sp://store/"));
 
 QToolButton *chromeButton(QAction *action, QWidget *parent = nullptr)
 {
@@ -751,7 +758,8 @@ QWidget *BrowserWindow::createNavigationBar()
     m_extensionsMenu = new QMenu(this);
     m_extensionsButton->setMenu(m_extensionsMenu);
     connect(m_extensionsMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateExtensionsMenu);
-    m_extensionsButton->setVisible(ChromeExtensions::isSupported() && m_services.extensions);
+    // User scripts work in every normal window; Chrome extensions where Qt allows them.
+    m_extensionsButton->setVisible(!m_isPrivate && m_services.userScripts);
     layout->addWidget(m_extensionsButton);
 
     m_downloadsButton = chromeButton(m_downloadsAction);
@@ -1084,6 +1092,7 @@ void BrowserWindow::showExtensionsDialog()
         return;
 
     ExtensionsDialog dialog(m_services.userScripts, m_services.extensions, this);
+    connect(&dialog, &ExtensionsDialog::scriptStoreRequested, this, [this] { newTab(kStoreUrl); });
     connect(&dialog, &ExtensionsDialog::webStoreRequested, this, [this] {
         newTab(QUrl(QStringLiteral("https://chromewebstore.google.com/category/extensions")));
     });
@@ -1796,7 +1805,7 @@ void BrowserWindow::updateTabLabel(WebView *view)
                                           : QStringLiteral("%1\n%2").arg(title, url.toDisplayString());
 
     QIcon icon = view->icon();
-    if (isStartPage(url) || url.scheme() == QLatin1String("about"))
+    if (url.scheme() == QLatin1String("sp") || url.scheme() == QLatin1String("about"))
         icon = Icons::icon(Icons::Penguin);
     else if (icon.isNull())
         icon = Icons::icon(Icons::Globe);
@@ -2014,13 +2023,29 @@ void BrowserWindow::populateExtensionsMenu()
             action->setToolTip(tr("This extension works on pages by itself; it has no panel."));
         }
     }
+    // User scripts: tick to switch one on or off.
+    if (UserScripts *scripts = m_services.userScripts) {
+        for (const UserScript &script : scripts->scripts()) {
+            any = true;
+            QAction *toggle = m_extensionsMenu->addAction(Icons::icon(Icons::Extensions), script.name);
+            toggle->setCheckable(true);
+            toggle->setChecked(scripts->isEnabled(script.id));
+            const QString id = script.id;
+            connect(toggle, &QAction::toggled, this,
+                    [scripts, id](bool on) { scripts->setScriptEnabled(id, on); });
+        }
+    }
     if (!any)
         m_extensionsMenu->addAction(tr("No extensions yet"))->setEnabled(false);
     m_extensionsMenu->addSeparator();
-    connect(m_extensionsMenu->addAction(Icons::icon(Icons::Globe), tr("Chrome Web Store")),
-            &QAction::triggered, this, [this] {
-                newTab(QUrl(QStringLiteral("https://chromewebstore.google.com/category/extensions")));
-            });
+    connect(m_extensionsMenu->addAction(Icons::icon(Icons::Penguin), tr("SpacePenguin Store")),
+            &QAction::triggered, this, [this] { newTab(kStoreUrl); });
+    if (ChromeExtensions::isSupported() && m_services.extensions) {
+        connect(m_extensionsMenu->addAction(Icons::icon(Icons::Globe), tr("Chrome Web Store")),
+                &QAction::triggered, this, [this] {
+                    newTab(QUrl(QStringLiteral("https://chromewebstore.google.com/category/extensions")));
+                });
+    }
     m_extensionsMenu->addAction(m_extensionsAction);
 }
 
@@ -2046,8 +2071,98 @@ void BrowserWindow::showExtensionPopup(const QUrl &url)
     popup->show();
 }
 
+void BrowserWindow::offerUserScript(WebView *view, const QUrl &url, bool quiet)
+{
+    UserScripts *scripts = m_services.userScripts;
+    if (!scripts || m_isPrivate || scripts->directory().isEmpty()) {
+        if (!quiet)
+            showToast(tr("Extensions are added from a normal window, not a private one."), 5000);
+        return;
+    }
+    if (!m_network)
+        m_network = new QNetworkAccessManager(this);
+    QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply *reply = m_network->get(request);
+    QPointer<WebView> target(view);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, target, url, quiet, scripts] {
+        reply->deleteLater();
+        const QString source = QString::fromUtf8(reply->readAll());
+        if (!target || indexOfView(target) < 0)
+            return;
+        if (reply->error() != QNetworkReply::NoError || !source.contains(QLatin1String("==UserScript=="))) {
+            if (!quiet)
+                showToast(tr("Could not get the extension: %1").arg(reply->errorString()), 6000);
+            return;
+        }
+        const QString fileName = QUrl::fromPercentEncoding(url.fileName().toUtf8());
+        const QString name = UserScripts::parseName(source, fileName.section(QLatin1Char('.'), 0, 0));
+        for (const UserScript &existing : scripts->scripts()) {
+            if (existing.name == name)
+                return; // already added
+        }
+
+        // Say where it will run: a user script can read and change those sites.
+        QStringList sites;
+        for (const QString &pattern : UserScripts::parseMatchPatterns(source)) {
+            static const QRegularExpression hostOf(QStringLiteral("^[^:]*://([^/]+)"));
+            QString host = hostOf.match(pattern).captured(1);
+            if (pattern == QLatin1String("<all_urls>") || pattern == QLatin1String("*") || host == QLatin1String("*")) {
+                sites = {tr("every website")};
+                break;
+            }
+            host.remove(QRegularExpression(QStringLiteral("^(\\*\\.|www\\.)")));
+            if (!host.isEmpty() && !sites.contains(host))
+                sites.append(host);
+        }
+        QString where = sites.isEmpty() ? tr("the sites it chooses") : sites.mid(0, 3).join(QStringLiteral(", "));
+        if (sites.size() > 3)
+            where += tr(" and %n more", nullptr, int(sites.size() - 3));
+
+        Prompt prompt;
+        prompt.key = QStringLiteral("userscript:%1").arg(name);
+        prompt.icon = Icons::Extensions;
+        prompt.text = tr("Add <b>%1</b> to SpacePenguin? It can read and change %2.")
+                          .arg(name.toHtmlEscaped(), where.toHtmlEscaped());
+        prompt.buttons = {{tr("Add to SpacePenguin"), [this, scripts, source, fileName, name] {
+                               const QString folder = QDir(QDir::tempPath()).filePath(QStringLiteral("spacepenguin-scripts"));
+                               QDir().mkpath(folder);
+                               QString safe = fileName;
+                               safe.replace(QRegularExpression(QStringLiteral("[^\\w.-]")), QStringLiteral("_"));
+                               if (!safe.endsWith(QLatin1String(".js")))
+                                   safe += QStringLiteral(".user.js");
+                               const QString path = QDir(folder).filePath(safe);
+                               QFile file(path);
+                               QString error;
+                               if (!file.open(QIODevice::WriteOnly) || file.write(source.toUtf8()) < 0) {
+                                   error = file.errorString();
+                               } else {
+                                   file.close();
+                                   scripts->addScript(path, &error);
+                                   QFile::remove(path);
+                               }
+                               showToast(error.isEmpty() ? tr("Added “%1”. Reload a page for it to run there.").arg(name)
+                                                         : tr("Could not add “%1”: %2").arg(name, error),
+                                         6000);
+                           }}};
+        addPrompt(target, prompt);
+    });
+}
+
 void BrowserWindow::offerWebStoreExtension(WebView *view)
 {
+    // Greasy Fork's script pages: offer the script without a trip through Install.
+    static const QRegularExpression greasyFork(QStringLiteral("^/(?:[a-zA-Z-]+/)?scripts/(\\d+)(?:-[^/]*)?/?$"));
+    const QRegularExpressionMatch script = greasyFork.match(view->url().path());
+    if ((view->url().host() == QLatin1String("greasyfork.org") || view->url().host() == QLatin1String("sleazyfork.org"))
+        && script.hasMatch() && !m_offeredScripts.contains(view->url().host() + script.captured(1))) {
+        m_offeredScripts.insert(view->url().host() + script.captured(1));
+        offerUserScript(view, QUrl(QStringLiteral("https://%1/scripts/%2/code/script.user.js")
+                                       .arg(view->url().host(), script.captured(1))),
+                        true);
+    }
+
     ChromeExtensions *extensions = m_services.extensions;
     const QString id = ChromeExtensions::webStoreId(view->url());
     // An offer for the extension of a page the tab has left goes with it.
@@ -2696,6 +2811,8 @@ void BrowserWindow::connectView(WebView *view)
     // address and title changes count too; the title names the extension.
     connect(view, &QWebEngineView::loadFinished, this, [this, view] { offerWebStoreExtension(view); });
     connect(view, &QWebEngineView::titleChanged, this, [this, view] { offerWebStoreExtension(view); });
+    connect(view->browserPage(), &BrowserPage::userScriptRequested, this,
+            [this, view](const QUrl &url) { offerUserScript(view, url, false); });
     connect(view->browserPage(), &BrowserPage::loginSubmitted, this,
             [this, view](const QString &username, const QString &password) {
                 offerToSaveLogin(view, username, password);

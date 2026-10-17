@@ -78,6 +78,11 @@ bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, 
         emit internalPageRequested(url);
         return false;
     }
+    if (userInitiated && (url.scheme() == QLatin1String("https") || url.scheme() == QLatin1String("http"))
+        && url.path().endsWith(QLatin1String(".user.js"), Qt::CaseInsensitive)) {
+        emit userScriptRequested(url);
+        return false;
+    }
 
     return isAllowedScheme(url.scheme());
 }

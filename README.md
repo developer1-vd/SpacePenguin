@@ -60,6 +60,12 @@ checkbox list.
   runs
 - **Content blocking** — an Adblock Plus style filter list, applied through a
   request interceptor
+- **SpacePenguin Store** — `sp://store`, from the puzzle piece in the toolbar: one
+  search over the user-script extensions of Greasy Fork and OpenUserJS, most installed
+  first and in your language first, and colour themes for SpacePenguin (Penguin,
+  Aurora, Ember, Orchid, Forest, Rose, Midnight; also in *Settings › Appearance*).
+  Adding an extension asks first, in a bar above the page that names the sites it can
+  read and change. The Install buttons on greasyfork.org and openuserjs.org work too
 - **Extensions** — JavaScript user scripts, installed per profile and managed
   from `Tools → Extensions…`
 

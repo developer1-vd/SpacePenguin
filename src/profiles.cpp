@@ -13,6 +13,7 @@
 #include "historymanager.h"
 #include "preferences.h"
 #include "startpageschemehandler.h"
+#include "store.h"
 #include "userextensions.h"
 #include "youtube.h"
 
@@ -201,6 +202,7 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
         services.extensions = new ChromeExtensions(services.profile, parent);
 
     services.userScripts = new UserScripts(services.profile, parent);
+    startPage->setStore(new Store(services.userScripts, parent));
     if (!isPrivate)
         services.userScripts->setDirectory(extensionsDirectory());
 

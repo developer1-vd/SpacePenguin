@@ -18,6 +18,9 @@ signals:
      * render those itself, so the window does it instead.
      */
     void internalPageRequested(const QUrl &url);
+    /** A link to a user script (….user.js), as the Install buttons of Greasy Fork and
+     *  OpenUserJS are: the window offers to add it instead of showing its code. */
+    void userScriptRequested(const QUrl &url);
     /** Someone signed in on the page; see LoginStore::captureScript. */
     void loginSubmitted(const QString &username, const QString &password);
 

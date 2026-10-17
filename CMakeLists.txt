@@ -112,6 +112,8 @@ qt_add_executable(spacepenguin
     src/tabbar.h
     src/sitepermissions.cpp
     src/sitepermissions.h
+    src/store.cpp
+    src/store.h
     src/tabgroups.cpp
     src/tabgroups.h
     src/browserpage.cpp
@@ -329,6 +331,10 @@ if(SPACEPENGUIN_BUILD_TESTS)
             tests/tst_startpage.cpp
             src/startpageschemehandler.cpp
             src/startpageschemehandler.h
+            src/store.cpp
+            src/store.h
+            src/userextensions.cpp
+            src/userextensions.h
             src/shortcuts.cpp
             src/shortcuts.h
             src/preferences.cpp
@@ -338,7 +344,7 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/urlresolver.cpp
             src/urlresolver.h
         )
-        target_link_libraries(tst_startpage PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
+        target_link_libraries(tst_startpage PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore Qt6::Network)
         target_include_directories(tst_startpage PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_definitions(tst_startpage PRIVATE
             SPACEPENGUIN_START_PAGE="${CMAKE_CURRENT_SOURCE_DIR}/html/start.html")

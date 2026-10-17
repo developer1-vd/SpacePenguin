@@ -21,6 +21,8 @@ public:
 signals:
     /** Open the Chrome Web Store in a tab. */
     void webStoreRequested();
+    /** Open the SpacePenguin Store in a tab. */
+    void scriptStoreRequested();
 
 private:
     void reload();

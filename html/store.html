@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpacePenguin Store</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --card-hover: #eef0f4; --text: #1b1e25; --muted: #5f6675;
+    --line: #e1e4ea; --accent: #2f5fe0; --on-accent: #ffffff; --chip: #eceff4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      --bg: #121317; --card: #1b1d23; --card-hover: #23262d; --text: #e9ebf1; --muted: #9aa1b1;
+      --line: #2a2d35; --accent: #82a0ff; --on-accent: #10142a; --chip: #23262d;
+    }
+  }
+  :root.dark {
+    color-scheme: dark;
+    --bg: #121317; --card: #1b1d23; --card-hover: #23262d; --text: #e9ebf1; --muted: #9aa1b1;
+    --line: #2a2d35; --accent: #82a0ff; --on-accent: #10142a; --chip: #23262d;
+  }
+  :root.light { color-scheme: light; }
+  /*SP_ACCENT*/
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 64rem; margin: 0 auto; padding: 2.5rem 1.5rem 3rem; }
+  header { display: flex; align-items: center; gap: .75rem; }
+  header svg { width: 44px; height: 44px; }
+  h1 { font-size: 1.6rem; margin: 0; letter-spacing: -.02em; }
+  .lede { color: var(--muted); margin: .4rem 0 1.5rem; }
+  nav { display: flex; gap: .4rem; border-bottom: 1px solid var(--line); margin-bottom: 1.25rem; }
+  nav button { border: 0; background: none; color: var(--muted); font: 600 .95rem system-ui, sans-serif;
+               padding: .6rem .9rem; border-bottom: 2px solid transparent; cursor: pointer; }
+  nav button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  form { display: flex; gap: .5rem; margin-bottom: .75rem; }
+  input { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--card);
+          border: 1px solid var(--line); border-radius: 999px; padding: .6rem 1rem; outline: none; }
+  input:focus { border-color: var(--accent); }
+  .button { border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
+            font: 600 .9rem system-ui, sans-serif; border-radius: 999px; padding: .5rem 1rem;
+            cursor: pointer; text-decoration: none; white-space: nowrap; display: inline-block; }
+  .button.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+  .button[disabled] { opacity: .55; cursor: default; }
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.25rem; }
+  .chips button { border: 1px solid var(--line); background: var(--card); color: var(--muted);
+                  border-radius: 999px; padding: .3rem .8rem; font: inherit; font-size: .85rem; cursor: pointer; }
+  .chips button[aria-pressed="true"] { color: var(--text); border-color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(19rem, 100%), 1fr)); gap: .75rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1rem 1.1rem;
+          display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+  .card h3 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: .8rem; }
+  .desc { color: var(--muted); font-size: .9rem; margin: 0; flex: 1; overflow-wrap: anywhere;
+          display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .row { display: flex; gap: .5rem; align-items: center; margin-top: .3rem; }
+  .badge { font-size: .72rem; font-weight: 600; border-radius: 999px; padding: .1rem .55rem;
+           background: var(--chip); color: var(--muted); }
+  .status { color: var(--muted); padding: 1.5rem 0; text-align: center; }
+  .note { color: var(--muted); font-size: .85rem; margin-top: 2rem; }
+  .preview { height: 64px; border-radius: 10px; border: 1px solid var(--line); overflow: hidden;
+             display: grid; grid-template-rows: 22px 1fr; }
+  .preview .strip { display: flex; align-items: center; gap: 6px; padding: 0 8px; }
+  .preview .tab { height: 12px; width: 46px; border-radius: 6px; background: rgba(255,255,255,.75); }
+  .preview .page { display: flex; align-items: center; justify-content: center; }
+  .preview .pill { height: 14px; width: 72px; border-radius: 7px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+        <clipPath id="sp-globe"><circle cx="50" cy="72" r="20"/></clipPath>
+        <g transform="translate(50 50) scale(.92) translate(-50 -53.25)">
+          <path d="M25.5 54V35a24.5 24.5 0 0 1 49 0v19" fill="none" stroke="#ff7a1a" stroke-width="7"/>
+          <path d="M32 47V35a18 18 0 0 1 36 0v12h1a14 14 0 0 1 14 14v22a14 14 0 0 1-14 14H31a14 14 0 0 1-14-14V61a14 14 0 0 1 14-14z" fill="#16171d" stroke="#fff" stroke-width="5" stroke-linejoin="round" paint-order="stroke"/>
+          <path d="M37 47V36a13 13 0 0 1 26 0v11z" fill="#fff"/>
+          <circle cx="45" cy="34" r="2.6" fill="#16171d"/>
+          <circle cx="55" cy="34" r="2.6" fill="#16171d"/>
+          <path d="M47 38.5h6l-3 4z" fill="#ffb21f" stroke="#ffb21f" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="50" cy="72" r="20" fill="#6a4fe0"/>
+          <path d="M33 64c4-3 10-3 13 0 2 3-1 5-1 8 0 4 4 6 3 10-1 5-6 7-9 5-3-2-2-7-5-10-3-3-6-6-5-9 1-2 2-3 4-4zM56 61c5-1 11 1 13 5 1 3-1 5-4 5-3 1-3 4-2 7 2 4 1 8-3 10-4 1-5-3-6-7-1-5-4-8-4-13 0-4 2-6 6-7z" fill="#2fb7a3" clip-path="url(#sp-globe)"/>
+        </g>
+      </svg>
+    <h1>SpacePenguin Store</h1>
+  </header>
+  <p class="lede">Extensions from Greasy Fork and OpenUserJS, and themes for SpacePenguin.</p>
+
+  <nav role="tablist">
+    <button role="tab" id="tab-extensions" aria-selected="true">Extensions</button>
+    <button role="tab" id="tab-themes" aria-selected="false">Themes</button>
+  </nav>
+
+  <section id="extensions">
+    <form id="search" role="search" autocomplete="off">
+      <input id="q" type="search" placeholder="Search extensions, or a site such as youtube.com" aria-label="Search extensions">
+      <button class="button" type="submit">Search</button>
+    </form>
+    <div class="chips" id="suggestions">
+      <span class="meta" style="align-self:center">Try:</span>
+      <button data-q="youtube">YouTube</button>
+      <button data-q="reddit">Reddit</button>
+      <button data-q="dark mode">Dark mode</button>
+      <button data-q="github">GitHub</button>
+      <button data-q="wikipedia">Wikipedia</button>
+      <button data-q="twitter">X / Twitter</button>
+    </div>
+    <div class="chips" id="sources">
+      <button aria-pressed="true" data-source="">All</button>
+      <button aria-pressed="false" data-source="Greasy Fork">Greasy Fork</button>
+      <button aria-pressed="false" data-source="OpenUserJS">OpenUserJS</button>
+    </div>
+    <div class="grid" id="results"></div>
+    <p class="status" id="status">Loading popular extensions…</p>
+    <p class="note">Extensions are user scripts written by their authors and shared on Greasy Fork and
+      OpenUserJS; SpacePenguin does not review them. Before one is added, SpacePenguin shows which sites it
+      can read and change. Manage them under the puzzle piece in the toolbar.</p>
+  </section>
+
+  <section id="themes" hidden>
+    <div class="grid" id="theme-list"></div>
+    <p class="note">Themes colour SpacePenguin's tabs, toolbar and pages, in light and dark.</p>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var results = [], installed = [], source = "";
+  var dark = document.documentElement.classList.contains("dark") ||
+      (!document.documentElement.classList.contains("light") && matchMedia("(prefers-color-scheme: dark)").matches);
+
+  function el(tag, attrs, text) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+  function count(n) {
+    return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M" :
+           n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
+  }
+
+  // ---- Extensions ----
+  function render() {
+    var grid = document.getElementById("results");
+    grid.textContent = "";
+    results.filter(function (r) { return !source || r.source === source; }).forEach(function (r) {
+      var card = el("article", { "class": "card" });
+      card.appendChild(el("h3", {}, r.name));
+      var meta = el("div", { "class": "meta" });
+      meta.appendChild(el("span", { "class": "badge" }, r.source));
+      meta.appendChild(document.createTextNode("  " + (r.author ? "by " + r.author + " · " : "") + count(r.installs) + " installs"));
+      card.appendChild(meta);
+      card.appendChild(el("p", { "class": "desc" }, r.description || ""));
+      var row = el("div", { "class": "row" });
+      var added = installed.indexOf(r.name) >= 0;
+      var add = el("a", { "class": "button", href: r.install }, added ? "Added" : "Add");
+      if (added) { add.removeAttribute("href"); add.setAttribute("disabled", ""); }
+      else add.addEventListener("click", watchInstalled);
+      row.appendChild(add);
+      row.appendChild(el("a", { "class": "button ghost", href: r.page }, "Details"));
+      card.appendChild(row);
+      grid.appendChild(card);
+    });
+  }
+
+  function loadInstalled() {
+    return fetch("/api/installed").then(function (r) { return r.json(); })
+      .then(function (names) { installed = names; render(); }).catch(function () {});
+  }
+  // After Add, the browser asks in a bar above the page; notice when it is added.
+  var watching = 0;
+  function watchInstalled() {
+    clearInterval(watching);
+    var tries = 0;
+    watching = setInterval(function () {
+      loadInstalled();
+      if (++tries > 30) clearInterval(watching);
+    }, 2000);
+  }
+
+  function search(query) {
+    var status = document.getElementById("status");
+    status.hidden = false;
+    status.textContent = query ? "Searching for “" + query + "”…" : "Loading popular extensions…";
+    results = [];
+    render();
+    fetch("/api/search?q=" + encodeURIComponent(query)).then(function (r) { return r.json(); })
+      .then(function (data) {
+        results = data.results || [];
+        render();
+        var problems = (data.errors || []).join(" ");
+        status.textContent = results.length ? problems : (problems || "Nothing found. Try another word, or a site's name.");
+        status.hidden = !status.textContent;
+      })
+      .catch(function () { status.textContent = "The store could not be searched."; });
+  }
+
+  document.getElementById("search").addEventListener("submit", function (event) {
+    event.preventDefault();
+    search(document.getElementById("q").value.trim());
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("#suggestions button"), function (button) {
+    button.addEventListener("click", function () {
+      document.getElementById("q").value = button.getAttribute("data-q");
+      search(button.getAttribute("data-q"));
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("#sources button"), function (button) {
+    button.addEventListener("click", function () {
+      source = button.getAttribute("data-source");
+      Array.prototype.forEach.call(document.querySelectorAll("#sources button"), function (other) {
+        other.setAttribute("aria-pressed", String(other === button));
+      });
+      render();
+    });
+  });
+
+  // ---- Themes ----
+  function renderThemes(themes) {
+    var list = document.getElementById("theme-list");
+    list.textContent = "";
+    themes.forEach(function (t) {
+      var accent = dark ? t.dark : t.light;
+      var card = el("article", { "class": "card" });
+      var preview = el("div", { "class": "preview" });
+      var strip = el("div", { "class": "strip" });
+      strip.style.background = "color-mix(in srgb, " + accent + " " + (t.id === "midnight" ? 30 : 16) + "%, var(--card-hover))";
+      strip.appendChild(el("span", { "class": "tab" }));
+      strip.appendChild(el("span", { "class": "tab" }));
+      var body = el("div", { "class": "page" });
+      body.style.background = "var(--card)";
+      var pill = el("span", { "class": "pill" });
+      pill.style.background = accent;
+      body.appendChild(pill);
+      preview.appendChild(strip);
+      preview.appendChild(body);
+      card.appendChild(preview);
+      card.appendChild(el("h3", {}, t.name));
+      var row = el("div", { "class": "row" });
+      var use = el("button", { "class": t.current ? "button ghost" : "button" }, t.current ? "In use" : "Use theme");
+      if (t.current) use.setAttribute("disabled", "");
+      use.addEventListener("click", function () {
+        fetch("/api/theme?id=" + encodeURIComponent(t.id)).then(function () { location.reload(); });
+      });
+      row.appendChild(use);
+      card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+
+  function showTab(name) {
+    document.getElementById("extensions").hidden = name !== "extensions";
+    document.getElementById("themes").hidden = name !== "themes";
+    document.getElementById("tab-extensions").setAttribute("aria-selected", String(name === "extensions"));
+    document.getElementById("tab-themes").setAttribute("aria-selected", String(name === "themes"));
+    if (name === "themes")
+      fetch("/api/themes").then(function (r) { return r.json(); }).then(renderThemes);
+    history.replaceState(null, "", name === "themes" ? "#themes" : "#");
+  }
+  document.getElementById("tab-extensions").addEventListener("click", function () { showTab("extensions"); });
+  document.getElementById("tab-themes").addEventListener("click", function () { showTab("themes"); });
+
+  loadInstalled();
+  search("");
+  if (location.hash === "#themes") showTab("themes");
+})();
+</script>
+</body>
+</html>

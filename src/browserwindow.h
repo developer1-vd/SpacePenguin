@@ -2,6 +2,7 @@
 
 #include <QHash>
 #include <QList>
+#include <QSet>
 #include <QMainWindow>
 #include <QPointer>
 #include <QUrl>
@@ -20,6 +21,7 @@ class QActionGroup;
 class QCompleter;
 class QLabel;
 class QLineEdit;
+class QNetworkAccessManager;
 class QMenu;
 class QProgressBar;
 class QStackedWidget;
@@ -145,6 +147,7 @@ private:
     void populateExtensionsMenu();
     void showExtensionPopup(const QUrl &url);
     void offerWebStoreExtension(WebView *view);
+    void offerUserScript(WebView *view, const QUrl &url, bool quiet);
 
     // Tabs on the side, and tab groups.
     void setTabsOnSide(bool side);
@@ -230,6 +233,8 @@ private:
     QToolButton *m_downloadsButton = nullptr;
     QToolButton *m_extensionsButton = nullptr;
     QMenu *m_extensionsMenu = nullptr;
+    QNetworkAccessManager *m_network = nullptr;
+    QSet<QString> m_offeredScripts; // store pages offer their script once
     QToolButton *m_menuButton = nullptr;
     QLabel *m_zoomMenuLabel = nullptr;
 

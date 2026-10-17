@@ -1,5 +1,7 @@
 #include "startpageschemehandler.h"
 
+#include "store.h"
+
 #include "preferences.h"
 #include "shortcuts.h"
 #include "theme.h"
@@ -79,6 +81,11 @@ QByteArray StartPageSchemeHandler::renderPage(const QByteArray &templateHtml,
 
 void StartPageSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
 {
+    if (m_store && job->requestUrl().host() == QLatin1String("store")) {
+        m_store->handle(job);
+        return;
+    }
+
     if (m_template.isEmpty()) {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
         return;
@@ -94,6 +101,8 @@ void StartPageSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
                      Theme::isDark() ? QByteArrayLiteral("<html lang=\"en\" class=\"dark\">")
                                      : QByteArrayLiteral("<html lang=\"en\" class=\"light\">"));
     }
+
+    page.replace(QByteArrayLiteral("/*SP_ACCENT*/"), Theme::accentCss());
 
     // One buffer per request: concurrent loads must not share a read position.
     auto *buffer = new QBuffer(job);

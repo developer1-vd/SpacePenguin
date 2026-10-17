@@ -13,6 +13,7 @@
 
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QPixmap>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDesktopServices>
@@ -296,6 +297,27 @@ QWidget *SettingsDialog::createAppearanceTab()
     }
     layout->addWidget(mutedLabel(tr("The theme colours the browser itself. Websites that "
                                     "support dark mode follow your system setting.")));
+
+    layout->addWidget(sectionTitle(tr("Colour")));
+    auto *colourRow = new QHBoxLayout;
+    auto *colour = new QComboBox;
+    for (const Theme::Palette &palette : Theme::palettes()) {
+        QPixmap swatch(14, 14);
+        swatch.fill(palette.lightAccent);
+        colour->addItem(QIcon(swatch), palette.name, palette.id);
+        if (palette.id == Theme::storedPalette())
+            colour->setCurrentIndex(colour->count() - 1);
+    }
+    connect(colour, &QComboBox::currentIndexChanged, this, [colour] {
+        Theme::storePalette(colour->currentData().toString());
+        Theme::apply(Theme::storedMode());
+        Preferences::instance()->notifyChanged();
+    });
+    colourRow->addWidget(colour);
+    colourRow->addStretch(1);
+    layout->addLayout(colourRow);
+    layout->addWidget(mutedLabel(tr("More in the SpacePenguin Store, under the puzzle piece in "
+                                    "the toolbar.")));
 
     layout->addWidget(sectionTitle(tr("Tabs")));
     auto *sideTabs = new QCheckBox(tr("Show tabs on the side"));
