@@ -48,7 +48,7 @@ die() { echo "error: $*" >&2; exit 1; }
 if [[ ${UNINSTALL} -eq 1 ]]; then
     rm -rf "${INSTALL_DIR}"
     rm -f "${BIN_DIR}/spacepenguin" "${LAUNCHER}" "${ICON_DIR}/${APP_ID}.png"
-    echo "SpacePenguin is removed. Your bookmarks and history are still in ~/.local/share/SpacePenguin."
+    echo "SpacePenguin is removed. Your bookmarks and history are still in ~/.local/share/SpacePenguin/SpacePenguin."
     exit 0
 fi
 

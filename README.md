@@ -2,6 +2,8 @@
 
 A secure, lightweight, and usable browser written in Qt.
 
+**Website:** <https://developer1-vd.github.io/SpacePenguin/> (from [`docs/`](docs/))
+
 **Status: pre-alpha (v0.0.1).** It opens web pages in tabs and gets out of the
 way. Everything below is what actually exists in the tree today — no aspirational
 checkbox list.
@@ -378,8 +380,9 @@ QtWebEngine code takes about 500 MB per compiler job. If you do,
 `tools/build-jobs.sh` picks a job count that fits (usually 1 or 2 there).
 
 Platform data locations come from `QStandardPaths`, so the profile lands in
-`~/.local/share/SpacePenguin` on Linux, `~/Library/Application Support` on
-macOS, and `%APPDATA%` on Windows.
+`~/.local/share/SpacePenguin/SpacePenguin` on Linux,
+`~/Library/Application Support/SpacePenguin/SpacePenguin` on macOS, and
+`%APPDATA%\SpacePenguin\SpacePenguin` on Windows (organisation, then application).
 
 ## Building
 

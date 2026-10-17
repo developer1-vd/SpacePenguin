@@ -1,0 +1,50 @@
+name: pages
+
+# Publishes the project site in docs/ to GitHub Pages whenever it changes on main.
+# One-time setup: Settings › Pages › Build and deployment › Source: GitHub Actions.
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer push replaces a queued one, but a deployment
+# already running is allowed to finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy the site
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write      # to publish
+      id-token: write   # to prove the deployment comes from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the site's local links
+        run: |
+          cd docs
+          missing=0
+          for ref in $(grep -oE '(src|href|srcset)="[^"#:]+"' index.html | sed -E 's/^[a-z]+="//; s/"$//' | sort -u); do
+            [ -e "$ref" ] || { echo "missing: $ref"; missing=1; }
+          done
+          exit $missing
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -3,177 +3,277 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SpacePenguin — a small, honest browser</title>
-<meta name="description" content="SpacePenguin is a Qt and QtWebEngine browser with a light and dark theme, user script extensions, content blocking, and built-in about pages.">
+<title>SpacePenguin — a fast, private browser</title>
+<meta name="description" content="SpacePenguin is a lightweight, cross-platform browser built on Qt and Chromium. It blocks ads (YouTube's too), skips sponsor segments, and runs on Windows, macOS, Linux and Chromebooks.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="SpacePenguin">
+<meta property="og:description" content="A fast, private, cross-platform browser that blocks ads — YouTube's too.">
+<meta property="og:image" content="assets/screenshot-dark.webp">
+<link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="hero">
-<nav>
-<a class="brand" href="#main"><span aria-hidden="true">🐧</span> SpacePenguin</a>
-<ul>
-<li><a href="#features">Features</a></li>
-<li><a href="#build">Build</a></li>
-<li><a href="#use">Using it</a></li>
-<li><a href="#limits">Limits</a></li>
-</ul>
-</nav>
-<h1>A browser that shows its work.</h1>
-<p class="lede">SpacePenguin is a small Qt and QtWebEngine browser. It keeps the parts you
-actually use — tabs, private windows, find in page, zoom, session restore — and adds a light
-and dark theme, user script extensions, content blocking, and honest <code>about:</code>
-pages. It is pre-alpha software, and it says so.</p>
-<p class="cta"><a class="button" href="#build">Build it yourself</a>
-<a class="button ghost" href="#limits">Read the limits first</a></p>
+<header class="site-header">
+  <nav class="wrap nav" aria-label="Main">
+    <a class="brand" href="#top"><img src="assets/favicon.png" alt="" width="28" height="28"> SpacePenguin</a>
+    <ul>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#download">Download</a></li>
+      <li><a href="#chromebook">Chromebooks</a></li>
+      <li><a href="#privacy">Privacy</a></li>
+      <li><a href="#build">Build</a></li>
+      <li><a class="nav-gh" href="https://github.com/developer1-vd/SpacePenguin">GitHub</a></li>
+    </ul>
+  </nav>
 </header>
 
 <main id="main">
 
-<section id="features">
-<h2>Features</h2>
-
-<article class="card">
-<h3>Light and dark</h3>
-<p>Pick <strong>Follow system</strong>, <strong>Light</strong> or <strong>Dark</strong> in
-<em>View → Theme</em>. The choice is saved. SpacePenguin sets the application colour scheme,
-and websites that honour <code>prefers-color-scheme</code> follow along. Websites that ignore
-it are still websites, so SpacePenguin does not rewrite their CSS.</p>
-</article>
-
-<article class="card">
-<h3>Extensions, as user scripts</h3>
-<p>QtWebEngine does not support Chrome extensions, and SpacePenguin does not pretend
-otherwise. It runs <strong>JavaScript user scripts</strong> instead. Drop a <code>.js</code> file
-into the extensions folder, or use <em>Tools → Extensions…</em> to add one, then enable,
-disable or remove it.</p>
-<pre><code>// @name Readability helper
-// @match *://example.com/*
-console.log('running on', location.hostname);</code></pre>
-<p>A script with no <code>// @match</code> lines runs on every page. With <code>// @match</code>
-lines it runs only where the pattern matches the hostname.</p>
-</article>
-
-<article class="card">
-<h3>Content blocking</h3>
-<p>SpacePenguin reads an Adblock Plus format filter list and applies it two ways: requests
-are blocked before they leave the browser, and <code>##</code> element-hiding rules are
-compiled into a stylesheet injected at document creation.</p>
-<p>Both halves matter. YouTube serves its ad requests from <code>www.youtube.com</code>
-itself, so a network rule can only reach the ad <em>endpoints</em>. The ad you actually
-see, the overlay and the pop-out player are elements in the page, and only element hiding
-touches those.</p>
-<pre><code>||googlesyndication.com^$third-party
-||youtube.com/pagead/
-/api/stats/ads?
-youtube.com##.ytp-ad-overlay</code></pre>
-<p>A fresh install writes a small starter list so blocking is visible immediately. For real
-coverage point the browser at EasyList or another maintained list: <code>--filter-list
-./easylist.txt</code>. SpacePenguin parses 53,859 network rules and 24,009 cosmetic rules
-from EasyList.</p>
-<p>Click the blocking control in the status bar to turn blocking off, pause it for the site
-you are on, or check how many requests have been stopped.</p>
-</article>
-
-<article class="card">
-<h3><code>about:</code> pages</h3>
-<ul>
-<li><code>about:about</code> — index of the internal pages</li>
-<li><code>about:version</code> — version, Qt build, platform, theme, filter rules, extensions</li>
-<li><code>about:license</code> — SpacePenguin, Qt and Chromium licenses</li>
-<li><code>about:mozilla</code> — Book of Mozilla</li>
-<li><code>about:extensions</code> — user script management</li>
-<li><code>about:downloads</code> — download manager</li>
-<li><code>about:history</code> — browsing history</li>
-<li><code>about:settings</code> — open the Settings dialog</li>
-<li><code>about:penguin</code>, <code>about:teapot</code>, <code>about:pan</code>,
-<code>about:tatooine</code>, <code>about:hoth</code>, <code>about:dagobah</code>,
-<code>about:endor</code>, <code>about:naboo</code>, <code>about:coruscant</code> — easter eggs</li>
-</ul>
-</article>
-
-<article class="card">
-<h3>Everyday browsing</h3>
-<p>Tabs and tab groups, an omnibox that resolves URLs and searches, back and forward, reload and
-stop, zoom, find in page with match highlighting, a progress bar, a security indicator, private
-windows that write nothing to disk, session restore, and multiple profiles.</p>
-</article>
-</ul>
+<section class="hero" id="top">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="wrap hero-inner">
+    <img class="hero-icon" src="assets/icon-256.png" alt="" width="96" height="96">
+    <h1>The browser that<br><span class="accent">stays out of your way.</span></h1>
+    <p class="lede">SpacePenguin is a small, fast browser built on Qt and Chromium. It blocks ads
+      and trackers — YouTube's included — skips sponsor segments, and runs the same on
+      Windows, macOS, Linux and school Chromebooks.</p>
+    <p class="cta">
+      <a class="button" href="#download">Download</a>
+      <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin">View on GitHub</a>
+    </p>
+    <p class="fineprint">Free and open source · GPLv3 · Pre-release software</p>
+    <picture class="shot">
+      <source srcset="assets/screenshot-dark.webp" media="(prefers-color-scheme: dark)">
+      <img src="assets/screenshot-light.webp" width="1200" height="780"
+           alt="SpacePenguin's window: a row of rounded tabs with the window buttons, an address bar, and the start page with a search box.">
+    </picture>
+  </div>
 </section>
 
-<section id="build">
-<h2>Build</h2>
-<p>SpacePenguin needs Qt 6.4 or newer with QtWebEngine, CMake 3.21+, and a C++20 compiler.</p>
-<pre><code>cmake -B build -DCMAKE_BUILD_TYPE=Release
+<section id="features" class="wrap section">
+  <h2>What you get</h2>
+  <div class="grid">
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">🛡️</div>
+      <h3>Ads blocked, YouTube too</h3>
+      <p>Ad networks and trackers are stopped before they load. On YouTube the ad
+        schedule is taken out of the player's own data, so videos start without the ad
+        — and an ad that slips through is muted and skipped.</p>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">⏭️</div>
+      <h3>Sponsor segments skipped</h3>
+      <p>Sponsor reads, self-promotion and "subscribe" reminders inside videos are skipped
+        with <a href="https://sponsor.ajay.app">SponsorBlock</a>'s community timestamps —
+        without telling anyone which video you watch.</p>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">🪟</div>
+      <h3>One clean row</h3>
+      <p>Tabs and the window buttons share a single row; everything is rounded, from the
+        tabs to the window's corners. Light, dark, or follow your system.</p>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">🔒</div>
+      <h3>Private windows</h3>
+      <p>A private window writes nothing to disk — no history, cookies or cache — and
+        forgets everything when it closes.</p>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">💻</div>
+      <h3>Light on small machines</h3>
+      <p>On 4 GB laptops and Chromebooks it shares processes between tabs and switches on
+        Chromium's low-end mode by itself. The window is up in about a third of a second.</p>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">🧩</div>
+      <h3>User-script extensions</h3>
+      <p>Drop a JavaScript file into the extensions folder and it runs on the sites you
+        choose. Simple, inspectable, no store required.</p>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">🧱</div>
+      <h3>Sandboxed, and honest about it</h3>
+      <p>Pages run in Chromium's sandbox. If your system blocks it, SpacePenguin tells you
+        why and how to fix it, instead of crashing or staying quiet.</p>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">📖</div>
+      <h3>Pages that explain themselves</h3>
+      <p><code>about:version</code> shows what the browser is doing: the sandbox, the blocker,
+        how it tuned itself for your device. <code>about:</code> pages cover history,
+        downloads and more.</p>
+    </article>
+  </div>
+</section>
+
+<section id="download" class="band">
+  <div class="wrap section">
+    <h2>Download</h2>
+    <p class="section-lede">Every package is built and launch-tested automatically on each
+      platform. Packages are published on the
+      <a href="https://github.com/developer1-vd/SpacePenguin/releases">Releases page</a>
+      with each tagged version; until the first one is out, <a href="#build">build it
+      yourself</a> in a few commands.</p>
+    <div class="grid downloads">
+      <article class="card download">
+        <h3>Windows</h3>
+        <p class="meta">Windows 10 and 11, 64-bit</p>
+        <p>An installer for just you (no administrator rights) or everyone, plus a portable
+          zip.</p>
+        <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the installer</a>
+      </article>
+      <article class="card download">
+        <h3>macOS</h3>
+        <p class="meta">macOS 12 Monterey to 26 Tahoe · Apple silicon and Intel</p>
+        <p>One universal app in a DMG: drag it to Applications.</p>
+        <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the DMG</a>
+      </article>
+      <article class="card download">
+        <h3>Linux</h3>
+        <p class="meta">x86-64 and ARM64 · X11 and Wayland</p>
+        <p>An AppImage that runs on almost any distribution, plus a Flatpak,
+          <code>.deb</code>, <code>.rpm</code>, Arch package and Nix flake.</p>
+        <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the AppImage</a>
+      </article>
+    </div>
+    <details class="more">
+      <summary>Which Linux package should I use?</summary>
+      <ul>
+        <li><strong>AppImage</strong> — any distribution from Ubuntu 22.04, Debian 12 and
+          Fedora 36 on (ARM64: Ubuntu 24.04, Debian 13 and newer). For faster starts,
+          install it once: <code>bash packaging/chromeos/install.sh SpacePenguin-*.AppImage</code>.</li>
+        <li><strong>.deb / .rpm</strong> — Debian 13, Ubuntu 25.04+, Fedora 41+, openSUSE
+          Tumbleweed. They also set up the sandbox permission on Ubuntu.</li>
+        <li><strong>Arch</strong> — <code>packaging/arch/PKGBUILD</code>.</li>
+        <li><strong>Nix</strong> — <code>nix run github:developer1-vd/SpacePenguin</code>.</li>
+        <li><strong>Flatpak</strong> — built from <code>packaging/flatpak/</code>.</li>
+      </ul>
+    </details>
+  </div>
+</section>
+
+<section id="chromebook" class="wrap section split">
+  <div>
+    <h2>On a school Chromebook</h2>
+    <p>SpacePenguin runs in ChromeOS's Linux environment, on Intel, AMD and ARM
+      Chromebooks, and tunes itself for 4 GB machines without GPU acceleration.</p>
+    <ol class="steps">
+      <li><strong>Turn on Linux:</strong> Settings › About ChromeOS › Developers › Linux
+        development environment.</li>
+      <li><strong>In the Terminal app,</strong> run the two lines on the right.</li>
+      <li><strong>Open it</strong> from the launcher, under Linux apps.</li>
+    </ol>
+    <p class="note">On a school-managed Chromebook, the school decides whether Linux is
+      allowed. If the setting is missing or greyed out, only the school's admin can turn
+      it on — there is no way around that from the Chromebook.</p>
+  </div>
+  <div>
+    <pre class="code" aria-label="Chromebook install commands"><code><span class="c"># download the installer, then run it</span>
+curl -fsSLO https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/packaging/chromeos/install.sh
+bash install.sh</code></pre>
+    <p class="fineprint">The installer needs a published release. It checks each
+      download's SHA-256 and won't install a file that doesn't match.</p>
+  </div>
+</section>
+
+<section id="privacy" class="band">
+  <div class="wrap section split">
+    <div>
+      <h2>Privacy, plainly</h2>
+      <p>SpacePenguin has no account, no telemetry and no update pings. Apart from the
+        sites you visit, it contacts only:</p>
+      <ul class="checks">
+        <li><strong>Your search engine</strong>, when you search from the address bar.</li>
+        <li><strong>SponsorBlock</strong>, for skipping sponsor segments on YouTube. It's asked
+          about only the first four characters of a hash of the video's ID — a prefix shared by dozens
+          of videos, so it can't tell which one you're watching. You can turn it off in
+          Settings.</li>
+      </ul>
+    </div>
+    <div class="card quiet">
+      <h3>Where your data lives</h3>
+      <p>History, bookmarks and settings stay on your computer:</p>
+      <ul>
+        <li>Linux: <code>~/.local/share/SpacePenguin/SpacePenguin</code></li>
+        <li>macOS: <code>~/Library/Application Support/SpacePenguin/SpacePenguin</code></li>
+        <li>Windows: <code>%APPDATA%\SpacePenguin\SpacePenguin</code></li>
+      </ul>
+      <p>Private windows keep nothing at all.</p>
+    </div>
+  </div>
+</section>
+
+<section id="build" class="wrap section">
+  <h2>Build it yourself</h2>
+  <p class="section-lede">One script installs everything — compiler, CMake and Qt 6.8 with
+    QtWebEngine — on Debian, Ubuntu, Fedora, openSUSE, Arch, Alpine, Void, Gentoo, macOS
+    and Windows.</p>
+  <div class="split">
+    <div>
+      <h3>Linux and macOS</h3>
+      <pre class="code"><code>git clone https://github.com/developer1-vd/SpacePenguin
+cd SpacePenguin
+./install-deps.sh
+cmake -B build
 cmake --build build --parallel "$(tools/build-jobs.sh)"
-ctest --test-dir build</code></pre>
-<p>On Nix, the exact set used for development:</p>
-<pre><code>nix-shell -p 'qt6.qtbase' 'qt6.qtdeclarative' 'qt6.qtwebengine' \
-         cmake gnumake libglvnd</code></pre>
-<p>The build produces <code>spacepenguin</code>, a macOS app bundle, and a Windows GUI
-executable, plus four unit test binaries wired into CTest.</p>
+./build/SpacePenguin</code></pre>
+    </div>
+    <div>
+      <h3>Windows (PowerShell)</h3>
+      <pre class="code"><code>git clone https://github.com/developer1-vd/SpacePenguin
+cd SpacePenguin
+powershell -ExecutionPolicy Bypass -File install-deps.ps1
+cmake -B build
+cmake --build build --config Release --parallel 2</code></pre>
+    </div>
+  </div>
+  <p class="note"><code>tools/build-jobs.sh</code> runs only as many compiler jobs as your
+    free memory allows — each needs about 500 MB, and running too many at once can freeze a
+    small laptop. Packaging scripts for the AppImage, DMG and Windows installer are described in
+    <a href="https://github.com/developer1-vd/SpacePenguin/blob/main/BUILD_SCRIPTS.md">BUILD_SCRIPTS.md</a>.</p>
 </section>
 
-<section id="use">
-<h2>Using it</h2>
-<h3>Command line</h3>
-<pre><code>spacepenguin                          # normal window
-spacepenguin --private                # nothing is written to disk
-spacepenguin --user-data-dir ./profile # keep data somewhere else
-spacepenguin --filter-list ./filters.txt</code></pre>
-
-<h3>Shortcuts</h3>
-<table>
-<thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
-<tbody>
-<tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>New tab</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Reopen closed tab</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Next and previous tab</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd></td><td>Jump to tab</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Focus the address bar</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>New window, new private window</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Find in page</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Zoom in, out, reset</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd> / <kbd>Esc</kbd></td><td>Reload, stop</td></tr>
-<tr><td><kbd>Alt</kbd>+<kbd>Home</kbd></td><td>Start page</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Extensions</td></tr>
-</tbody>
-</table>
-
-<h3>Where your data lives</h3>
-<p>Profiles, the bundled <code>sp://</code> start page, the extensions folder and the default
-filter list live under the platform application data directory
-(<code>~/.local/share/SpacePenguin</code> on Linux). Private windows keep nothing.</p>
-</section>
-
-<section id="limits">
-<h2>Limits, stated plainly</h2>
-<ul>
-<li><strong>Pre-alpha.</strong> No stability or compatibility promise. Save your work.</li>
-<li><strong>No Chrome extensions.</strong> QtWebEngine cannot load them. User scripts are the
-supported path.</li>
-<li><strong>Blocking is not complete.</strong> No <code>$redirect</code> or
-<code>$removeparam</code> rewrites, no <code>##+js()</code> scriptlets, no per-site exception
-editor. A few sites still show placeholders or count blocked requests.</li>
-<li><strong>Pop-ups.</strong> Real pop-up windows are already refused by the security policy.
-In-page pop-ups and overlays need <code>##</code> rules from your list.</li>
-<li><strong>Some sites will not work.</strong> Google sign-in, DRM playback and other
-services that depend on unsupported Chromium integrations commonly break in QtWebEngine.</li>
-<li><strong>The theme is application chrome.</strong> Page colours follow the site's own
-CSS.</li>
-</ul>
+<section id="limits" class="band">
+  <div class="wrap section">
+    <h2>Good to know</h2>
+    <div class="grid two">
+      <div>
+        <h3>It's pre-release</h3>
+        <p>SpacePenguin is young. Expect rough edges, and please
+          <a href="https://github.com/developer1-vd/SpacePenguin/issues">report what you find</a>.</p>
+      </div>
+      <div>
+        <h3>No Chrome Web Store</h3>
+        <p>QtWebEngine can't run Chrome extensions, so SpacePenguin uses JavaScript user
+          scripts instead — and has the blocker built in.</p>
+      </div>
+      <div>
+        <h3>Chromium underneath</h3>
+        <p>Pages render with Chromium through Qt's QtWebEngine, so sites work as they do in
+          Chrome. Security updates follow Qt's releases.</p>
+      </div>
+      <div>
+        <h3>YouTube changes things</h3>
+        <p>YouTube changes how it delivers ads now and then. If an ad gets through,
+          <a href="https://github.com/developer1-vd/SpacePenguin/issues">open an issue</a>.</p>
+      </div>
+    </div>
+  </div>
 </section>
 
 </main>
 
-<footer>
-<p>SpacePenguin is free software under the GNU General Public License v3. Qt is used under the
-LGPL v3, the GPL v3, or a commercial license. Chromium is covered by its own BSD-style
-license.</p>
-<p><a href="https://github.com/">Source</a></p>
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p><img src="assets/favicon.png" alt="" width="20" height="20"> SpacePenguin · Free software
+      under the <a href="https://github.com/developer1-vd/SpacePenguin/blob/main/LICENSE">GNU GPL v3</a></p>
+    <p><a href="https://github.com/developer1-vd/SpacePenguin">Source</a> ·
+      <a href="https://github.com/developer1-vd/SpacePenguin/issues">Issues</a> ·
+      <a href="https://github.com/developer1-vd/SpacePenguin/releases">Releases</a></p>
+  </div>
 </footer>
-
 </body>
 </html>
