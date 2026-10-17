@@ -73,7 +73,8 @@ if command -v apt-get >/dev/null; then
     packages=(libegl1 libgl1 libopengl0 libfontconfig1 libfreetype6 libx11-6 libx11-xcb1
               libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libwayland-egl1
               libwayland-cursor0 libxcb-cursor0 libasound2 libnss3 libxshmfence1
-              libgbm1 libdrm2 libglib2.0-0 fonts-dejavu-core ca-certificates curl)
+              libgbm1 libdrm2 libglib2.0-0 libgpg-error0 libharfbuzz0b fonts-dejavu-core
+              ca-certificates curl)
     # Ubuntu 24.04 and later renamed some of these with a t64 suffix.
     available=()
     for package in "${packages[@]}"; do

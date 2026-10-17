@@ -40,10 +40,14 @@ jobs:
           - name: Linux AppImage
             os: ubuntu-22.04      # glibc 2.35: the AppImage runs on this and anything newer
             release: true
+            chromebook: bookworm  # ChromeOS's Linux container: Debian 12
           # ARM Chromebooks (MediaTek, Snapdragon), Raspberry Pi 5, ARM laptops.
+          # Qt's ARM64 Linux binaries need glibc 2.38+, so this builds on 24.04 and
+          # its AppImage needs Debian 13 (ChromeOS: upgrade the Linux container).
           - name: Linux AppImage (ARM64)
-            os: ubuntu-22.04-arm
+            os: ubuntu-24.04-arm
             release: true
+            chromebook: trixie
           - name: Windows 10 (Server 2022)
             os: windows-2022
           - name: Windows 11 (Server 2025, 24H2 core)
@@ -99,12 +103,12 @@ jobs:
         if: runner.os == 'Linux'
         run: ./build-appimage.sh
 
-      # Debian 12 is what ChromeOS's Linux environment runs: install the AppImage
-      # the way a Chromebook user does, in a stock container, and launch it.
-      - name: Check the AppImage on Debian 12 (Chromebook Linux)
+      # ChromeOS's Linux environment is a Debian container: install the AppImage
+      # the way a Chromebook user does, in a stock one, and launch it.
+      - name: Check the AppImage on Debian ${{ matrix.chromebook }} (Chromebook Linux)
         if: runner.os == 'Linux'
         run: |
-          docker run --rm -v "$PWD:/src:ro" debian:bookworm sh -c '
+          docker run --rm -v "$PWD:/src:ro" debian:${{ matrix.chromebook }} sh -c '
             set -e
             apt-get update -qq && apt-get install -y -qq sudo >/dev/null
             useradd -m student && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student

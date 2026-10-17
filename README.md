@@ -353,7 +353,12 @@ cannot run on ChromeOS without it.
 The script installs the few system libraries the AppImage cannot carry, unpacks
 it into `~/.local/opt/spacepenguin` (no FUSE needed) and adds the launcher entry;
 `bash install.sh --uninstall` removes it. It picks the x86-64 or ARM64 build to
-match the Chromebook (Celeron/Pentium/Core/Ryzen or MediaTek/Snapdragon).
+match the Chromebook (Celeron/Pentium/Core/Ryzen or MediaTek/Snapdragon). The
+ARM64 build needs the Debian 13 container, because Qt's ARM64 libraries need a
+newer C library than Debian 12 has; if `install.sh` reports a `GLIBC` error,
+upgrade the container (Settings › About ChromeOS › Developers › Linux
+development environment › Upgrade, or `sudo apt full-upgrade` after switching
+the sources to trixie).
 
 Typical school Chromebooks have 4 GB of memory, of which Linux gets a share, and
 often no GPU acceleration for Linux apps. At start-up SpacePenguin checks both:

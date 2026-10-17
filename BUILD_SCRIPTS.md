@@ -85,7 +85,9 @@ CMake, Ninja, Python 3 and NSIS when they are missing, then Qt for MSVC 2022 int
 4. Launches the AppImage with a scrubbed environment to check it starts.
 
 An AppImage runs on distributions whose glibc is at least as new as the build
-machine's, which is why CI builds it on Ubuntu 22.04.
+machine's, which is why CI builds it on Ubuntu 22.04. The ARM64 AppImage is built
+on Ubuntu 24.04, because Qt's ARM64 Linux binaries need glibc 2.38; it runs on
+Ubuntu 24.04, Debian 13, Fedora 39 and newer.
 
 ## packaging/chromeos/install.sh
 
