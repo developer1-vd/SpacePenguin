@@ -7,8 +7,10 @@
 #include "datasavermanager.h"
 #include "downloadmanager.h"
 #include "historymanager.h"
+#include "preferences.h"
 #include "startpageschemehandler.h"
 #include "userextensions.h"
+#include "youtube.h"
 
 #include <QDir>
 #include <QFile>
@@ -106,9 +108,6 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
         services.profile->setCachePath(dataDirectory + QStringLiteral("/cache"));
     }
 
-    services.profile->installUrlSchemeHandler(QByteArrayLiteral("sp"),
-                                             new StartPageSchemeHandler(services.profile));
-
     services.adBlocker = new AdBlocker(parent);
     services.profile->setUrlRequestInterceptor(services.adBlocker);
 
@@ -121,6 +120,16 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     services.dataSaverManager = new DataSaverManager(parent);
 
     services.historyManager = new HistoryManager(parent);
+
+    auto *startPage = new StartPageSchemeHandler(isPrivate, services.profile);
+    HistoryManager *history = services.historyManager;
+    startPage->setTileProvider([history] {
+        QList<StartPageTile> tiles;
+        for (const HistoryEntry &entry : history->mostVisited(8))
+            tiles.append(StartPageTile{entry.title, entry.url.toString()});
+        return tiles;
+    });
+    services.profile->installUrlSchemeHandler(QByteArrayLiteral("sp"), startPage);
 
     const bool explicitList = !filterListPath.isEmpty();
     const QString listPath = explicitList ? filterListPath : defaultFilterListPath();
@@ -135,6 +144,28 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     QObject::connect(blocker, &AdBlocker::filtersChanged, blocker,
                      [profile, blocker] { installCosmeticFilter(profile, blocker); });
     installCosmeticFilter(profile, blocker);
+
+    // Preferences that live on the services rather than on a window.
+    Preferences *preferences = Preferences::instance();
+    DownloadManager *downloads = services.downloadManager;
+    const auto applyPreferences = [preferences, blocker, downloads] {
+        if (blocker->isEnabled() != preferences->blockingEnabled())
+            blocker->setEnabled(preferences->blockingEnabled());
+        downloads->setDownloadPath(preferences->downloadDirectory());
+    };
+    QObject::connect(preferences, &Preferences::changed, blocker, applyPreferences);
+    applyPreferences();
+
+    // YouTube's ads and sponsor segments need page scripts, not request rules.
+    const auto installYouTube = [profile, blocker, preferences] {
+        const bool blockAds = blocker->isEnabled()
+            && !blocker->isPausedFor(QStringLiteral("www.youtube.com"));
+        YouTube::installScripts(profile, blockAds, preferences->skipSponsors());
+    };
+    QObject::connect(blocker, &AdBlocker::enabledChanged, blocker, installYouTube);
+    QObject::connect(blocker, &AdBlocker::pausedHostsChanged, blocker, installYouTube);
+    QObject::connect(preferences, &Preferences::changed, blocker, installYouTube);
+    installYouTube();
 
     services.userScripts = new UserScripts(services.profile, parent);
     if (!isPrivate)

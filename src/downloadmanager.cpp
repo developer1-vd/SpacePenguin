@@ -37,11 +37,17 @@ void DownloadManager::onDownloadRequested(QWebEngineDownloadRequest *download)
         return;
     }
 
+    // Accept first: QtWebEngine settles the final, de-duplicated file name only once
+    // the directory is set, so the recorded path matches what lands on disk.
+    download->setDownloadDirectory(m_downloadPath);
+    download->accept();
+
     DownloadItem item;
     item.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     item.url = download->url().toString();
-    item.suggestedFileName = download->suggestedFileName();
-    item.filePath = QDir(m_downloadPath).filePath(item.suggestedFileName);
+    item.suggestedFileName = download->downloadFileName();
+    item.filePath = QDir(download->downloadDirectory()).filePath(download->downloadFileName());
+    item.totalBytes = download->totalBytes();
     item.state = DownloadItem::InProgress;
 
     m_downloads.prepend(item);
@@ -89,25 +95,22 @@ void DownloadManager::onDownloadRequested(QWebEngineDownloadRequest *download)
                     emit downloadFinished(item);
                     break;
                 default:
-                    break;
+                    // Still running: keep it cancellable.
+                    return;
                 }
                 break;
             }
         }
         m_activeDownloads.remove(id);
     });
-
-    download->setDownloadDirectory(m_downloadPath);
-    download->accept();
 }
 
 void DownloadManager::cancelDownload(const QString &id)
 {
-    auto it = m_activeDownloads.find(id);
-    if (it != m_activeDownloads.end()) {
-        it.value()->cancel();
-        m_activeDownloads.erase(it);
-    }
+    // Take it out first: cancel() can emit stateChanged synchronously, and that
+    // handler also edits m_activeDownloads.
+    if (QWebEngineDownloadRequest *download = m_activeDownloads.take(id))
+        download->cancel();
 
     for (auto &item : m_downloads) {
         if (item.id == id && item.state == DownloadItem::InProgress) {

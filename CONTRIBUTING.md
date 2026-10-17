@@ -12,7 +12,7 @@ a C++20 compiler, and Make.
 
 ```sh
 cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(nproc)
+cmake --build build --parallel "$(tools/build-jobs.sh)"   # as many jobs as memory allows
 ```
 
 The binary is `build/SpacePenguin`.

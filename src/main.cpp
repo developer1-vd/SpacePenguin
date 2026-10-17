@@ -2,10 +2,22 @@
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QDir>
+#include <QFileOpenEvent>
+#include <QLoggingCategory>
+#include <QTimer>
 #include <QWebEngineProfile>
+#include <QWebEngineUrlScheme>
 
 #include "browserwindow.h"
+#include "devicetuning.h"
+#include "icons.h"
 #include "profiles.h"
+#include "sandbox.h"
+#include "singleinstance.h"
+#include "startuptrace.h"
+#include "theme.h"
+
+#include <functional>
 
 #ifndef SPACEPENGUIN_VERSION
 #    define SPACEPENGUIN_VERSION "0.0.0"
@@ -13,9 +25,36 @@
 
 int main(int argc, char *argv[])
 {
+    spacepenguin::StartupTrace::mark("process started");
     QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
+    // Before Chromium starts: fall back cleanly where its sandbox cannot run
+    // (Ubuntu 23.10+ without an AppArmor profile) instead of aborting.
+    spacepenguin::Sandbox::prepare();
+    // Small machines, school Chromebooks above all: fewer renderer processes and,
+    // where Linux apps get no GPU, software drawing instead of black pages.
+    spacepenguin::DeviceTuning::prepare();
+
+    // The start page scheme must be known to Chromium before the first profile exists.
+    QWebEngineUrlScheme startScheme(QByteArrayLiteral("sp"));
+    startScheme.setSyntax(QWebEngineUrlScheme::Syntax::Host);
+    startScheme.setFlags(QWebEngineUrlScheme::SecureScheme);
+    QWebEngineUrlScheme::registerScheme(startScheme);
+
+    spacepenguin::StartupTrace::mark("sandbox and device checks done");
+
+    // Qt reports that the desktop portal already knows this app when it was started
+    // from a terminal that registered itself; nothing is wrong. QT_LOGGING_RULES
+    // still overrides this.
+    QLoggingCategory::setFilterRules(QStringLiteral("qt.qpa.services.warning=false"));
     QApplication app(argc, argv);
+    spacepenguin::StartupTrace::mark("Qt application created");
+    // Fusion draws the same everywhere, which the chrome stylesheet relies on.
+    QApplication::setStyle(spacepenguin::Theme::createStyle());
+    QApplication::setWindowIcon(spacepenguin::Icons::appIcon());
+    // Lets Wayland compositors and Linux docks match windows to the installed
+    // launcher entry and its icon.
+    QGuiApplication::setDesktopFileName(QStringLiteral("org.spacepenguin.SpacePenguin"));
     QCoreApplication::setOrganizationName(QStringLiteral("SpacePenguin"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("spacepenguin.invalid"));
     QCoreApplication::setApplicationName(QStringLiteral("SpacePenguin"));
@@ -32,7 +71,7 @@ int main(int argc, char *argv[])
         QStringLiteral("Do not write history, cookies, or cache to disk for this session."));
     parser.addOption(privateModeOption);
 
-    const     QCommandLineOption userDataOption(
+    const QCommandLineOption userDataOption(
         QStringList{QStringLiteral("user-data-dir")},
         QStringLiteral("Store persistent data in <dir> instead of the default location."),
         QStringLiteral("dir"));
@@ -44,19 +83,107 @@ int main(int argc, char *argv[])
         QStringLiteral("file"));
     parser.addOption(filterListOption);
 
+    parser.addPositionalArgument(QStringLiteral("urls"),
+                                 QStringLiteral("Addresses or searches to open in new tabs."),
+                                 QStringLiteral("[urls...]"));
+
     parser.process(app);
 
+    const bool isPrivate = parser.isSet(privateModeOption);
+    const QStringList urls = parser.positionalArguments();
+
+    // One process per profile: a second launch hands its pages to the first one.
+    const QString dataDirectory = parser.isSet(userDataOption)
+        ? QDir(parser.value(userDataOption)).absolutePath()
+        : spacepenguin::defaultDataDirectory();
+    spacepenguin::SingleInstance instance(dataDirectory);
+    QStringList handOff = urls;
+    if (isPrivate)
+        handOff.prepend(QStringLiteral("--private"));
+    if (instance.sendToRunningInstance(handOff))
+        return 0;
+
+    spacepenguin::StartupTrace::mark("single-instance check done");
     spacepenguin::ProfileServices services = spacepenguin::createProfileServices(
-        &app, parser.isSet(privateModeOption), parser.value(filterListOption));
+        &app, isPrivate, parser.value(filterListOption));
+    spacepenguin::StartupTrace::mark("browser profile, history and filters loaded");
 
     if (parser.isSet(userDataOption)) {
-        const QString dataDirectory = QDir(parser.value(userDataOption)).absolutePath();
         QDir().mkpath(dataDirectory);
         services.profile->setPersistentStoragePath(dataDirectory);
         services.profile->setCachePath(dataDirectory + QStringLiteral("/cache"));
     }
 
     spacepenguin::BrowserWindow window(std::move(services));
+    spacepenguin::StartupTrace::mark("window built");
     window.show();
+    QTimer::singleShot(0, [] { spacepenguin::StartupTrace::mark("window shown"); });
+
+    for (const QString &url : urls)
+        window.openInNewTab(url);
+
+    // Pages that arrive from outside go to the window in front, the way they do
+    // in every other browser.
+    const auto frontWindow = [&window]() -> spacepenguin::BrowserWindow * {
+        if (auto *active = qobject_cast<spacepenguin::BrowserWindow *>(QApplication::activeWindow());
+            active && !active->isPrivate()) {
+            return active;
+        }
+        const auto widgets = QApplication::topLevelWidgets();
+        for (QWidget *widget : widgets) {
+            auto *candidate = qobject_cast<spacepenguin::BrowserWindow *>(widget);
+            if (candidate && candidate->isVisible() && !candidate->isPrivate())
+                return candidate;
+        }
+        return &window;
+    };
+    const auto openFromOutside = [&frontWindow](QStringList texts) {
+        spacepenguin::BrowserWindow *target = frontWindow();
+        if (texts.removeAll(QStringLiteral("--private")) > 0) {
+            target = target->openWindow(true, texts);
+        } else if (texts.isEmpty()) {
+            target->openInNewTab(QString());
+        } else {
+            for (const QString &text : std::as_const(texts))
+                target->openInNewTab(text);
+        }
+        if (target->isMinimized())
+            target->showNormal();
+        target->show();
+        target->raise();
+        target->activateWindow();
+        QApplication::alert(target);
+    };
+
+    if (!isPrivate) {
+        QObject::connect(&instance, &spacepenguin::SingleInstance::argumentsReceived, &app,
+                         openFromOutside);
+        instance.listen();
+    }
+
+    // macOS delivers links and files opened from Finder, or sent to the default
+    // browser, as events rather than command-line arguments.
+    class FileOpenFilter : public QObject
+    {
+    public:
+        explicit FileOpenFilter(std::function<void(QStringList)> open, QObject *parent)
+            : QObject(parent), m_open(std::move(open)) {}
+
+    protected:
+        bool eventFilter(QObject *watched, QEvent *event) override
+        {
+            if (event->type() == QEvent::FileOpen) {
+                const auto *open = static_cast<QFileOpenEvent *>(event);
+                m_open({open->url().isLocalFile() ? open->file() : open->url().toString()});
+                return true;
+            }
+            return QObject::eventFilter(watched, event);
+        }
+
+    private:
+        std::function<void(QStringList)> m_open;
+    };
+    app.installEventFilter(new FileOpenFilter(openFromOutside, &app));
+
     return app.exec();
 }

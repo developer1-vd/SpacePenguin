@@ -1,0 +1,51 @@
+# Flatpak build for every distribution with Flatpak, from the repository root:
+#
+#   flatpak install --user flathub org.kde.Platform//6.8 org.kde.Sdk//6.8 \
+#       io.qt.qtwebengine.BaseApp//6.8
+#   flatpak-builder --user --install --force-clean build-flatpak \
+#       packaging/flatpak/org.spacepenguin.SpacePenguin.yml
+#   flatpak run org.spacepenguin.SpacePenguin
+#
+# Or make a single-file bundle to share:
+#   flatpak-builder --repo=repo --force-clean build-flatpak packaging/flatpak/org.spacepenguin.SpacePenguin.yml
+#   flatpak build-bundle repo SpacePenguin.flatpak org.spacepenguin.SpacePenguin
+id: org.spacepenguin.SpacePenguin
+runtime: org.kde.Platform
+runtime-version: '6.8'
+sdk: org.kde.Sdk
+base: io.qt.qtwebengine.BaseApp
+base-version: '6.8'
+command: SpacePenguin
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=dri
+  # Downloads land in the user's Downloads folder, like any browser.
+  - --filesystem=xdg-download
+  - --talk-name=org.freedesktop.Notifications
+  # Chromium's own sandbox cannot nest inside Flatpak's; Flatpak isolates the app.
+  - --env=QTWEBENGINE_DISABLE_SANDBOX=1
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
+modules:
+  - name: spacepenguin
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSPACEPENGUIN_BUILD_TESTS=OFF
+      - -DSPACEPENGUIN_INSTALL_QT_CONF=OFF
+      - -DSPACEPENGUIN_USE_LOCAL_QT=OFF
+      - -DSPACEPENGUIN_INSTALL_APPARMOR_PROFILE=OFF
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .qt
+          - build
+          - dist
+          - build-appimage
+          - build-flatpak
+          - .flatpak-builder

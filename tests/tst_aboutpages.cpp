@@ -30,6 +30,10 @@ private slots:
     void versionPageReportsFeatures();
     void versionPageAlwaysReportsPlatform();
     void htmlShellEscapesTitles();
+    void historyPageListsEntries();
+    void historyPageEscapesEntries();
+    void historyPageIsEmptyInPrivate();
+    void downloadsPageListsEntries();
 };
 
 void TestAboutPages::indexListsEveryPage()
@@ -171,6 +175,55 @@ void TestAboutPages::htmlShellEscapesTitles()
                                                QStringLiteral("body"));
     QVERIFY(!html.contains(QStringLiteral("<script>")));
     QVERIFY(html.contains(QStringLiteral("&lt;script&gt;")));
+}
+
+void TestAboutPages::historyPageListsEntries()
+{
+    AboutPageContext context = sampleContext();
+    context.history.append(AboutPageEntry{QStringLiteral("Example Domain"),
+                                          QStringLiteral("https://example.com/"),
+                                          QStringLiteral("today")});
+
+    const QString html = AboutPages::render(QStringLiteral("about:history"), context);
+    QVERIFY(html.contains(QStringLiteral("href=\"https://example.com/\"")));
+    QVERIFY(html.contains(QStringLiteral("Example Domain")));
+    QVERIFY(html.contains(QStringLiteral("today")));
+}
+
+void TestAboutPages::historyPageEscapesEntries()
+{
+    AboutPageContext context = sampleContext();
+    context.history.append(AboutPageEntry{QStringLiteral("<script>alert(1)</script>"),
+                                          QStringLiteral("javascript:alert(1)"),
+                                          QStringLiteral("<b>now</b>")});
+
+    const QString html = AboutPages::render(QStringLiteral("about:history"), context);
+    QVERIFY(!html.contains(QStringLiteral("<script>")));
+    QVERIFY(!html.contains(QStringLiteral("<b>now</b>")));
+    // Only web addresses become links.
+    QVERIFY(!html.contains(QStringLiteral("href=\"javascript:")));
+}
+
+void TestAboutPages::historyPageIsEmptyInPrivate()
+{
+    AboutPageContext context = sampleContext();
+    context.isPrivate = true;
+    const QString html = AboutPages::render(QStringLiteral("about:history"), context);
+    QVERIFY(html.contains(QStringLiteral("private window")));
+}
+
+void TestAboutPages::downloadsPageListsEntries()
+{
+    AboutPageContext context = sampleContext();
+    QVERIFY(AboutPages::render(QStringLiteral("about:downloads"), context)
+                .contains(QStringLiteral("Nothing downloaded")));
+
+    context.downloads.append(AboutPageEntry{QStringLiteral("report.pdf"),
+                                            QStringLiteral("https://example.com/report.pdf"),
+                                            QStringLiteral("Completed")});
+    const QString html = AboutPages::render(QStringLiteral("about:downloads"), context);
+    QVERIFY(html.contains(QStringLiteral("report.pdf")));
+    QVERIFY(html.contains(QStringLiteral("Completed")));
 }
 
 QTEST_MAIN(TestAboutPages)

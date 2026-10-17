@@ -1,0 +1,285 @@
+name: build
+
+# Builds, tests and packages SpacePenguin everywhere it ships:
+#   - Windows, macOS and Linux runners, set up with install-deps, producing the
+#     installer and zip, the .app zip and DMG, and the AppImage; each package is
+#     launched to check it starts
+#   - Linux distributions in containers: install-deps, build, tests, and the native
+#     package (deb, rpm, Arch pkg) installed with the distribution's own tools
+#   - Nix: the flake's package, tests and dev shell on Linux and macOS
+#   - the Flatpak
+# A tag such as v0.1.0 also publishes the packages as a GitHub release.
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_VERSION: '6.8.3'
+
+jobs:
+  desktop:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `release` marks the job whose packages are published.
+          - name: Linux AppImage
+            os: ubuntu-22.04      # glibc 2.35: the AppImage runs on this and anything newer
+            release: true
+            chromebook: bookworm  # ChromeOS's Linux container: Debian 12
+          # ARM Chromebooks (MediaTek, Snapdragon), Raspberry Pi 5, ARM laptops.
+          # Qt's ARM64 Linux binaries need glibc 2.38+, so this builds on 24.04 and
+          # its AppImage needs Debian 13 (ChromeOS: upgrade the Linux container).
+          - name: Linux AppImage (ARM64)
+            os: ubuntu-24.04-arm
+            release: true
+            chromebook: trixie
+          - name: Windows 10 (Server 2022)
+            os: windows-2022
+          - name: Windows 11 (Server 2025, 24H2 core)
+            os: windows-2025
+            release: true
+          - name: macOS 14 Sonoma
+            os: macos-14
+          - name: macOS 26 Tahoe
+            os: macos-26
+            release: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: .qt
+          key: qt-${{ env.QT_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('install-deps.*') }}
+
+      - name: Install dependencies (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: ./install-deps.sh --yes --qt bundled --qt-version "${QT_VERSION}"
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./install-deps.ps1 -QtVersion $env:QT_VERSION
+
+      # No Qt path is passed: CMake must find .qt/ by itself, as it does for users.
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Check scripts
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y --no-install-recommends shellcheck
+          shellcheck install-deps.sh build-*.sh .github/scripts/*.sh packaging/chromeos/*.sh tools/*.sh
+          desktop-file-validate packaging/linux/org.spacepenguin.SpacePenguin.desktop
+          appstreamcli validate --no-net build/org.spacepenguin.SpacePenguin.metainfo.xml
+
+      - name: Package AppImage
+        if: runner.os == 'Linux'
+        run: ./build-appimage.sh
+
+      # ChromeOS's Linux environment is a Debian container: install the AppImage
+      # the way a Chromebook user does, in a stock one, and launch it.
+      - name: Check the AppImage on Debian ${{ matrix.chromebook }} (Chromebook Linux)
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -v "$PWD:/src:ro" debian:${{ matrix.chromebook }} sh -c '
+            set -e
+            apt-get update -qq && apt-get install -y -qq sudo >/dev/null
+            useradd -m student && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student
+            su student -c "bash /src/packaging/chromeos/install.sh --yes /src/dist/*.AppImage"
+            su student -c "QT_QPA_PLATFORM=offscreen ~/.local/bin/spacepenguin --version" | tee /dev/stderr | grep -q SpacePenguin
+            su student -c "bash /src/packaging/chromeos/install.sh --uninstall"'
+
+      - name: Package .app and DMG
+        if: runner.os == 'macOS'
+        run: ./build-dmg.sh --universal
+
+      - name: Check the DMG
+        if: runner.os == 'macOS'
+        run: |
+          dmg=$(ls dist/*.dmg)
+          mount=$(hdiutil attach -nobrowse -readonly "$dmg" | awk -F'\t' '/\/Volumes\// {print $NF}')
+          app="$mount/SpacePenguin.app"
+          lipo -archs "$app/Contents/MacOS/SpacePenguin" | tee /dev/stderr | grep -q arm64
+          lipo -archs "$app/Contents/MacOS/SpacePenguin" | grep -q x86_64
+          "$app/Contents/MacOS/SpacePenguin" --version
+          hdiutil detach "$mount"
+
+      - name: Package installer and zip
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./build-windows.ps1
+
+      - name: Check the installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist\*-setup.exe).FullName
+          $target = Join-Path $env:RUNNER_TEMP "SpacePenguin"
+          # Per-user, silent; /D must come last.
+          $p = Start-Process -FilePath $setup -ArgumentList "/S", "/CurrentUser", "/D=$target" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
+          foreach ($file in "SpacePenguin.exe", "QtWebEngineProcess.exe", "vcruntime140.dll", "Uninstall.exe") {
+            if (-not (Get-ChildItem -Path $target -Recurse -Filter $file)) { throw "not installed: $file" }
+          }
+          $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SpacePenguin"
+          if (-not (Test-Path $key)) { throw "no Apps & features entry" }
+          $env:QT_COMMAND_LINE_PARSER_NO_GUI_MESSAGE_BOXES = "1"
+          $out = Join-Path $env:RUNNER_TEMP "version.txt"
+          $run = Start-Process -FilePath (Join-Path $target "SpacePenguin.exe") -ArgumentList "--version" `
+                   -RedirectStandardOutput $out -NoNewWindow -PassThru
+          if (-not $run.WaitForExit(120000)) { $run.Kill(); throw "the installed app did not exit" }
+          Get-Content $out
+          if ((Get-Content $out -Raw) -notlike "*SpacePenguin*") { throw "the installed app did not start" }
+          # Uninstall silently; the uninstaller copies itself to TEMP, so wait for that copy.
+          Start-Process -FilePath (Join-Path $target "Uninstall.exe") -ArgumentList "/S", "/CurrentUser" -Wait
+          for ($i = 0; $i -lt 60 -and (Test-Path (Join-Path $target "SpacePenguin.exe")); $i++) { Start-Sleep 1 }
+          if (Test-Path (Join-Path $target "SpacePenguin.exe")) { throw "uninstall left files behind" }
+          if (Test-Path $key) { throw "uninstall left the Apps & features entry" }
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.release
+        with:
+          name: SpacePenguin-${{ runner.os }}-${{ runner.arch }}
+          if-no-files-found: error
+          path: |
+            dist/*.AppImage
+            dist/*.dmg
+            dist/*.zip
+            dist/*-setup.exe
+            dist/*.sha256
+
+  distro:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13 (.deb)
+            image: debian:trixie
+            package: deb
+          - name: Ubuntu 26.04 Resolute Raccoon (.deb)
+            image: ubuntu:26.04
+            package: deb
+          - name: Ubuntu 24.04 (bundled Qt)
+            image: ubuntu:24.04
+            package: none
+          - name: Fedora (.rpm)
+            image: fedora:latest
+            package: rpm
+          - name: openSUSE Tumbleweed (.rpm)
+            image: registry.opensuse.org/opensuse/tumbleweed:latest   # avoids Docker Hub limits
+            package: rpm
+          - name: Arch Linux (pkg)
+            image: archlinux:latest
+            package: pkg
+          # These two base images have no bash, which the scripts need.
+          - name: Alpine (musl)
+            image: alpine:latest
+            package: none
+            prepare: apk add --no-cache bash >/dev/null &&
+          - name: Void Linux
+            image: ghcr.io/void-linux/void-glibc-full:latest
+            package: none
+            prepare: xbps-install -Sy bash >/dev/null &&
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install, build, test, package, install the package, launch
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src "${{ matrix.image }}" \
+            sh -c '${{ matrix.prepare }} exec bash /src/.github/scripts/distro.sh ${{ matrix.package }}'
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.package != 'none'
+        with:
+          name: SpacePenguin-${{ matrix.package }}-${{ strategy.job-index }}
+          if-no-files-found: error
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.pkg.tar.zst
+
+  nix:
+    name: Nix (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-26]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - name: nix flake check (builds the package and runs the tests)
+        run: nix flake check -L
+      - name: nix build and launch
+        run: |
+          nix build -L .#default
+          QT_QPA_PLATFORM=offscreen HOME="$(mktemp -d)" ./result/bin/SpacePenguin --version
+      - name: nix-build (without flakes)
+        run: nix-build -I nixpkgs=flake:nixpkgs
+      - name: nix develop builds from source
+        run: |
+          nix develop -c sh -c 'cmake -B build-nix -G Ninja && cmake --build build-nix && QT_QPA_PLATFORM=offscreen ctest --test-dir build-nix --output-on-failure'
+
+  flatpak:
+    name: Flatpak
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.8
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
+        with:
+          manifest-path: packaging/flatpak/org.spacepenguin.SpacePenguin.yml
+          bundle: SpacePenguin.flatpak
+          cache-key: flatpak-builder-${{ github.sha }}
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, distro, nix, flatpak]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: packages/*
+          generate_release_notes: true

@@ -1,4 +1,6 @@
 # ---- Build trees ----------------------------------------------------------
+# Qt installed by install-deps.sh / install-deps.ps1
+.qt/
 build/
 build-*/
 cmake-build-*/
@@ -71,22 +73,22 @@ qtwebengine_*.qrc
 *.map
 *.core
 vgcore.*
+# Core dumps: "core" or "core.<pid>" only, never sources such as core.cpp
 core
-core.*
+core.[0-9]*
 
 # ---- Editor / IDE ----------------------------------------------------------
 .idea/
 .vscode/
 *.code-workspace
-.cache/
 .clangd/
-.clang-format
 compile_flags.txt
+.direnv/
 
 # ---- Browser runtime data (never commit user profiles) ---------------------
-profile/
-user-data/
-data/
+/profile/
+/user-data/
+/data/
 cookies.sqlite
 cookies.sqlite-journal
 history.sqlite
@@ -109,8 +111,30 @@ Desktop.ini
 # ---- Kilo code data  ------------------------------------------------------
 .kilo/
 
-# ---- Installers and packages ------------------------------------------------------
+# ---- Packages and packaging leftovers --------------------------------------
+# Everything the build-*.sh / build-windows.ps1 scripts produce goes to dist/,
+# their downloaded tools (linuxdeploy) to .cache/.
+dist/
+.cache/
 *.dmg
-*.appimage
 *.AppImage
-# just in case Ignore language is case-sensitive
+*.appimage
+*.zsync
+*.deb
+*.rpm
+*.pkg.tar.*
+*.flatpak
+# An AppImage unpacked with --appimage-extract
+squashfs-root/
+# Arch makepkg (packaging/arch)
+packaging/arch/src/
+packaging/arch/pkg/
+packaging/arch/*.tar.gz
+# Flatpak
+.flatpak-builder/
+/repo/
+# Nix: nix build / nix-build output links
+/result
+/result-*
+# Python virtual environments (aqtinstall)
+.venv/

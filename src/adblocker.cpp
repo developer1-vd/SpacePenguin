@@ -724,6 +724,7 @@ void AdBlocker::setPausedHosts(const QStringList &hosts)
         if (!trimmed.isEmpty())
             m_pausedHosts.append(trimmed);
     }
+    emit pausedHostsChanged();
 }
 
 bool AdBlocker::isPausedFor(const QString &host) const

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.spacepenguin.SpacePenguin</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>SpacePenguin</name>
+  <summary>A secure, lightweight, and usable browser written in Qt</summary>
+  <description>
+    <p>
+      SpacePenguin is a small web browser built on Qt 6 and QtWebEngine. It blocks ads
+      with Adblock Plus style filter lists, runs JavaScript user scripts, keeps private
+      windows off the disk, and never phones home.
+    </p>
+  </description>
+  <developer id="io.github.developer1-vd">
+    <name>SpacePenguin contributors</name>
+  </developer>
+  <launchable type="desktop-id">org.spacepenguin.SpacePenguin.desktop</launchable>
+  <url type="homepage">https://github.com/developer1-vd/SpacePenguin</url>
+  <url type="bugtracker">https://github.com/developer1-vd/SpacePenguin/issues</url>
+  <categories>
+    <category>Network</category>
+    <category>WebBrowser</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@PROJECT_VERSION@" date="@SPACEPENGUIN_RELEASE_DATE@"/>
+  </releases>
+</component>
