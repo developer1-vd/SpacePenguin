@@ -1,7 +1,7 @@
 # ---- Build trees ----------------------------------------------------------
 # Qt installed by install-deps.sh / install-deps.ps1
 .qt/
-build/
+/build*/
 build-*/
 cmake-build-*/
 out/
