@@ -545,7 +545,10 @@ sudo packaging/linux/install-apparmor-profile.sh   # then restart SpacePenguin
 
 It writes `/etc/apparmor.d/spacepenguin-local`, which grants `userns` to this
 checkout's builds, its `.qt/` QtWebEngine helper, `/usr/local/bin/SpacePenguin` and
-AppImages, and nothing else; `--remove` takes it out again. The `.deb` and `.rpm`
+an AppImage installed with `packaging/chromeos/install.sh`, and nothing else;
+`--remove` takes it out again. It never names paths under `/tmp`, where anyone
+could put a program, so an AppImage run straight from its file stays unsandboxed:
+install it first. The `.deb` and `.rpm`
 install and load their own profile for `/usr/bin/SpacePenguin`. Running
 SpacePenguin with `sudo` also turns the sandbox off; run it as your normal user.
 

@@ -64,7 +64,7 @@ die() { echo "error: $*" >&2; exit 1; }
 
 [[ "$(uname -s)" == Linux ]] || die "AppImages are built on Linux"
 case "${ARCH}" in x86_64|aarch64) ;; *) die "linuxdeploy has no build for ${ARCH}" ;; esac
-for tool in cmake curl file; do
+for tool in cmake curl file sha256sum; do
     command -v "${tool}" >/dev/null || die "${tool} is missing; run ./install-deps.sh"
 done
 
@@ -121,21 +121,45 @@ DESTDIR="${ROOT}/${APPDIR}" cmake --install "${BUILD_DIR}"
 
 # ---- Tools ---------------------------------------------------------------------------
 
+# Fixed releases, checked against their SHA-256 before every use: these tools run
+# with full access to the build that produces the shipped AppImage, so a changed
+# download must never be run. To update, pick new tags and record the new hashes.
+LINUXDEPLOY_TAG="1-alpha-20251107-1"
+LINUXDEPLOY_QT_TAG="1-alpha-20250213-1"
+case "${ARCH}" in
+    x86_64)
+        LINUXDEPLOY_SHA256="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
+        LINUXDEPLOY_QT_SHA256="15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724" ;;
+    aarch64)
+        LINUXDEPLOY_SHA256="620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff"
+        LINUXDEPLOY_QT_SHA256="bf1c24aff6d749b5cf423afad6f15abd4440f81dec1aab95706b25f6667cdcf1" ;;
+esac
+
 TOOLS_DIR="${ROOT}/.cache/linuxdeploy"
 mkdir -p "${TOOLS_DIR}"
+# Downloads <name> from <url> unless a copy with the right hash is cached, and
+# refuses to continue with anything that does not match <sha256>.
 fetch() {
-    local name="$1" url="$2"
-    if [[ ! -x "${TOOLS_DIR}/${name}" ]]; then
-        step "Downloading ${name}"
-        curl -fSL --retry 3 -o "${TOOLS_DIR}/${name}.part" "${url}"
-        chmod +x "${TOOLS_DIR}/${name}.part"
-        mv "${TOOLS_DIR}/${name}.part" "${TOOLS_DIR}/${name}"
+    local name="$1" url="$2" sha256="$3" file="${TOOLS_DIR}/$1"
+    if [[ -f "${file}" ]] && echo "${sha256}  ${file}" | sha256sum --check --status; then
+        return
     fi
+    step "Downloading ${name}"
+    rm -f "${file}" "${file}.part"
+    curl -fSL --retry 3 -o "${file}.part" "${url}"
+    if ! echo "${sha256}  ${file}.part" | sha256sum --check --status; then
+        rm -f "${file}.part"
+        die "${name} from ${url} does not have the expected SHA-256; refusing to run it"
+    fi
+    chmod +x "${file}.part"
+    mv "${file}.part" "${file}"
 }
 fetch "linuxdeploy-${ARCH}.AppImage" \
-    "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${ARCH}.AppImage"
+    "https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_TAG}/linuxdeploy-${ARCH}.AppImage" \
+    "${LINUXDEPLOY_SHA256}"
 fetch "linuxdeploy-plugin-qt-${ARCH}.AppImage" \
-    "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${ARCH}.AppImage"
+    "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/${LINUXDEPLOY_QT_TAG}/linuxdeploy-plugin-qt-${ARCH}.AppImage" \
+    "${LINUXDEPLOY_QT_SHA256}"
 
 # ---- Bundle --------------------------------------------------------------------------
 

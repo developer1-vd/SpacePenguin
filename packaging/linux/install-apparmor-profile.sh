@@ -2,8 +2,9 @@
 # Let SpacePenguin use Chromium's sandbox on Ubuntu 23.10+ and other systems that
 # restrict unprivileged user namespaces with AppArmor:
 #
-#   sudo ./packaging/linux/install-apparmor-profile.sh            # this checkout, the
-#                                                                 # AppImage, /usr/local
+#   sudo ./packaging/linux/install-apparmor-profile.sh            # this checkout, an
+#                                                                 # installed AppImage,
+#                                                                 # /usr/local
 #   sudo ./packaging/linux/install-apparmor-profile.sh <program>  # specific binaries
 #   sudo ./packaging/linux/install-apparmor-profile.sh --remove
 #
@@ -11,6 +12,12 @@
 # it `userns` and nothing else, then loads it. Restart SpacePenguin afterwards.
 # /usr/bin/SpacePenguin is left to the .deb and .rpm packages, whose own profile
 # (/etc/apparmor.d/spacepenguin) covers it; two profiles may not claim one program.
+#
+# Only existing files are named, never patterns under /tmp: anyone can create a
+# directory there, and a pattern such as /tmp/.mount_* would hand the user
+# namespaces that Ubuntu restricts on purpose to whatever program they put in it.
+# A running AppImage lives in such a directory, so install it first
+# (packaging/chromeos/install.sh unpacks it into ~/.local/opt/spacepenguin).
 set -euo pipefail
 
 PROFILE=/etc/apparmor.d/spacepenguin-local
@@ -53,13 +60,15 @@ else
                    "${ROOT}"/.qt/*/*/libexec/QtWebEngineProcess; do
         PROGRAMS+=("$(realpath "${program}")")
     done
+    # An AppImage installed by packaging/chromeos/install.sh for the user running sudo.
+    home="$(getent passwd "${SUDO_USER:-root}" | cut -d: -f6)"
+    for program in "${home}"/.local/opt/spacepenguin/usr/bin/SpacePenguin \
+                   "${home}"/.local/opt/spacepenguin/usr/libexec/QtWebEngineProcess; do
+        if [[ -e "${program}" ]]; then PROGRAMS+=("$(realpath "${program}")"); fi
+    done
     shopt -u nullglob
-    # Hand-installed copies and AppImages, wherever their runtime unpacks them.
-    PROGRAMS+=(/usr/local/bin/SpacePenguin
-               "/tmp/.mount_SpaceP*/usr/bin/SpacePenguin"
-               "/tmp/.mount_SpaceP*/usr/libexec/QtWebEngineProcess"
-               "/tmp/appimage_extracted_*/usr/bin/SpacePenguin"
-               "/tmp/appimage_extracted_*/usr/libexec/QtWebEngineProcess")
+    # A hand-installed copy.
+    PROGRAMS+=(/usr/local/bin/SpacePenguin)
 fi
 
 tmp="$(mktemp)"

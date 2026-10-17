@@ -112,11 +112,14 @@ if [[ -z "${APPIMAGE}" ]]; then
     [[ -n "${url}" ]] || die "no ${ARCH} AppImage in the newest release of ${REPO}; download one by hand and run: bash $0 <file>"
     step "Downloading $(basename "${url}")"
     curl -fL --retry 3 -o "${WORK}/SpacePenguin.AppImage" "${url}"
-    if curl -fsSL -o "${WORK}/sum" "${url}.sha256" 2>/dev/null; then
-        expected="$(cut -d' ' -f1 "${WORK}/sum")"
-        actual="$(sha256sum "${WORK}/SpacePenguin.AppImage" | cut -d' ' -f1)"
-        [[ "${expected}" == "${actual}" ]] || die "the download is damaged (checksum mismatch); try again"
-    fi
+    # Every release publishes a .sha256 beside the AppImage; nothing is installed
+    # or run without it matching.
+    curl -fsSL --retry 3 -o "${WORK}/sum" "${url}.sha256" ||
+        die "could not download $(basename "${url}").sha256 to check the download; try again"
+    expected="$(cut -d' ' -f1 "${WORK}/sum")"
+    [[ "${expected}" =~ ^[0-9a-f]{64}$ ]] || die "$(basename "${url}").sha256 is not a SHA-256 checksum"
+    actual="$(sha256sum "${WORK}/SpacePenguin.AppImage" | cut -d' ' -f1)"
+    [[ "${expected}" == "${actual}" ]] || die "the download is damaged (checksum mismatch); try again"
     APPIMAGE="${WORK}/SpacePenguin.AppImage"
 else
     [[ -f "${APPIMAGE}" ]] || die "${APPIMAGE} does not exist. Files from the ChromeOS Files app must be shared with Linux first (right-click › Share with Linux) or moved to \"Linux files\"."
