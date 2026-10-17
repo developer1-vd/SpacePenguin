@@ -297,6 +297,16 @@ QWidget *SettingsDialog::createAppearanceTab()
     layout->addWidget(mutedLabel(tr("The theme colours the browser itself. Websites that "
                                     "support dark mode follow your system setting.")));
 
+    layout->addWidget(sectionTitle(tr("Tabs")));
+    auto *sideTabs = new QCheckBox(tr("Show tabs on the side"));
+    sideTabs->setChecked(preferences->sideTabs());
+    connect(sideTabs, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setSideTabs(checked); });
+    layout->addWidget(sideTabs);
+    layout->addWidget(mutedLabel(tr("A panel down the left of the window, with room for long "
+                                    "titles and many tabs. Collapse it to just the icons with "
+                                    "its arrow button.")));
+
     layout->addWidget(sectionTitle(tr("Toolbar")));
     auto *homeButton = new QCheckBox(tr("Show the Home button"));
     homeButton->setChecked(preferences->showHomeButton());
@@ -335,8 +345,9 @@ QWidget *SettingsDialog::createAppearanceTab()
 
     // Keep the controls honest when the same setting changes elsewhere.
     connect(Preferences::instance(), &Preferences::changed, page,
-            [homeButton, bookmarksBar, menuBar] {
+            [sideTabs, homeButton, bookmarksBar, menuBar] {
                 Preferences *current = Preferences::instance();
+                sideTabs->setChecked(current->sideTabs());
                 homeButton->setChecked(current->showHomeButton());
                 bookmarksBar->setChecked(current->showBookmarksBar());
                 menuBar->setChecked(current->showMenuBar());

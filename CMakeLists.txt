@@ -100,6 +100,12 @@ qt_add_executable(spacepenguin
     src/aboutpages.h
     src/browserwindow.cpp
     src/browserwindow.h
+    src/sidetabs.cpp
+    src/sidetabs.h
+    src/tabbar.cpp
+    src/tabbar.h
+    src/tabgroups.cpp
+    src/tabgroups.h
     src/browserpage.cpp
     src/browserpage.h
     src/webview.cpp

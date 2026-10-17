@@ -18,7 +18,9 @@
 #include "sandbox.h"
 #include "settingsdialog.h"
 #include "shortcuts.h"
+#include "sidetabs.h"
 #include "startuptrace.h"
+#include "tabgroups.h"
 #include "userextensions.h"
 #include "webview.h"
 #include "windowframe.h"
@@ -29,12 +31,16 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QCompleter>
+#include <QCursor>
 #include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
@@ -43,6 +49,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QProgressBar>
 #include <QSet>
 #include <QSettings>
@@ -70,8 +77,6 @@ constexpr qreal kMaximumZoom = 2.0;
 constexpr qreal kZoomStep = 0.1;
 constexpr int kMaximumRestoredTabs = 32;
 constexpr int kMaximumClosedTabs = 16;
-constexpr int kMinimumTabWidth = 72;
-constexpr int kMaximumTabWidth = 240;
 constexpr int kMaximumCompletions = 400;
 constexpr int kLinkPreviewMargin = 6;
 
@@ -143,39 +148,6 @@ QString formatPercent(qreal factor)
 
 } // namespace
 
-// ---- TabBar ---------------------------------------------------------------
-
-TabBar::TabBar(QWidget *parent)
-    : QTabBar(parent)
-{
-    setObjectName(QStringLiteral("tabBar"));
-    setExpanding(false);
-    setMovable(true);
-    setTabsClosable(false); // each tab gets its own themed close button
-    setUsesScrollButtons(true);
-    setElideMode(Qt::ElideRight);
-    setDocumentMode(true);
-    setDrawBase(false);
-    setIconSize(QSize(16, 16));
-    setFocusPolicy(Qt::NoFocus);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-}
-
-QSize TabBar::tabSizeHint(int index) const
-{
-    QSize hint = QTabBar::tabSizeHint(index);
-    const int tabs = qMax(1, count());
-    hint.setWidth(qBound(kMinimumTabWidth, width() / tabs, kMaximumTabWidth));
-    return hint;
-}
-
-QSize TabBar::minimumTabSizeHint(int index) const
-{
-    QSize hint = QTabBar::minimumTabSizeHint(index);
-    hint.setWidth(kMinimumTabWidth);
-    return hint;
-}
-
 // ---- BrowserWindow ----------------------------------------------------------
 
 BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
@@ -199,6 +171,9 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
     m_frame = new WindowFrame(this);
 
     Theme::apply(Theme::storedMode());
+
+    m_groups = new TabGroups(this);
+    connect(m_groups, &TabGroups::changed, this, &BrowserWindow::refreshGroups);
 
     createActions();
     createChrome();
@@ -389,6 +364,12 @@ void BrowserWindow::createActions()
     connect(m_bookmarksBarAction, &QAction::triggered, this,
             [](bool checked) { Preferences::instance()->setShowBookmarksBar(checked); });
 
+    m_sideTabsAction = makeAction(tr("Tabs on the Side"), {}, Icons::icon(Icons::SideTabs));
+    m_sideTabsAction->setCheckable(true);
+    m_sideTabsAction->setToolTip(tr("Show tabs on the side"));
+    connect(m_sideTabsAction, &QAction::triggered, this,
+            [](bool checked) { Preferences::instance()->setSideTabs(checked); });
+
     m_menuBarAction = makeAction(tr("Show Menu Bar"));
     m_menuBarAction->setCheckable(true);
     connect(m_menuBarAction, &QAction::triggered, this,
@@ -492,7 +473,23 @@ void BrowserWindow::createChrome()
     m_linkPreview->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_linkPreview->hide();
 
-    layout->addWidget(content, 1);
+    m_sideTabs = new SideTabs(m_tabBar, m_groups, m_newTabAction, m_isPrivate);
+    m_sideTabs->hide();
+    connect(m_sideTabs, &SideTabs::closeRequested, this, &BrowserWindow::closeTab);
+    connect(m_sideTabs, &SideTabs::contextMenuRequested, this, &BrowserWindow::showTabMenu);
+    connect(m_sideTabs, &SideTabs::groupToggleRequested, this, &BrowserWindow::toggleGroupCollapsed);
+    connect(m_sideTabs, &SideTabs::groupMenuRequested, this, &BrowserWindow::showGroupMenu);
+    connect(m_sideTabs, &SideTabs::collapseRequested, this,
+            [](bool collapsed) { Preferences::instance()->setSideTabsCollapsed(collapsed); });
+    connect(m_sideTabs, &SideTabs::topTabsRequested, this,
+            [] { Preferences::instance()->setSideTabs(false); });
+
+    auto *body = new QHBoxLayout;
+    body->setContentsMargins(0, 0, 0, 0);
+    body->setSpacing(0);
+    body->addWidget(m_sideTabs);
+    body->addWidget(content, 1);
+    layout->addLayout(body, 1);
     layout->addWidget(createFindBar());
 
     setCentralWidget(central);
@@ -509,7 +506,13 @@ QWidget *BrowserWindow::createTabStrip()
     layout->setContentsMargins(6, 0, 6, 0);
     layout->setSpacing(2);
 
+    // Edge's place for it: the first thing in the row.
+    auto *sideTabsButton = chromeButton(m_sideTabsAction);
+    sideTabsButton->setCheckable(false);
+    layout->addWidget(sideTabsButton, 0, Qt::AlignVCenter);
+
     m_tabBar = new TabBar;
+    m_tabBar->setGroups(m_groups);
     m_tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
     m_tabBar->installEventFilter(this);
     m_tabStrip->installEventFilter(this);
@@ -540,6 +543,12 @@ QWidget *BrowserWindow::createTabStrip()
     });
 
     connect(m_tabBar, &QTabBar::currentChanged, this, &BrowserWindow::onCurrentTabChanged);
+    connect(m_tabBar, &QTabBar::currentChanged, this, &BrowserWindow::syncSideTabs);
+    connect(m_tabBar, &QTabBar::tabMoved, this, &BrowserWindow::syncSideTabs);
+    connect(m_tabBar, &TabBar::tabsChanged, this, &BrowserWindow::syncSideTabs);
+    connect(m_tabBar, &TabBar::dragFinished, this, &BrowserWindow::onTabDragFinished);
+    connect(m_tabBar, &TabBar::groupChipClicked, this, &BrowserWindow::toggleGroupCollapsed);
+    connect(m_tabBar, &TabBar::groupMenuRequested, this, &BrowserWindow::showGroupMenu);
     connect(m_tabBar, &QTabBar::customContextMenuRequested, this,
             &BrowserWindow::showTabContextMenu);
     connect(m_tabBar, &QTabBar::tabBarDoubleClicked, this, [this](int index) {
@@ -672,6 +681,10 @@ QWidget *BrowserWindow::createNavigationBar()
     m_menuButton->setFocusPolicy(Qt::NoFocus);
     m_menuButton->setMenu(createAppMenu());
     layout->addWidget(m_menuButton);
+
+    // With the tabs on the side this row is the title bar: the window buttons move
+    // here and its empty part moves the window.
+    m_frame->addDragArea(m_navBar, [this](const QPoint &) { return m_tabsOnSide; });
 
     return m_navBar;
 }
@@ -827,6 +840,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_extensionsAction);
     menu->addAction(m_settingsAction);
     menu->addSeparator();
+    menu->addAction(m_sideTabsAction);
     menu->addAction(m_menuBarAction);
 
     QMenu *help = menu->addMenu(tr("Help"));
@@ -874,6 +888,7 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_fullScreenAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_bookmarksBarAction);
+    viewMenu->addAction(m_sideTabsAction);
     viewMenu->addAction(m_menuBarAction);
     QMenu *themeMenu = viewMenu->addMenu(tr("Theme"));
     themeMenu->addActions(m_themeGroup->actions());
@@ -937,8 +952,12 @@ void BrowserWindow::applyPreferences()
     m_menuBarAction->setChecked(preferences->showMenuBar());
 #endif
     m_frame->setCustomTitleBar(!preferences->useSystemTitleBar());
+    setTabsOnSide(preferences->sideTabs());
+    m_sideTabs->setCollapsed(preferences->sideTabsCollapsed());
 
     syncThemeMenu();
+    // The groups' colours follow the theme.
+    refreshGroups();
     updateBlockingIndicator();
 }
 
@@ -1318,6 +1337,30 @@ void BrowserWindow::restoreSession()
                                int(urls.size()) - 1);
     for (const QString &url : urls)
         newTab(QUrl(url));
+
+    const QJsonObject saved =
+        QJsonDocument::fromJson(settings.value(QStringLiteral("session/groups")).toString().toUtf8())
+            .object();
+    const QJsonArray groupList = saved.value(QStringLiteral("groups")).toArray();
+    const QJsonArray tabGroups = saved.value(QStringLiteral("tabs")).toArray();
+    QHash<int, int> ids; // place in the saved list -> new group
+    for (int index = 0; index < tabGroups.size() && index < m_tabBar->count(); ++index) {
+        const int place = tabGroups.at(index).toInt(-1);
+        if (place < 0 || place >= groupList.size())
+            continue;
+        if (!ids.contains(place)) {
+            const QJsonObject group = groupList.at(place).toObject();
+            ids.insert(place, m_groups->create(group.value(QStringLiteral("title")).toString(),
+                                               group.value(QStringLiteral("color")).toInt()));
+        }
+        m_groups->setGroupOf(viewAt(index), ids.value(place));
+    }
+    for (auto it = ids.cbegin(); it != ids.cend(); ++it) {
+        m_groups->setCollapsed(it.value(),
+                               groupList.at(it.key()).toObject().value(QStringLiteral("collapsed")).toBool());
+    }
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
     m_tabBar->setCurrentIndex(current);
 }
 
@@ -1330,13 +1373,34 @@ void BrowserWindow::saveSession() const
 
     QStringList urls;
     urls.reserve(m_tabBar->count());
+    // Each saved tab's group, as a place in the list of groups; -1 for none.
+    const QList<TabGroup> groups = m_groups->groups();
+    QJsonArray tabGroups;
     for (int index = 0; index < m_tabBar->count(); ++index) {
         const WebView *view = viewAt(index);
-        if (view && view->url().isValid() && !view->url().isEmpty())
+        if (view && view->url().isValid() && !view->url().isEmpty()) {
             urls.append(view->url().toString());
+            const int group = m_groups->groupOf(view);
+            int place = -1;
+            for (int i = 0; i < groups.size(); ++i) {
+                if (groups.at(i).id == group)
+                    place = i;
+            }
+            tabGroups.append(place);
+        }
+    }
+    QJsonArray groupList;
+    for (const TabGroup &group : groups) {
+        groupList.append(QJsonObject{{QStringLiteral("title"), group.title},
+                                     {QStringLiteral("color"), group.color},
+                                     {QStringLiteral("collapsed"), group.collapsed}});
     }
 
     settings.setValue(QStringLiteral("session/urls"), urls);
+    settings.setValue(QStringLiteral("session/groups"),
+                      QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("groups"), groupList},
+                                                                  {QStringLiteral("tabs"), tabGroups}})
+                                            .toJson(QJsonDocument::Compact)));
     settings.setValue(QStringLiteral("session/currentTab"), m_tabBar->currentIndex());
     settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
 }
@@ -1384,6 +1448,7 @@ WebView *BrowserWindow::addTab(bool background)
     const int insertAt = current < 0 ? 0 : (background ? current + 1 : m_tabBar->count());
     const int index = m_tabBar->insertTab(insertAt, Icons::icon(Icons::Globe), tr("New Tab"));
     m_tabBar->setTabData(index, QVariant::fromValue(static_cast<QObject *>(view)));
+    m_tabBar->setLabel(index, {tr("New Tab"), Icons::icon(Icons::Globe), tr("New Tab")});
 
     auto *closeButton = new QToolButton;
     closeButton->setObjectName(QStringLiteral("tabClose"));
@@ -1396,8 +1461,15 @@ WebView *BrowserWindow::addTab(bool background)
     connect(closeButton, &QToolButton::clicked, this, [this, view] { closeTab(indexOfView(view)); });
     m_tabBar->setTabButton(index, QTabBar::RightSide, closeButton);
 
+    // A link opened in the background from a grouped tab joins its group, as in
+    // other browsers; any other new tab stays out of the groups it lands among.
+    if (background && current >= 0)
+        m_groups->setGroupOf(view, m_groups->groupOf(tabObject(m_tabBar, current)));
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
+
     if (!background || m_tabBar->count() == 1)
-        m_tabBar->setCurrentIndex(index);
+        m_tabBar->setCurrentIndex(indexOfView(view));
 
     return view;
 }
@@ -1478,9 +1550,12 @@ void BrowserWindow::closeTab(int index)
         return;
     }
 
+    m_tabBar->releaseChip(index);
     m_tabBar->removeTab(index);
     m_stack->removeWidget(view);
+    m_groups->forget(view);
     view->deleteLater();
+    refreshGroups();
 }
 
 void BrowserWindow::closeOtherTabs(int index)
@@ -1513,14 +1588,23 @@ void BrowserWindow::reopenClosedTab()
     const int to = qBound(0, closed.index, m_tabBar->count() - 1);
     if (from != to)
         m_tabBar->moveTab(from, to);
-    m_tabBar->setCurrentIndex(to);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
+    m_tabBar->setCurrentIndex(indexOfView(view));
 }
 
 void BrowserWindow::selectTabByOffset(int offset)
 {
     if (m_tabBar->count() < 2)
         return;
-    const int index = (m_tabBar->currentIndex() + offset + m_tabBar->count()) % m_tabBar->count();
+    // Tabs in collapsed groups are skipped, as in other browsers.
+    const int count = m_tabBar->count();
+    int index = m_tabBar->currentIndex();
+    for (int step = 0; step < count; ++step) {
+        index = (index + offset + count) % count;
+        if (!m_groups->isCollapsed(m_groups->groupOf(tabObject(m_tabBar, index))))
+            break;
+    }
     m_tabBar->setCurrentIndex(index);
 }
 
@@ -1532,7 +1616,11 @@ void BrowserWindow::selectTabByIndex(int index)
 
 void BrowserWindow::showTabContextMenu(const QPoint &pos)
 {
-    const int index = m_tabBar->tabAt(pos);
+    showTabMenu(m_tabBar->tabAt(pos), m_tabBar->mapToGlobal(pos));
+}
+
+void BrowserWindow::showTabMenu(int index, const QPoint &globalPosition)
+{
     QMenu menu(this);
     menu.addAction(m_newTabAction);
     if (index >= 0) {
@@ -1541,6 +1629,44 @@ void BrowserWindow::showTabContextMenu(const QPoint &pos)
                 this, [this, index] { if (WebView *view = viewAt(index)) view->reload(); });
         connect(menu.addAction(tr("Duplicate")), &QAction::triggered, this,
                 [this, index] { duplicateTab(index); });
+
+        menu.addSeparator();
+        QObject *tab = tabObject(m_tabBar, index);
+        const int ownGroup = m_groups->groupOf(tab);
+        connect(menu.addAction(tr("Add Tab to New Group")), &QAction::triggered, this,
+                [this, index] { addTabToNewGroup(index); });
+        const QList<TabGroup> groups = m_groups->groups();
+        if (groups.size() > (ownGroup ? 1 : 0)) {
+            QMenu *addTo = menu.addMenu(tr("Add Tab to Group"));
+            for (const TabGroup &group : groups) {
+                if (group.id == ownGroup)
+                    continue;
+                QPixmap swatch(12, 12);
+                swatch.fill(Qt::transparent);
+                QPainter painter(&swatch);
+                painter.setRenderHint(QPainter::Antialiasing);
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(TabGroups::color(group.color, Theme::isDark()));
+                painter.drawEllipse(QRectF(1, 1, 10, 10));
+                painter.end();
+                const QString name = group.title.isEmpty() ? tr("Unnamed group") : group.title;
+                connect(addTo->addAction(QIcon(swatch), name), &QAction::triggered, this,
+                        [this, tab, id = group.id] {
+                            m_groups->setGroupOf(tab, id);
+                            m_groups->arrange(m_tabBar);
+                            refreshGroups();
+                        });
+            }
+        }
+        if (ownGroup) {
+            connect(menu.addAction(tr("Remove from Group")), &QAction::triggered, this, [this, tab] {
+                // Keeping the group together moves the tab out of its run of tabs.
+                m_groups->setGroupOf(tab, 0);
+                m_groups->arrange(m_tabBar);
+                refreshGroups();
+            });
+        }
+
         menu.addSeparator();
         connect(menu.addAction(Icons::icon(Icons::Close), tr("Close Tab")), &QAction::triggered,
                 this, [this, index] { closeTab(index); });
@@ -1549,7 +1675,9 @@ void BrowserWindow::showTabContextMenu(const QPoint &pos)
         connect(others, &QAction::triggered, this, [this, index] { closeOtherTabs(index); });
     }
     menu.addAction(m_reopenTabAction);
-    menu.exec(m_tabBar->mapToGlobal(pos));
+    menu.addSeparator();
+    menu.addAction(m_sideTabsAction);
+    menu.exec(globalPosition);
 }
 
 void BrowserWindow::updateTabLabel(WebView *view)
@@ -1573,16 +1701,215 @@ void BrowserWindow::updateTabLabel(WebView *view)
             title = tr("New Tab");
     }
 
-    m_tabBar->setTabText(index, title);
-    m_tabBar->setTabToolTip(index, url.isEmpty() ? title
-                                                 : QStringLiteral("%1\n%2").arg(title, url.toDisplayString()));
+    const QString toolTip = url.isEmpty() ? title
+                                          : QStringLiteral("%1\n%2").arg(title, url.toDisplayString());
 
     QIcon icon = view->icon();
     if (isStartPage(url) || url.scheme() == QLatin1String("about"))
         icon = Icons::icon(Icons::Penguin);
     else if (icon.isNull())
         icon = Icons::icon(Icons::Globe);
-    m_tabBar->setTabIcon(index, icon);
+    m_tabBar->setLabel(index, {title, icon, toolTip});
+    syncSideTabs();
+}
+
+// ---- Tabs on the side, and tab groups ---------------------------------------------
+
+void BrowserWindow::setTabsOnSide(bool side)
+{
+    m_sideTabsAction->setChecked(side);
+    if (side == m_tabsOnSide && m_sideTabs->isHidden() == !side)
+        return;
+    m_tabsOnSide = side;
+    m_tabStrip->setVisible(!side);
+    m_sideTabs->setVisible(side);
+    // The window buttons go where the title bar is: the tab row, or with the tabs on
+    // the side, the toolbar, as in Firefox.
+    auto *row = static_cast<QBoxLayout *>((side ? m_navBar : m_tabStrip)->layout());
+    row->addWidget(m_frame->controls());
+    if (side)
+        m_sideTabs->sync();
+}
+
+void BrowserWindow::syncSideTabs()
+{
+    if (m_sideTabs)
+        m_sideTabs->sync();
+}
+
+void BrowserWindow::refreshGroups()
+{
+    if (!m_tabBar)
+        return;
+    m_tabBar->refreshGroups();
+    syncSideTabs();
+}
+
+void BrowserWindow::addTabToNewGroup(int index)
+{
+    QObject *tab = tabObject(m_tabBar, index);
+    if (!tab)
+        return;
+    const int group = m_groups->create();
+    m_groups->setGroupOf(tab, group);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
+
+    // Ask for a name straight away, by the group's chip, as other browsers do.
+    QPoint position = QCursor::pos();
+    if (!m_tabsOnSide) {
+        for (int i = 0; i < m_tabBar->count(); ++i) {
+            if (m_groups->groupOf(tabObject(m_tabBar, i)) == group) {
+                position = m_tabBar->mapToGlobal(m_tabBar->tabRect(i).bottomLeft());
+                break;
+            }
+        }
+    }
+    QTimer::singleShot(0, this, [this, group, position] { showGroupMenu(group, position); });
+}
+
+void BrowserWindow::toggleGroupCollapsed(int group)
+{
+    const bool collapse = !m_groups->isCollapsed(group);
+    const int current = m_tabBar->currentIndex();
+    if (collapse && m_groups->groupOf(tabObject(m_tabBar, current)) == group) {
+        // Step off the group first, to the nearest tab outside it, or a new tab.
+        int target = -1;
+        for (int distance = 1; distance < m_tabBar->count() && target < 0; ++distance) {
+            for (const int candidate : {current + distance, current - distance}) {
+                if (candidate < 0 || candidate >= m_tabBar->count())
+                    continue;
+                const int other = m_groups->groupOf(tabObject(m_tabBar, candidate));
+                if (other != group && !m_groups->isCollapsed(other)) {
+                    target = candidate;
+                    break;
+                }
+            }
+        }
+        if (target < 0)
+            newTab();
+        else
+            m_tabBar->setCurrentIndex(target);
+    }
+    m_groups->setCollapsed(group, collapse);
+}
+
+void BrowserWindow::showGroupMenu(int group, const QPoint &globalPosition)
+{
+    const TabGroup *info = m_groups->group(group);
+    if (!info)
+        return;
+
+    QMenu menu(this);
+
+    // The name and colour, edited in place at the top of the menu.
+    auto *editor = new QWidget(&menu);
+    auto *editorLayout = new QVBoxLayout(editor);
+    editorLayout->setContentsMargins(12, 8, 12, 6);
+    editorLayout->setSpacing(8);
+    auto *name = new QLineEdit(info->title, editor);
+    name->setPlaceholderText(tr("Name this group"));
+    name->setClearButtonEnabled(true);
+    connect(name, &QLineEdit::textChanged, this,
+            [this, group](const QString &text) { m_groups->setTitle(group, text.trimmed()); });
+    connect(name, &QLineEdit::returnPressed, &menu, &QMenu::close);
+    editorLayout->addWidget(name);
+
+    auto *swatches = new QHBoxLayout;
+    swatches->setSpacing(6);
+    const QStringList colorNames = TabGroups::colorNames();
+    const Theme::Colors colors = Theme::currentColors();
+    for (int i = 0; i < colorNames.size(); ++i) {
+        auto *swatch = new QToolButton(editor);
+        swatch->setToolTip(colorNames.at(i));
+        swatch->setAccessibleName(colorNames.at(i));
+        swatch->setFixedSize(22, 22);
+        swatch->setFocusPolicy(Qt::NoFocus);
+        const QString ring = i == info->color ? QStringLiteral("2px solid %1").arg(colors.text.name())
+                                              : QStringLiteral("none");
+        swatch->setStyleSheet(QStringLiteral("QToolButton { background: %1; border: %2; border-radius: 11px; }")
+                                  .arg(TabGroups::color(i, colors.dark).name(), ring));
+        connect(swatch, &QToolButton::clicked, &menu, [this, group, i, &menu] {
+            m_groups->setColor(group, i);
+            menu.close();
+        });
+        swatches->addWidget(swatch);
+    }
+    swatches->addStretch(1);
+    editorLayout->addLayout(swatches);
+    auto *editorAction = new QWidgetAction(&menu);
+    editorAction->setDefaultWidget(editor);
+    menu.addAction(editorAction);
+    menu.addSeparator();
+
+    connect(menu.addAction(Icons::icon(Icons::Plus), tr("New Tab in Group")), &QAction::triggered,
+            this, [this, group] { newTabInGroup(group); });
+    connect(menu.addAction(info->collapsed ? tr("Expand Group") : tr("Collapse Group")),
+            &QAction::triggered, this, [this, group] { toggleGroupCollapsed(group); });
+    connect(menu.addAction(tr("Ungroup")), &QAction::triggered, this,
+            [this, group] { m_groups->ungroup(group); });
+    connect(menu.addAction(Icons::icon(Icons::Close), tr("Close Group")), &QAction::triggered,
+            this, [this, group] { closeGroup(group); });
+
+    QTimer::singleShot(0, name, [name] {
+        name->setFocus();
+        name->selectAll();
+    });
+    menu.exec(globalPosition);
+}
+
+void BrowserWindow::newTabInGroup(int group)
+{
+    WebView *view = newTab();
+    // The new tab is last; keeping the group together puts it at the group's end.
+    m_groups->setGroupOf(view, group);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
+    m_tabBar->setCurrentIndex(indexOfView(view));
+    m_omnibox->setFocus();
+}
+
+void BrowserWindow::closeGroup(int group)
+{
+    for (int i = m_tabBar->count() - 1; i >= 0; --i) {
+        if (m_groups->groupOf(tabObject(m_tabBar, i)) == group)
+            closeTab(i);
+    }
+}
+
+void BrowserWindow::onTabDragFinished(QObject *tab)
+{
+    const int index = indexOfView(qobject_cast<WebView *>(tab));
+    if (index < 0)
+        return;
+
+    // Dropped between two tabs of an open group, a tab joins it; dropped next to its
+    // own group, it stays; anywhere else, it leaves its group. A collapsed group's
+    // chip keeps its group wherever it goes.
+    const int own = m_groups->groupOf(tab);
+    int group = 0;
+    if (own && m_groups->isCollapsed(own)) {
+        group = own;
+    } else {
+        const auto neighbour = [this, index](int step) {
+            for (int i = index + step; i >= 0 && i < m_tabBar->count(); i += step) {
+                if (m_tabBar->isTabVisible(i)) {
+                    const int other = m_groups->groupOf(tabObject(m_tabBar, i));
+                    return m_groups->isCollapsed(other) ? 0 : other;
+                }
+            }
+            return 0;
+        };
+        const int left = neighbour(-1);
+        const int right = neighbour(1);
+        if (left && left == right)
+            group = left;
+        else if (own && (own == left || own == right))
+            group = own;
+    }
+    m_groups->setGroupOf(tab, group);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
 }
 
 // ---- Navigation ---------------------------------------------------------------
@@ -1992,6 +2319,11 @@ void BrowserWindow::onCurrentTabChanged(int index)
     WebView *view = viewAt(index);
     if (!view)
         return;
+
+    // A tab chosen in a collapsed group (with the keyboard, or on its chip-only
+    // tab) opens the group.
+    if (const int group = m_groups->groupOf(view); m_groups->isCollapsed(group))
+        m_groups->setCollapsed(group, false);
 
     m_stack->setCurrentWidget(view);
     m_linkPreview->hide();

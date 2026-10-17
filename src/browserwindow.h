@@ -3,11 +3,11 @@
 #include <QList>
 #include <QMainWindow>
 #include <QPointer>
-#include <QTabBar>
 #include <QUrl>
 
 #include "aboutpages.h"
 #include "profiles.h"
+#include "tabbar.h"
 #include "theme.h"
 #include "urlresolver.h"
 
@@ -30,20 +30,9 @@ class WindowFrame;
 
 class DownloadsDialog;
 class HistoryDialog;
+class SideTabs;
+class TabGroups;
 class WebView;
-
-/** Tab bar whose tabs shrink to share the available width, like a modern browser. */
-class TabBar : public QTabBar
-{
-    Q_OBJECT
-
-public:
-    explicit TabBar(QWidget *parent = nullptr);
-
-protected:
-    QSize tabSizeHint(int index) const override;
-    QSize minimumTabSizeHint(int index) const override;
-};
 
 class BrowserWindow : public QMainWindow
 {
@@ -123,7 +112,19 @@ private:
     void selectTabByOffset(int offset);
     void selectTabByIndex(int index);
     void showTabContextMenu(const QPoint &pos);
+    void showTabMenu(int index, const QPoint &globalPosition);
     void updateTabLabel(WebView *view);
+
+    // Tabs on the side, and tab groups.
+    void setTabsOnSide(bool side);
+    void syncSideTabs();
+    void refreshGroups();
+    void addTabToNewGroup(int index);
+    void toggleGroupCollapsed(int group);
+    void showGroupMenu(int group, const QPoint &globalPosition);
+    void newTabInGroup(int group);
+    void closeGroup(int group);
+    void onTabDragFinished(QObject *tab);
 
     // Navigation.
     void navigate(const QString &text);
@@ -171,6 +172,9 @@ private:
     QWidget *m_tabStrip = nullptr;
     WindowFrame *m_frame = nullptr;
     TabBar *m_tabBar = nullptr;
+    TabGroups *m_groups = nullptr;
+    SideTabs *m_sideTabs = nullptr;
+    bool m_tabsOnSide = false;
     QStackedWidget *m_stack = nullptr;
     QWidget *m_navBar = nullptr;
     QToolBar *m_bookmarksBar = nullptr;
@@ -229,6 +233,7 @@ private:
     QAction *m_bookmarkPageAction = nullptr;
     QAction *m_bookmarksBarAction = nullptr;
     QAction *m_menuBarAction = nullptr;
+    QAction *m_sideTabsAction = nullptr;
     QAction *m_bookmarksAction = nullptr;
     QAction *m_historyAction = nullptr;
     QAction *m_downloadsAction = nullptr;

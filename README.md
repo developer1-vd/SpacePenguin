@@ -13,6 +13,16 @@ checkbox list.
 - **Tabs** — tab strip on top; new, close, middle-click to close, drag to reorder,
   duplicate, close others, reopen closed, session restored on restart. Links that ask
   for a new tab or window (`target=_blank`, "Open link in new tab") open as tabs
+- **Tabs on the side** — the button at the start of the tab row (or *View › Tabs on
+  the Side*) moves the tabs into a panel down the left of the window, as in Edge and
+  Firefox; the window buttons move onto the toolbar. The panel's arrow narrows it
+  to the tabs' icons
+- **Tab groups** — right-click a tab › *Add Tab to New Group*, then name it and pick
+  a colour. A group shows as a coloured chip with a line under its tabs (on the
+  side, a header row); click the chip or header to collapse the group, right-click
+  it to rename, recolour, add a tab, ungroup or close it. Dragging a tab between
+  two of a group's tabs adds it; dragging it away takes it out. Groups are saved
+  with the session
 - **Address bar** — takes URLs, `about:` pages and plain-language queries; anything
   that isn't a URL becomes a search on the chosen engine (DuckDuckGo by default).
   Suggests matching bookmarks and history as you type; shows a lock, warning or info

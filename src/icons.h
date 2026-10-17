@@ -32,6 +32,9 @@ public:
         Search,
         ChevronUp,
         ChevronDown,
+        ChevronLeft,
+        ChevronRight,
+        SideTabs,    // a window with its tabs down the left side
         History,
         Bookmarks,
         Settings,

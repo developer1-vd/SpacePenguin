@@ -351,6 +351,14 @@ QTabBar#tabBar QToolButton:hover { background: @hover; }
 QTabBar#tabBar QToolButton#tabClose { background: transparent; margin: 0; padding: 2px; border-radius: 10px; }
 QTabBar#tabBar QToolButton#tabClose:hover { background: @pressed; }
 
+#sideTabs { background: @tabStrip; border-right: 1px solid @border; }
+#sideTabs[private="true"] { background: @privateStrip; }
+#sideTabs QListWidget { background: transparent; border: none; outline: none; }
+#sideTabs QToolButton { background: transparent; color: @text; border: none; border-radius: 14px; padding: 5px; }
+#sideTabs QToolButton:hover { background: @hover; }
+#sideTabs QToolButton:pressed { background: @pressed; }
+#sideTabs QToolButton#sideNewTab { border-radius: 10px; padding: 7px 10px; text-align: left; }
+
 #navBar { background: @window; border-bottom: 1px solid @border; }
 #navBar QToolButton, #tabStrip QToolButton, #findBar QToolButton, #bookmarksBar QToolButton {
     background: transparent; color: @text; border: none; border-radius: 14px; padding: 5px;
