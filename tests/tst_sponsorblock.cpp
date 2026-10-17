@@ -1,12 +1,12 @@
 #include <QtTest>
 
-#include "youtube.h"
+#include "sponsorblock.h"
 
 #include <QCryptographicHash>
 
 using namespace spacepenguin;
 
-class TestYouTube : public QObject
+class TestSponsorBlock : public QObject
 {
     Q_OBJECT
 
@@ -18,7 +18,7 @@ private slots:
     void toleratesGarbage();
 };
 
-void TestYouTube::videoIdFromEveryUrlShape_data()
+void TestSponsorBlock::videoIdFromEveryUrlShape_data()
 {
     QTest::addColumn<QString>("url");
     QTest::addColumn<QString>("id");
@@ -35,23 +35,23 @@ void TestYouTube::videoIdFromEveryUrlShape_data()
     QTest::newRow("lookalike") << "https://notyoutube.com/watch?v=dQw4w9WgXcQ" << "";
 }
 
-void TestYouTube::videoIdFromEveryUrlShape()
+void TestSponsorBlock::videoIdFromEveryUrlShape()
 {
     QFETCH(QString, url);
     QFETCH(QString, id);
-    QCOMPARE(YouTube::videoId(QUrl(url)), id);
+    QCOMPARE(SponsorBlock::videoId(QUrl(url)), id);
 }
 
-void TestYouTube::hashPrefixIsFourHexDigitsOfSha256()
+void TestSponsorBlock::hashPrefixIsFourHexDigitsOfSha256()
 {
-    const QString prefix = YouTube::hashPrefix(QStringLiteral("dQw4w9WgXcQ"));
+    const QString prefix = SponsorBlock::hashPrefix(QStringLiteral("dQw4w9WgXcQ"));
     QCOMPARE(prefix.size(), 4);
     const QByteArray full =
         QCryptographicHash::hash("dQw4w9WgXcQ", QCryptographicHash::Sha256).toHex();
     QVERIFY(full.startsWith(prefix.toLatin1()));
 }
 
-void TestYouTube::parsesOnlyThisVideosSkippableSegments()
+void TestSponsorBlock::parsesOnlyThisVideosSkippableSegments()
 {
     // A hash-prefix response lists every video sharing the prefix.
     const QByteArray json = R"([
@@ -65,7 +65,7 @@ void TestYouTube::parsesOnlyThisVideosSkippableSegments()
         {"segment": [500, 520], "category": "interaction"}
       ]}
     ])";
-    const QList<YouTube::Segment> segments = YouTube::parseSegments(json, QStringLiteral("dQw4w9WgXcQ"));
+    const QList<SponsorBlock::Segment> segments = SponsorBlock::parseSegments(json, QStringLiteral("dQw4w9WgXcQ"));
     QCOMPARE(segments.size(), 3);
     QCOMPARE(segments.at(0).start, 10.0); // sorted by start
     QCOMPARE(segments.at(0).category, QStringLiteral("selfpromo"));
@@ -74,13 +74,13 @@ void TestYouTube::parsesOnlyThisVideosSkippableSegments()
     QCOMPARE(segments.at(2).category, QStringLiteral("interaction")); // actionType defaults to skip
 }
 
-void TestYouTube::toleratesGarbage()
+void TestSponsorBlock::toleratesGarbage()
 {
-    QVERIFY(YouTube::parseSegments("not json", QStringLiteral("dQw4w9WgXcQ")).isEmpty());
-    QVERIFY(YouTube::parseSegments("{}", QStringLiteral("dQw4w9WgXcQ")).isEmpty());
-    QVERIFY(YouTube::parseSegments(R"([{"videoID":"dQw4w9WgXcQ","segments":[{"segment":[1]}]}])",
+    QVERIFY(SponsorBlock::parseSegments("not json", QStringLiteral("dQw4w9WgXcQ")).isEmpty());
+    QVERIFY(SponsorBlock::parseSegments("{}", QStringLiteral("dQw4w9WgXcQ")).isEmpty());
+    QVERIFY(SponsorBlock::parseSegments(R"([{"videoID":"dQw4w9WgXcQ","segments":[{"segment":[1]}]}])",
                                    QStringLiteral("dQw4w9WgXcQ")).isEmpty());
 }
 
-QTEST_GUILESS_MAIN(TestYouTube)
-#include "tst_youtube.moc"
+QTEST_GUILESS_MAIN(TestSponsorBlock)
+#include "tst_sponsorblock.moc"

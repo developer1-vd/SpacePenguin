@@ -283,6 +283,8 @@ on each of them for every push.
 | -------- | ---------- | -------- | ----- |
 | Linux (X11 and Wayland), any distribution, x86-64 and ARM64 | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
 | ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `packaging/chromeos/install.sh` | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
+| Android 9+ (ARM64) | Qt Quick + QtWebView, Qt 6.8 | APK | a separate, smaller app on the phone's own web engine — see [Phones](#phones-android-and-ios) |
+| iOS and iPadOS 16+ | Qt Quick + QtWebView, Qt 6.8 | Simulator build; signed `.ipa` with your Apple team | as Android |
 | Windows 10 and 11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
 | macOS 12 Monterey to 26 Tahoe, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | Tahoe-style icon, registered for `http`/`https`; ready to notarise |
 
@@ -383,6 +385,47 @@ Platform data locations come from `QStandardPaths`, so the profile lands in
 `~/.local/share/SpacePenguin/SpacePenguin` on Linux,
 `~/Library/Application Support/SpacePenguin/SpacePenguin` on macOS, and
 `%APPDATA%\SpacePenguin\SpacePenguin` on Windows (organisation, then application).
+
+### Phones (Android and iOS)
+
+QtWebEngine, the Chromium that the desktop app is built on, does not exist for
+Android or iOS — and iOS allows no engine but its own. So the phone version in
+[`mobile/`](mobile/) is a separate, smaller app: a Qt Quick interface around
+QtWebView, which shows pages with the phone's engine (Android System WebView,
+iOS WKWebView). It shares the address handling, settings and the
+YouTube/SponsorBlock code with the desktop app (`src/sponsorblock.*`,
+`src/youtubescripts.*`, `src/urlresolver.*`, `src/preferences.*`).
+
+It has tabs, a start page with your bookmarks, bookmarks and history, a
+bottom toolbar within thumb reach, light and dark, and the choice of search
+engine. Android's Back button closes what is open, then goes back.
+
+What the phone engines do not allow, and so it does not do:
+
+- **Request blocking.** An app cannot see a web view's network requests through
+  Qt, so ads are hidden (the filter list's element rules, and YouTube's ad boxes)
+  and YouTube ads that start are muted and skipped — but they are still downloaded.
+- **YouTube ad removal before playback.** That needs a script that runs before the
+  page's own, which the phone web views do not offer; the desktop app does it.
+- **Private tabs.** All tabs share the web view's storage; *Settings › Clear
+  history and cookies* is the way to forget.
+
+Sponsor segments are skipped as on the desktop.
+
+```sh
+./build-android.sh          # dist/SpacePenguin-<version>-android-arm64.apk (debug key)
+./build-ios.sh              # macOS + Xcode: a Simulator build
+./build-ios.sh --team <ID>  # a signed .ipa for devices, with your Apple Developer team
+```
+
+Both fetch what they need on first use (Qt for the phone and QtWebView into
+`.qt/`; for Android the SDK and NDK into `.cache/android-sdk`; Android also needs
+JDK 17+). Install the APK with `adb install -r` or by opening it on the phone.
+Publishing to Google Play needs your own signing key (`./build-android.sh
+--release`) and Play's target-SDK requirement; installing on an iPhone or
+publishing to the App Store needs an Apple Developer account. To try the
+interface without a phone, `cmake -S mobile -B build-mobile` builds it for the
+desktop.
 
 ## Building
 

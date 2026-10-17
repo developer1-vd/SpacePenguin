@@ -37,8 +37,8 @@
     <img class="hero-icon" src="assets/icon-256.png" alt="" width="96" height="96">
     <h1>The browser that<br><span class="accent">stays out of your way.</span></h1>
     <p class="lede">SpacePenguin is a small, fast browser built on Qt and Chromium. It blocks ads
-      and trackers — YouTube's included — skips sponsor segments, and runs the same on
-      Windows, macOS, Linux and school Chromebooks.</p>
+      and trackers — YouTube's included — skips sponsor segments, and runs on
+      Windows, macOS, Linux, school Chromebooks — and Android and iPhone.</p>
     <p class="cta">
       <a class="button" href="#download">Download</a>
       <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin">View on GitHub</a>
@@ -138,7 +138,25 @@
           <code>.deb</code>, <code>.rpm</code>, Arch package and Nix flake.</p>
         <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the AppImage</a>
       </article>
+      <article class="card download">
+        <h3>Android</h3>
+        <p class="meta">Android 9 and newer · ARM64</p>
+        <p>A lighter app on your phone's own web engine: tabs, bookmarks, history,
+          ad hiding and YouTube sponsor skipping.</p>
+        <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the APK</a>
+      </article>
+      <article class="card download">
+        <h3>iPhone and iPad</h3>
+        <p class="meta">iOS and iPadOS 16 and newer</p>
+        <p>The same app as on Android, on Safari's engine. Build it on a Mac with
+          <code>./build-ios.sh</code>; installing needs an Apple Developer account.</p>
+        <a class="button small ghost" href="https://github.com/developer1-vd/SpacePenguin#phones-android-and-ios">How to build it</a>
+      </article>
     </div>
+    <p class="note">On phones SpacePenguin uses the system's web engine, because Apple and Qt
+      offer no other. It hides ads and skips YouTube ads once they start rather than
+      stopping them from downloading, and has no private tabs.
+      <a href="https://github.com/developer1-vd/SpacePenguin#phones-android-and-ios">What's different on phones</a></p>
     <details class="more">
       <summary>Which Linux package should I use?</summary>
       <ul>

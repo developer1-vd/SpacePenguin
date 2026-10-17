@@ -11,6 +11,8 @@
 | `flake.nix` / `default.nix` | NixOS, any Linux or macOS with Nix | the browser in the Nix store (`./result`) |
 | `build-dmg.sh` | macOS | `dist/SpacePenguin-<version>-macos.dmg` and `.zip` of the `.app` |
 | `build-windows.ps1` | Windows | `dist/SpacePenguin-<version>-windows-x64-setup.exe` and `.zip` |
+| `build-android.sh` | Linux, macOS | `dist/SpacePenguin-<version>-android-arm64.apk` (the phone app in `mobile/`) |
+| `build-ios.sh` | macOS with Xcode | an iOS Simulator build, or a signed `.ipa` with `--team` |
 | `build-all.sh` | any | whichever of the above this machine can make |
 | `packaging/chromeos/install.sh` | ChromeOS Linux, Debian, Ubuntu | the AppImage installed per user, with a launcher entry |
 | `tools/build-jobs.sh` | Linux, macOS | the number of compiler jobs this machine has memory for |
@@ -47,6 +49,25 @@ checksum next to the package. All of them take `--help` (`-Help` on Windows).
 5. Checks CMake is 3.21+ and the Qt is 6.8+, and prints the build commands.
 
 The script needs bash: on Alpine run `apk add bash`, on Void `xbps-install bash`.
+
+## build-android.sh and build-ios.sh
+
+```bash
+./build-android.sh [--release]          # QT_ANDROID_KEYSTORE_* for --release
+./build-ios.sh [--team <id> [--export-method development|ad-hoc|app-store]]
+```
+
+They build the phone app in `mobile/` (Qt Quick and QtWebView; see the README's
+*Phones* section for what it can and cannot do). Each fetches its Qt with
+aqtinstall into `.qt/` — the phone kit with QtWebView, and the desktop kit its
+build tools run from. `build-android.sh` also fetches the Android command-line
+tools (checked against their SHA-256), then the SDK platform, build tools and
+NDK 26.1 that Qt 6.8 is built with, into `.cache/android-sdk` unless
+`ANDROID_SDK_ROOT` points at an SDK; it needs a JDK 17 or newer. Without
+`--release` the APK is signed with a debug key, which installs fine but is not
+accepted by Google Play. `build-ios.sh` generates an Xcode project; without
+`--team` it builds an unsigned Simulator app, with it an archive exported as an
+`.ipa` signed through your Xcode account.
 
 ## Build parallelism
 

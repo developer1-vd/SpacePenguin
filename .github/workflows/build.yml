@@ -266,10 +266,53 @@ jobs:
           bundle: SpacePenguin.flatpak
           cache-key: flatpak-builder-${{ github.sha }}
 
+  mobile:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Android (APK)
+            os: ubuntu-24.04
+            script: ./build-android.sh
+          # Qt 6.8 supports Xcode 16, which this runner has.
+          - name: iOS (Simulator)
+            os: macos-15
+            script: ./build-ios.sh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        if: runner.os == 'Linux'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: .qt
+          key: qt-mobile-${{ env.QT_VERSION }}-${{ runner.os }}-${{ hashFiles('build-android.sh', 'build-ios.sh') }}
+
+      - name: Build
+        run: ${{ matrix.script }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          # The simulator build is a check, not a download: only the APK is released.
+          name: ${{ runner.os == 'Linux' && 'SpacePenguin-Android' || 'ci-iOS-simulator' }}
+          if-no-files-found: error
+          path: |
+            dist/*.apk
+            dist/*-ios-simulator.zip
+            dist/*.sha256
+
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [desktop, distro, nix, flatpak]
+    needs: [desktop, distro, nix, flatpak, mobile]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -277,6 +320,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: packages
+          pattern: SpacePenguin-*
           merge-multiple: true
 
       - uses: softprops/action-gh-release@v2
