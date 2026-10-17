@@ -37,6 +37,8 @@ Canvas {
             poly([15.5, 3.8, 17.3, 6.7, 14.3, 8.2]); break;
         case "close": line(7, 7, 17, 17); line(17, 7, 7, 17); break;
         case "check": poly([5, 12.5, 10, 17.5, 19.5, 7]); break;
+        case "chevron-down": poly([6, 9, 12, 15, 18, 9]); break;
+        case "chevron-right": poly([9, 6, 15, 12, 9, 18]); break;
         case "plus": line(12, 5, 12, 19); line(5, 12, 19, 12); break;
         case "menu": [6, 12, 18].forEach(y => { g.beginPath(); g.arc(12, y, 1.6, 0, Math.PI * 2); g.fill(); }); break;
         case "tabs":

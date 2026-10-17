@@ -364,9 +364,10 @@ void BrowserWindow::createActions()
     connect(m_bookmarksBarAction, &QAction::triggered, this,
             [](bool checked) { Preferences::instance()->setShowBookmarksBar(checked); });
 
-    m_sideTabsAction = makeAction(tr("Tabs on the Side"), {}, Icons::icon(Icons::SideTabs));
+    m_sideTabsAction = makeAction(tr("Tabs on the Side"), Shortcuts::keys(Shortcuts::SideTabs),
+                                  Icons::icon(Icons::SideTabs));
     m_sideTabsAction->setCheckable(true);
-    m_sideTabsAction->setToolTip(tr("Show tabs on the side"));
+    m_sideTabsAction->setToolTip(tr("Show tabs on the side (%1)").arg(Shortcuts::text(Shortcuts::SideTabs)));
     connect(m_sideTabsAction, &QAction::triggered, this,
             [](bool checked) { Preferences::instance()->setSideTabs(checked); });
 

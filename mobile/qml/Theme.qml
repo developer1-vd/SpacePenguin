@@ -17,6 +17,18 @@ QtObject {
     readonly property color pressed: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
     readonly property color danger: dark ? "#ff7b7b" : "#c7362f"
 
+    // Tab group colours, the desktop's (src/tabgroups.cpp): strong on light, soft on dark.
+    readonly property var groupColorNames: [qsTr("Grey"), qsTr("Blue"), qsTr("Red"), qsTr("Yellow"),
+                                            qsTr("Green"), qsTr("Pink"), qsTr("Purple"), qsTr("Cyan"),
+                                            qsTr("Orange")]
+    readonly property var groupColorsLight: ["#5f6368", "#1a73e8", "#d93025", "#e8a200", "#1e8e3e",
+                                             "#d01884", "#9334e6", "#007b83", "#e8710a"]
+    readonly property var groupColorsDark: ["#dadce0", "#8ab4f8", "#f28b82", "#fdd663", "#81c995",
+                                            "#ff8bcb", "#c58af9", "#78d9ec", "#fcad70"]
+    function groupColor(index) { return (dark ? groupColorsDark : groupColorsLight)[index] || groupColorsLight[0]; }
+    // Dark text on the soft dark-theme colours and on yellow and orange.
+    function groupText(index) { return dark || index === 3 || index === 8 ? "#202124" : "#ffffff"; }
+
     readonly property int radius: 18
     readonly property int touch: 48   // smallest comfortable touch target
 }

@@ -273,6 +273,7 @@ the desktop — macOS gets the binding Safari and Chrome use there instead.
 | Full screen           | `F11`                           | `⌃⌘F`                         |
 | Bookmark this page    | `Ctrl+D`                        | `⌘D`                          |
 | Show bookmarks bar    | `Ctrl+Shift+B`                  | `⇧⌘B`                         |
+| Tabs on the side      | `Ctrl+Shift+,`                  | `⇧⌘,`                         |
 | Bookmarks             | `Ctrl+Shift+O`                  | `⌥⌘B`                         |
 | History               | `Ctrl+H`                        | `⌘Y`                          |
 | Downloads             | `Ctrl+J`                        | `⌥⌘L`                         |
@@ -406,9 +407,12 @@ iOS WKWebView). It shares the address handling, settings and the
 YouTube/SponsorBlock code with the desktop app (`src/sponsorblock.*`,
 `src/youtubescripts.*`, `src/urlresolver.*`, `src/preferences.*`).
 
-It has tabs, a start page with your bookmarks, bookmarks and history, a
-bottom toolbar within thumb reach, light and dark, and the choice of search
-engine. Android's Back button closes what is open, then goes back.
+It has tabs with tab groups (touch and hold a tab on the tabs screen to group it;
+tap a group's header to collapse it, ⋮ to rename, recolour, add a tab, ungroup
+or close it), a start page with your bookmarks, bookmarks and history, a bottom
+toolbar within thumb reach, light and dark, and the choice of search engine.
+Android's Back button closes what is open, then goes back. Tabs and groups last
+until the app closes; the phone app does not restore a session.
 
 What the phone engines do not allow, and so it does not do:
 

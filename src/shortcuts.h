@@ -38,6 +38,7 @@ public:
         FullScreen,
         BookmarkPage,
         BookmarksBar,
+        SideTabs,
         Bookmarks,
         History,
         Downloads,
