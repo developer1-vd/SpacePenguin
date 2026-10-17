@@ -33,6 +33,10 @@ TabBar::TabBar(QWidget *parent)
     setFocusPolicy(Qt::NoFocus);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
+    connect(this, &QTabBar::tabMoved, this, [](int from, int to) {
+        if (qEnvironmentVariableIntValue("SPACEPENGUIN_DEBUG_TABS") != 0)
+            qWarning("tabs: moved %d -> %d", from, to);
+    });
     connect(this, &QTabBar::tabMoved, this, [this] {
         // Only the user's drags; moves made to keep groups together are not news.
         if (m_pressed)
@@ -264,6 +268,28 @@ void TabBar::paintEvent(QPaintEvent *event)
         painter.setBrush(TabGroups::color(info->color, dark));
         painter.drawRoundedRect(QRectF(left, rect.bottom() - 3.5, right - left, 2.5), 1.25, 1.25);
     }
+}
+
+bool TabBar::event(QEvent *event)
+{
+    const bool handled = QTabBar::event(event);
+    // SPACEPENGUIN_DEBUG_TABS=1 logs what the tab row gets from the mouse, to find out
+    // why a tab will not move on a particular desktop.
+    static const bool debug = qEnvironmentVariableIntValue("SPACEPENGUIN_DEBUG_TABS") != 0;
+    if (debug && (event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseMove
+                  || event->type() == QEvent::MouseButtonRelease)) {
+        auto *mouse = static_cast<QMouseEvent *>(event);
+        const QPoint position = mouse->position().toPoint();
+        QWidget *grabber = QWidget::mouseGrabber();
+        qWarning("tabs: %s at %d,%d tab=%d buttons=%d movable=%d accepted=%d grabber=%s source=%d",
+                 event->type() == QEvent::MouseButtonPress ? "press"
+                 : event->type() == QEvent::MouseMove      ? "move"
+                                                           : "release",
+                 position.x(), position.y(), tabAt(position), int(mouse->buttons()), isMovable(),
+                 event->isAccepted(), grabber ? grabber->metaObject()->className() : "none",
+                 int(mouse->source()));
+    }
+    return handled;
 }
 
 void TabBar::mousePressEvent(QMouseEvent *event)

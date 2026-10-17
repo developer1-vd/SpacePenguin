@@ -57,6 +57,7 @@ protected:
     void tabInserted(int index) override;
     void tabRemoved(int index) override;
     void paintEvent(QPaintEvent *event) override;
+    bool event(QEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
 
