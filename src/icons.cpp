@@ -29,79 +29,53 @@ QPainterPath star(qreal cx, qreal cy, qreal outer, qreal inner)
 }
 
 /*
- * The mark: a penguin curled around the Earth, flat colours only. Drawn on a
- * 100-unit grid; the same shapes are in html/start.html and docs/ as SVG.
+ * The mark: a padlock. A black hole's accretion disc is the shackle, a penguin
+ * peeks out of the lock's body, and the body holds the Earth. Flat colours only,
+ * drawn on a 100-unit grid; html/start.html and docs/assets/logo.svg carry the
+ * same shapes as SVG.
  */
-const QColor kInk(0x1c, 0x1f, 0x2b);
-const QColor kSnow(0xf4, 0xf6, 0xfb);
-const QColor kBeak(0xff, 0x9a, 0x1f);
-const QColor kOcean(0x2f, 0x6f, 0xe0);
-const QColor kLand(0x3d, 0xae, 0x5c);
+const QColor kInk(0x16, 0x17, 0x1d);
+const QColor kSnow(0xff, 0xff, 0xff);
+const QColor kRim(0xff, 0xff, 0xff); // outlines the black parts, for dark backgrounds
+const QColor kBeak(0xff, 0xb2, 0x1f);
+const QColor kDisc(0xff, 0x7a, 0x1a);
+const QColor kOcean(0x6a, 0x4f, 0xe0);
+const QColor kLand(0x2f, 0xb7, 0xa3);
 
-const QPointF kEarth(56, 57);
-constexpr qreal kEarthRadius = 31;
-constexpr qreal kBodyInner = 34; // the body hugs the globe with a small gap
-constexpr qreal kBodyStart = -80; // degrees: the head, at the top
-constexpr qreal kBodySpan = 250;  // round the left side to the bottom right
-
-QPointF onEarth(qreal degrees, qreal radius)
+/** A shape with straight sides and a round top: the head, the face, the shackle. */
+QPainterPath arch(qreal left, qreal right, qreal top, qreal bottom, bool close = true)
 {
-    const qreal a = qDegreesToRadians(degrees);
-    return kEarth + QPointF(radius * qCos(a), radius * qSin(a));
-}
-
-/** Body thickness along the curl, t from 0 (head) to 1 (tail). */
-qreal bodyWidth(qreal t)
-{
-    return 17 * (1 - qPow(t, 2.2));
-}
-
-qreal bellyWidth(qreal t)
-{
-    if (t < 0.12 || t > 0.9)
-        return 0;
-    return 0.5 * bodyWidth(t) * qSin(M_PI * (t - 0.12) / 0.78);
-}
-
-QPainterPath band(qreal (*width)(qreal))
-{
-    constexpr int steps = 60;
-    QPolygonF outer, inner;
-    for (int i = 0; i <= steps; ++i) {
-        const qreal t = qreal(i) / steps;
-        const qreal angle = kBodyStart - kBodySpan * t;
-        outer << onEarth(angle, kBodyInner + width(t));
-        inner.prepend(onEarth(angle, kBodyInner));
-    }
+    const qreal width = right - left;
     QPainterPath path;
-    path.addPolygon(outer + inner);
-    path.closeSubpath();
+    path.moveTo(left, bottom);
+    path.lineTo(left, top + width / 2);
+    path.arcTo(QRectF(left, top, width, width), 180, -180);
+    path.lineTo(right, bottom);
+    if (close)
+        path.closeSubpath();
     return path;
 }
 
 QPainterPath land()
 {
     QPainterPath path;
-    path.moveTo(40, 32);
-    path.cubicTo(48, 28, 58, 29, 62, 35);
-    path.cubicTo(65, 40, 59, 43, 61, 48);
-    path.cubicTo(63, 54, 70, 54, 70, 61);
-    path.cubicTo(70, 67, 64, 70, 59, 68);
-    path.cubicTo(54, 66, 55, 59, 50, 57);
-    path.cubicTo(44, 55, 38, 58, 36, 52);
-    path.cubicTo(34, 45, 34, 36, 40, 32);
+    path.moveTo(33, 64);
+    path.cubicTo(37, 61, 43, 61, 46, 64);
+    path.cubicTo(48, 67, 45, 69, 45, 72);
+    path.cubicTo(45, 76, 49, 78, 48, 82);
+    path.cubicTo(47, 87, 42, 89, 39, 87);
+    path.cubicTo(36, 85, 37, 80, 34, 77);
+    path.cubicTo(31, 74, 28, 71, 29, 68);
+    path.cubicTo(30, 66, 31, 65, 33, 64);
     path.closeSubpath();
-    path.moveTo(74, 64);
-    path.cubicTo(79, 62, 85, 64, 87, 69);
-    path.cubicTo(88, 74, 84, 81, 78, 84);
-    path.cubicTo(73, 86, 69, 83, 70, 78);
-    path.cubicTo(71, 74, 71, 66, 74, 64);
-    path.closeSubpath();
-    path.moveTo(50, 78);
-    path.cubicTo(54, 77, 58, 79, 59, 82);
-    path.cubicTo(60, 85, 57, 88, 53, 88);
-    path.cubicTo(49, 88, 47, 86, 47, 83);
-    path.cubicTo(47, 80, 48, 78, 50, 78);
+    path.moveTo(56, 61);
+    path.cubicTo(61, 60, 67, 62, 69, 66);
+    path.cubicTo(70, 69, 68, 71, 65, 71);
+    path.cubicTo(62, 72, 62, 75, 63, 78);
+    path.cubicTo(65, 82, 64, 86, 60, 88);
+    path.cubicTo(56, 89, 55, 85, 54, 81);
+    path.cubicTo(53, 76, 50, 73, 50, 68);
+    path.cubicTo(50, 64, 52, 62, 56, 61);
     path.closeSubpath();
     return path;
 }
@@ -110,39 +84,44 @@ QPainterPath land()
 void drawPenguin(QPainter *p)
 {
     p->save();
-    p->setPen(Qt::NoPen);
     p->scale(0.24, 0.24);
-    p->translate(9.7, 0.4); // centre the drawing's bounds in the square
-    p->scale(0.96, 0.96);
+    p->translate(50, 50); // centre the drawing's bounds in the square
+    p->scale(0.92, 0.92);
+    p->translate(-50, -53.25);
 
+    // The shackle.
+    p->setBrush(Qt::NoBrush);
+    p->setPen(QPen(kDisc, 7, Qt::SolidLine, Qt::FlatCap));
+    p->drawPath(arch(25.5, 74.5, 10.5, 54, false));
+
+    // The head and the lock's body, as one black shape with a light rim.
+    QPainterPath body;
+    body.addRoundedRect(QRectF(17, 47, 66, 50), 14, 14);
+    body = body.united(arch(32, 68, 17, 50));
+    p->setPen(QPen(kRim, 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p->setBrush(kInk);
+    p->drawPath(body);
+    p->setPen(Qt::NoPen);
+    p->drawPath(body);
+
+    // The face.
+    p->setBrush(kSnow);
+    p->drawPath(arch(37, 63, 23, 47));
+    p->setBrush(kInk);
+    p->drawEllipse(QPointF(45, 34), 2.6, 2.6);
+    p->drawEllipse(QPointF(55, 34), 2.6, 2.6);
+    p->setPen(QPen(kBeak, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p->setBrush(kBeak);
+    p->drawPolygon(QPolygonF({QPointF(47, 38.5), QPointF(53, 38.5), QPointF(50, 42.5)}));
+    p->setPen(Qt::NoPen);
+
+    // The Earth.
     QPainterPath globe;
-    globe.addEllipse(kEarth, kEarthRadius, kEarthRadius);
+    globe.addEllipse(QPointF(50, 72), 20, 20);
     p->setBrush(kOcean);
     p->drawPath(globe);
     p->setBrush(kLand);
     p->drawPath(land().intersected(globe));
-
-    p->setBrush(kInk);
-    p->drawPath(band(bodyWidth));
-    p->setBrush(kSnow);
-    p->drawPath(band(bellyWidth));
-
-    // The head, tilted a little towards the beak.
-    p->translate(onEarth(kBodyStart, kBodyInner + 8.5));
-    p->rotate(-10);
-    p->setBrush(kInk);
-    p->drawEllipse(QPointF(0, 0), 12, 10.5);
-    p->setBrush(kSnow);
-    p->drawEllipse(QPointF(4.8, 2.2), 5.6, 5);
-    p->setBrush(kInk);
-    p->drawEllipse(QPointF(5.4, 0.4), 1.5, 1.5);
-    QPainterPath beak;
-    beak.moveTo(9, 3.2);
-    beak.quadTo(13, 3.8, 15.5, 5.5);
-    beak.quadTo(12.9, 7, 9, 7.2);
-    beak.closeSubpath();
-    p->setBrush(kBeak);
-    p->drawPath(beak);
     p->restore();
 }
 
