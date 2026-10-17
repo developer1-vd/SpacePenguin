@@ -148,6 +148,8 @@ private:
     void showExtensionPopup(const QUrl &url);
     void offerWebStoreExtension(WebView *view);
     void offerUserScript(WebView *view, const QUrl &url, bool quiet);
+    /** Downloads the @require libraries of a script; @p done gets an error, or nothing. */
+    void fetchRequires(const QString &source, std::function<void(const QString &failure)> done);
 
     // Tabs on the side, and tab groups.
     void setTabsOnSide(bool side);

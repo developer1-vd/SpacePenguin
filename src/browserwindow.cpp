@@ -85,6 +85,8 @@
 #include <QWebEngineSettings>
 #include <QWidgetAction>
 
+#include <memory>
+
 namespace spacepenguin {
 namespace {
 
@@ -2037,7 +2039,38 @@ void BrowserWindow::populateExtensionsMenu()
     }
     if (!any)
         m_extensionsMenu->addAction(tr("No extensions yet"))->setEnabled(false);
-    m_extensionsMenu->addSeparator();
+    QAction *storeSeparator = m_extensionsMenu->addSeparator();
+    // The commands this page's scripts offer, such as their settings, come in when the page answers.
+    if (WebView *view = currentView(); view && m_services.userScripts && !m_services.userScripts->scripts().isEmpty()) {
+        QPointer<QMenu> menu = m_extensionsMenu;
+        QPointer<WebView> page = view;
+        QPointer<QAction> before = storeSeparator;
+        view->page()->runJavaScript(
+            UserScripts::menuCommandsScript(), QWebEngineScript::ApplicationWorld,
+            [this, menu, page, before](const QVariant &result) {
+                if (!menu || !page || !before || !menu->isVisible())
+                    return;
+                QString section;
+                for (const QVariant &entry : result.toList()) {
+                    const QVariantList command = entry.toList();
+                    if (command.size() != 3)
+                        continue;
+                    if (command.at(1).toString() != section) {
+                        section = command.at(1).toString();
+                        menu->insertSection(before, section);
+                    }
+                    QAction *action = new QAction(command.at(2).toString(), menu);
+                    menu->insertAction(before, action);
+                    const int id = command.at(0).toInt();
+                    connect(action, &QAction::triggered, this, [page, id] {
+                        if (page)
+                            page->page()->runJavaScript(UserScripts::runMenuCommandScript(id),
+                                                        QWebEngineScript::ApplicationWorld);
+                    });
+                }
+                menu->adjustSize();
+            });
+    }
     connect(m_extensionsMenu->addAction(Icons::icon(Icons::Penguin), tr("SpacePenguin Store")),
             &QAction::triggered, this, [this] { newTab(kStoreUrl); });
     if (ChromeExtensions::isSupported() && m_services.extensions) {
@@ -2126,28 +2159,69 @@ void BrowserWindow::offerUserScript(WebView *view, const QUrl &url, bool quiet)
         prompt.text = tr("Add <b>%1</b> to SpacePenguin? It can read and change %2.")
                           .arg(name.toHtmlEscaped(), where.toHtmlEscaped());
         prompt.buttons = {{tr("Add to SpacePenguin"), [this, scripts, source, fileName, name] {
-                               const QString folder = QDir(QDir::tempPath()).filePath(QStringLiteral("spacepenguin-scripts"));
-                               QDir().mkpath(folder);
-                               QString safe = fileName;
-                               safe.replace(QRegularExpression(QStringLiteral("[^\\w.-]")), QStringLiteral("_"));
-                               if (!safe.endsWith(QLatin1String(".js")))
-                                   safe += QStringLiteral(".user.js");
-                               const QString path = QDir(folder).filePath(safe);
-                               QFile file(path);
-                               QString error;
-                               if (!file.open(QIODevice::WriteOnly) || file.write(source.toUtf8()) < 0) {
-                                   error = file.errorString();
-                               } else {
-                                   file.close();
-                                   scripts->addScript(path, &error);
-                                   QFile::remove(path);
-                               }
-                               showToast(error.isEmpty() ? tr("Added “%1”. Reload a page for it to run there.").arg(name)
-                                                         : tr("Could not add “%1”: %2").arg(name, error),
-                                         6000);
+                               fetchRequires(source, [this, scripts, source, fileName, name](const QString &failure) {
+                                   if (!failure.isEmpty()) {
+                                       showToast(tr("Could not add “%1”: %2").arg(name, failure), 6000);
+                                       return;
+                                   }
+                                   const QString folder = QDir(QDir::tempPath()).filePath(QStringLiteral("spacepenguin-scripts"));
+                                   QDir().mkpath(folder);
+                                   QString safe = fileName;
+                                   safe.replace(QRegularExpression(QStringLiteral("[^\\w.-]")), QStringLiteral("_"));
+                                   if (!safe.endsWith(QLatin1String(".js")))
+                                       safe += QStringLiteral(".user.js");
+                                   const QString path = QDir(folder).filePath(safe);
+                                   QFile file(path);
+                                   QString error;
+                                   if (!file.open(QIODevice::WriteOnly) || file.write(source.toUtf8()) < 0) {
+                                       error = file.errorString();
+                                   } else {
+                                       file.close();
+                                       scripts->addScript(path, &error);
+                                       QFile::remove(path);
+                                   }
+                                   showToast(error.isEmpty() ? tr("Added “%1”. Reload a page for it to run there.").arg(name)
+                                                             : tr("Could not add “%1”: %2").arg(name, error),
+                                             6000);
+                               });
                            }}};
         addPrompt(target, prompt);
     });
+}
+
+void BrowserWindow::fetchRequires(const QString &source, std::function<void(const QString &failure)> done)
+{
+    UserScripts *scripts = m_services.userScripts;
+    const QList<QUrl> missing = scripts ? scripts->missingRequires(source) : QList<QUrl>();
+    if (missing.isEmpty()) {
+        done(QString());
+        return;
+    }
+    if (!m_network)
+        m_network = new QNetworkAccessManager(this);
+    // The libraries a script asks for (often a settings dialog) are kept beside it.
+    auto pending = std::make_shared<int>(int(missing.size()));
+    auto failure = std::make_shared<QString>();
+    for (const QUrl &url : missing) {
+        QNetworkRequest request(url);
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                             QNetworkRequest::NoLessSafeRedirectPolicy);
+        QNetworkReply *reply = m_network->get(request);
+        const QString path = scripts->requireFile(url);
+        connect(reply, &QNetworkReply::finished, this, [reply, path, url, pending, failure, done] {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) {
+                *failure = tr("its library %1 could not be downloaded.").arg(url.toDisplayString());
+            } else {
+                QDir().mkpath(QFileInfo(path).path());
+                QFile file(path);
+                if (!file.open(QIODevice::WriteOnly) || file.write(reply->readAll()) < 0)
+                    *failure = file.errorString();
+            }
+            if (--*pending == 0)
+                done(*failure);
+        });
+    }
 }
 
 void BrowserWindow::offerWebStoreExtension(WebView *view)

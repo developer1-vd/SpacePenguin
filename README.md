@@ -67,7 +67,11 @@ checkbox list.
   Adding an extension asks first, in a bar above the page that names the sites it can
   read and change. The Install buttons on greasyfork.org and openuserjs.org work too
 - **Extensions** — JavaScript user scripts, installed per profile and managed
-  from `Tools → Extensions…`
+  from `Tools → Extensions…`. Scripts get the `GM_` functions of Tampermonkey
+  (saved settings, styles, menu commands and more), so their settings dialogs open
+  from the puzzle-piece menu
+- **Site pop-ups** — sign-in boxes and other small windows a site opens when you
+  click open in a window of their own, titled with the site's name
 
 ## Theme
 
@@ -101,10 +105,19 @@ console.log('running on', location.hostname);
 ```
 
 - `// @name` — the label shown in the manager; defaults to the file name
-- `// @match` — comma-separated host patterns; without it the script runs on
-  every page
-- The script body is wrapped in a guard that checks `location.hostname` against
+- `// @match`, `// @include` — address patterns, one per line (or comma-separated);
+  without them the script runs on every page. `// @exclude` leaves pages out
+- `// @require` — libraries (such as GM_config) downloaded when the script is
+  added and run before it
+- `// @run-at` — `document-start`, `document-end`, or by default once the page
+  has loaded
+- The script body is wrapped in a guard that checks `location.href` against
   the patterns and reports failures to the page console instead of throwing
+- Scripts get `GM_info`, `GM_getValue`/`GM_setValue`/`GM_deleteValue`/`GM_listValues`
+  (kept in the site's storage), `GM_addStyle`, `GM_addElement`,
+  `GM_registerMenuCommand` (shown in the puzzle-piece menu), `GM_openInTab`,
+  `GM_setClipboard`, `GM_notification`, `GM_xmlhttpRequest` (as the page's own
+  `fetch`, so other sites must allow it) and the `GM.` promise forms
 
 Private windows run no user scripts: the extension directory is not attached to
 an off-the-record profile.

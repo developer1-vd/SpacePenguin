@@ -35,6 +35,8 @@ protected:
     QWebEngineView *createWindow(QWebEnginePage::WebWindowType type) override;
 
 private:
+    WebView *openDialog();
+
     BrowserPage *m_page = nullptr;
     TabFactory m_tabFactory;
     bool m_loading = false;

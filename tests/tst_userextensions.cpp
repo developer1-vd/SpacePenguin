@@ -12,7 +12,8 @@ private slots:
     void parsesName();
     void parsesMatchPatterns();
     void defaultsWhenNoMetadata();
-    void injectedSourceGuardsByHost();
+    void injectedSourceGuardsByAddress();
+    void parsesEveryMetadataLine();
     void injectedSourceRunsEverywhereWithoutPatterns();
     void injectedSourceKeepsBody();
 
@@ -66,7 +67,7 @@ void TestUserScripts::defaultsWhenNoMetadata()
     QVERIFY(script.matchPatterns.isEmpty());
 }
 
-void TestUserScripts::injectedSourceGuardsByHost()
+void TestUserScripts::injectedSourceGuardsByAddress()
 {
     UserScript script;
     script.id = QStringLiteral("x.js");
@@ -75,9 +76,11 @@ void TestUserScripts::injectedSourceGuardsByHost()
 
     const QString source = UserScripts::buildInjectedSource(script, QStringLiteral("doThing();"));
     QVERIFY(source.contains(QStringLiteral("doThing();")));
-    QVERIFY(source.contains(QStringLiteral("location.hostname")));
-    QVERIFY(source.contains(QStringLiteral("example\\.com")));
-    QVERIFY(source.contains(QStringLiteral("if (!spPatterns.test(spHost)) return;")));
+    QVERIFY(source.contains(QStringLiteral("spInclude.test(location.href)")));
+    // A string literal, so the pattern is valid JavaScript.
+    QVERIFY(source.contains(QStringLiteral("new RegExp(\"^(?:(?:https?://example\\\\.com")));
+    QVERIFY(source.contains(QStringLiteral("function GM_getValue")));
+    QVERIFY(source.contains(QStringLiteral("function GM_registerMenuCommand")));
 }
 
 void TestUserScripts::injectedSourceRunsEverywhereWithoutPatterns()
@@ -87,7 +90,25 @@ void TestUserScripts::injectedSourceRunsEverywhereWithoutPatterns()
     script.name = QStringLiteral("x");
 
     const QString source = UserScripts::buildInjectedSource(script, QStringLiteral("doThing();"));
-    QVERIFY(source.contains(QStringLiteral("new RegExp(.*)")));
+    QVERIFY(source.contains(QStringLiteral("new RegExp(\".*\")")));
+}
+
+void TestUserScripts::parsesEveryMetadataLine()
+{
+    const QString body = QStringLiteral("// ==UserScript==\n// @name   Tidy\n"
+                                        "// @match  https://a.example/*\n// @include *://b.example/*\n"
+                                        "// @exclude https://a.example/admin*\n"
+                                        "// @require https://cdn.example/gm_config.js\n"
+                                        "// @run-at document-start\n// @noframes\n// ==/UserScript==\n"
+                                        "// @match https://not-metadata.example/*\n");
+    const UserScript script = UserScripts::parse(QStringLiteral("/tmp/tidy.user.js"), body);
+    QCOMPARE(script.name, QStringLiteral("Tidy"));
+    QCOMPARE(script.matchPatterns,
+             QStringList({QStringLiteral("https://a.example/*"), QStringLiteral("*://b.example/*")}));
+    QCOMPARE(script.excludePatterns, QStringList{QStringLiteral("https://a.example/admin*")});
+    QCOMPARE(script.libraries, QStringList{QStringLiteral("https://cdn.example/gm_config.js")});
+    QCOMPARE(script.runAt, QStringLiteral("document-start"));
+    QVERIFY(script.noFrames);
 }
 
 void TestUserScripts::injectedSourceKeepsBody()
