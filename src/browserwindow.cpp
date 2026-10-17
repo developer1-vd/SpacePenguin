@@ -35,6 +35,7 @@
 #include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QFocusEvent>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -2182,7 +2183,13 @@ void BrowserWindow::refreshCompletions()
 bool BrowserWindow::eventFilter(QObject *watched, QEvent *event)
 {
     if (watched == m_omnibox) {
-        if (event->type() == QEvent::FocusIn) {
+        // The suggestions popup takes focus and gives it back while you type; that
+        // is not the box being focused or left, and must not select what was typed.
+        const bool popup = (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut)
+            && static_cast<QFocusEvent *>(event)->reason() == Qt::PopupFocusReason;
+        if (popup) {
+            // Nothing to do.
+        } else if (event->type() == QEvent::FocusIn) {
             refreshCompletions();
             QTimer::singleShot(0, m_omnibox, &QLineEdit::selectAll);
         } else if (event->type() == QEvent::FocusOut) {
