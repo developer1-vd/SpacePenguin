@@ -28,99 +28,144 @@ QPainterPath star(qreal cx, qreal cy, qreal outer, qreal inner)
     return path;
 }
 
-void drawPenguinFigure(QPainter *p);
+/*
+ * The mark: a penguin curled around the Earth, flat colours only. Drawn on a
+ * 100-unit grid; the same shapes are in html/start.html and docs/ as SVG.
+ */
+const QColor kInk(0x1c, 0x1f, 0x2b);
+const QColor kSnow(0xf4, 0xf6, 0xfb);
+const QColor kBeak(0xff, 0x9a, 0x1f);
+const QColor kOcean(0x2f, 0x6f, 0xe0);
+const QColor kLand(0x3d, 0xae, 0x5c);
 
+const QPointF kEarth(56, 57);
+constexpr qreal kEarthRadius = 31;
+constexpr qreal kBodyInner = 34; // the body hugs the globe with a small gap
+constexpr qreal kBodyStart = -80; // degrees: the head, at the top
+constexpr qreal kBodySpan = 250;  // round the left side to the bottom right
+
+QPointF onEarth(qreal degrees, qreal radius)
+{
+    const qreal a = qDegreesToRadians(degrees);
+    return kEarth + QPointF(radius * qCos(a), radius * qSin(a));
+}
+
+/** Body thickness along the curl, t from 0 (head) to 1 (tail). */
+qreal bodyWidth(qreal t)
+{
+    return 17 * (1 - qPow(t, 2.2));
+}
+
+qreal bellyWidth(qreal t)
+{
+    if (t < 0.12 || t > 0.9)
+        return 0;
+    return 0.5 * bodyWidth(t) * qSin(M_PI * (t - 0.12) / 0.78);
+}
+
+QPainterPath band(qreal (*width)(qreal))
+{
+    constexpr int steps = 60;
+    QPolygonF outer, inner;
+    for (int i = 0; i <= steps; ++i) {
+        const qreal t = qreal(i) / steps;
+        const qreal angle = kBodyStart - kBodySpan * t;
+        outer << onEarth(angle, kBodyInner + width(t));
+        inner.prepend(onEarth(angle, kBodyInner));
+    }
+    QPainterPath path;
+    path.addPolygon(outer + inner);
+    path.closeSubpath();
+    return path;
+}
+
+QPainterPath land()
+{
+    QPainterPath path;
+    path.moveTo(40, 32);
+    path.cubicTo(48, 28, 58, 29, 62, 35);
+    path.cubicTo(65, 40, 59, 43, 61, 48);
+    path.cubicTo(63, 54, 70, 54, 70, 61);
+    path.cubicTo(70, 67, 64, 70, 59, 68);
+    path.cubicTo(54, 66, 55, 59, 50, 57);
+    path.cubicTo(44, 55, 38, 58, 36, 52);
+    path.cubicTo(34, 45, 34, 36, 40, 32);
+    path.closeSubpath();
+    path.moveTo(74, 64);
+    path.cubicTo(79, 62, 85, 64, 87, 69);
+    path.cubicTo(88, 74, 84, 81, 78, 84);
+    path.cubicTo(73, 86, 69, 83, 70, 78);
+    path.cubicTo(71, 74, 71, 66, 74, 64);
+    path.closeSubpath();
+    path.moveTo(50, 78);
+    path.cubicTo(54, 77, 58, 79, 59, 82);
+    path.cubicTo(60, 85, 57, 88, 53, 88);
+    path.cubicTo(49, 88, 47, 86, 47, 83);
+    path.cubicTo(47, 80, 48, 78, 50, 78);
+    path.closeSubpath();
+    return path;
+}
+
+/** Draws the mark into the 24-unit square at the painter's origin. */
 void drawPenguin(QPainter *p)
 {
-    // 24x24 design grid. A penguin in a space-blue disc with a couple of stars.
+    p->save();
     p->setPen(Qt::NoPen);
+    p->scale(0.24, 0.24);
+    p->translate(9.7, 0.4); // centre the drawing's bounds in the square
+    p->scale(0.96, 0.96);
 
-    QRadialGradient sky(QPointF(9, 7), 18);
-    sky.setColorAt(0, QColor(0x3d, 0x5a, 0xd6));
-    sky.setColorAt(1, QColor(0x14, 0x1a, 0x45));
-    p->setBrush(sky);
-    p->drawEllipse(QRectF(0.5, 0.5, 23, 23));
+    QPainterPath globe;
+    globe.addEllipse(kEarth, kEarthRadius, kEarthRadius);
+    p->setBrush(kOcean);
+    p->drawPath(globe);
+    p->setBrush(kLand);
+    p->drawPath(land().intersected(globe));
 
-    drawPenguinFigure(p);
+    p->setBrush(kInk);
+    p->drawPath(band(bodyWidth));
+    p->setBrush(kSnow);
+    p->drawPath(band(bellyWidth));
+
+    // The head, tilted a little towards the beak.
+    p->translate(onEarth(kBodyStart, kBodyInner + 8.5));
+    p->rotate(-10);
+    p->setBrush(kInk);
+    p->drawEllipse(QPointF(0, 0), 12, 10.5);
+    p->setBrush(kSnow);
+    p->drawEllipse(QPointF(4.8, 2.2), 5.6, 5);
+    p->setBrush(kInk);
+    p->drawEllipse(QPointF(5.4, 0.4), 1.5, 1.5);
+    QPainterPath beak;
+    beak.moveTo(9, 3.2);
+    beak.quadTo(13, 3.8, 15.5, 5.5);
+    beak.quadTo(12.9, 7, 9, 7.2);
+    beak.closeSubpath();
+    p->setBrush(kBeak);
+    p->drawPath(beak);
+    p->restore();
 }
 
 /**
  * The macOS shape: since Big Sur, and enforced by macOS 26 Tahoe, an app icon is a
- * rounded square filling 824 of 1024 units, centred, with a soft shadow below.
- * Icons that leave the shape empty are shown inside a grey tile by Tahoe.
+ * rounded square filling 824 of 1024 units, centred. Icons that leave the shape
+ * empty are shown inside a grey tile by Tahoe. A flat white tile with the mark on it.
  */
 void drawMacPenguin(QPainter *p)
 {
-    // Work on Apple's 1024 grid, then draw the 24-unit penguin scaled into it.
     p->save();
     p->scale(24.0 / 1024.0, 24.0 / 1024.0);
     p->setPen(Qt::NoPen);
-
-    const QRectF tile(100, 100, 824, 824);
-    const qreal radius = 185.4;
-
-    // Shadow: a few soft layers offset downwards.
-    for (int i = 6; i >= 1; --i) {
-        p->setBrush(QColor(0, 0, 0, 10));
-        p->drawRoundedRect(tile.adjusted(-i * 1.5, -i * 1.0 + 12, i * 1.5, i * 2.5 + 12),
-                           radius + i * 2, radius + i * 2);
-    }
-
-    QLinearGradient sky(tile.topLeft(), tile.bottomRight());
-    sky.setColorAt(0, QColor(0x45, 0x63, 0xe0));
-    sky.setColorAt(0.55, QColor(0x22, 0x2c, 0x7a));
-    sky.setColorAt(1, QColor(0x10, 0x14, 0x38));
-    p->setBrush(sky);
-    p->drawRoundedRect(tile, radius, radius);
-
-    // A faint highlight along the top edge, as on system icons.
-    QLinearGradient sheen(tile.topLeft(), QPointF(tile.left(), tile.top() + 300));
-    sheen.setColorAt(0, QColor(255, 255, 255, 46));
-    sheen.setColorAt(1, QColor(255, 255, 255, 0));
-    p->setBrush(sheen);
-    p->drawRoundedRect(tile, radius, radius);
+    p->setBrush(Qt::white);
+    p->drawRoundedRect(QRectF(100, 100, 824, 824), 185.4, 185.4);
     p->restore();
 
-    // The penguin, a little larger than in the disc version.
     p->save();
-    p->translate(12, 12.6);
-    p->scale(0.9, 0.9);
+    p->translate(12, 12);
+    p->scale(0.62, 0.62);
     p->translate(-12, -12);
-    drawPenguinFigure(p);
+    drawPenguin(p);
     p->restore();
-}
-
-void drawPenguinFigure(QPainter *p)
-{
-    p->setPen(Qt::NoPen);
-    p->setBrush(QColor(255, 255, 255, 220));
-    p->drawPath(star(5.2, 6.2, 1.3, 0.5));
-    p->drawPath(star(19.2, 5.0, 0.9, 0.35));
-    p->drawEllipse(QPointF(18.5, 9.6), 0.45, 0.45);
-
-    // Body.
-    p->setBrush(QColor(0x10, 0x12, 0x1c));
-    p->drawEllipse(QRectF(6.6, 5.0, 10.8, 16.4));
-    // Belly.
-    p->setBrush(QColor(0xf4, 0xf6, 0xfb));
-    p->drawEllipse(QRectF(8.4, 9.6, 7.2, 11.0));
-    // Face.
-    p->drawEllipse(QRectF(8.6, 7.2, 3.6, 3.8));
-    p->drawEllipse(QRectF(11.8, 7.2, 3.6, 3.8));
-    // Eyes.
-    p->setBrush(QColor(0x10, 0x12, 0x1c));
-    p->drawEllipse(QPointF(10.6, 9.1), 0.75, 0.85);
-    p->drawEllipse(QPointF(13.4, 9.1), 0.75, 0.85);
-    // Beak and feet.
-    p->setBrush(QColor(0xff, 0xb0, 0x2e));
-    QPainterPath beak;
-    beak.moveTo(10.7, 10.6);
-    beak.lineTo(13.3, 10.6);
-    beak.lineTo(12.0, 12.4);
-    beak.closeSubpath();
-    p->drawPath(beak);
-    p->drawEllipse(QRectF(8.3, 20.0, 3.2, 1.6));
-    p->drawEllipse(QRectF(12.5, 20.0, 3.2, 1.6));
 }
 
 void drawGlyph(QPainter *p, Icons::Glyph glyph, const QColor &color, const QColor &accent, bool on)

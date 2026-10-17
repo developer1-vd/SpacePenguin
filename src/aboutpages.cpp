@@ -633,7 +633,7 @@ QString AboutPages::htmlShell(const QString &pageTitle, const QString &bodyHtml)
                "gap:.6rem;color:var(--muted);font-weight:600;letter-spacing:.02em}"
                "header svg{width:28px;height:28px}"
                "main{max-width:52rem;margin:0 auto;background:var(--card);border:1px solid var(--line);"
-               "border-radius:18px;padding:2.25rem 2.5rem;box-shadow:0 10px 30px rgba(0,0,0,.06)}"
+               "border-radius:18px;padding:2.25rem 2.5rem}"
                "h1{font-size:1.9rem;margin:0 0 1rem;letter-spacing:-.02em}"
                "h2{font-size:1.05rem;margin:2rem 0 .5rem}"
                "p{margin:0 0 1rem}"

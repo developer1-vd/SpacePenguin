@@ -9,6 +9,7 @@
 <meta property="og:title" content="SpacePenguin">
 <meta property="og:description" content="A fast, private, cross-platform browser that blocks ads — YouTube's too.">
 <meta property="og:image" content="assets/screenshot-dark.webp">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -17,90 +18,79 @@
 
 <header class="site-header">
   <nav class="wrap nav" aria-label="Main">
-    <a class="brand" href="#top"><img src="assets/favicon.png" alt="" width="28" height="28"> SpacePenguin</a>
+    <a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="28" height="28"> SpacePenguin</a>
     <ul>
       <li><a href="#features">Features</a></li>
       <li><a href="#download">Download</a></li>
       <li><a href="#chromebook">Chromebooks</a></li>
       <li><a href="#privacy">Privacy</a></li>
       <li><a href="#build">Build</a></li>
-      <li><a class="nav-gh" href="https://github.com/developer1-vd/SpacePenguin">GitHub</a></li>
+      <li><a href="https://github.com/developer1-vd/SpacePenguin">GitHub</a></li>
     </ul>
   </nav>
 </header>
 
 <main id="main">
 
-<section class="hero" id="top">
-  <div class="stars" aria-hidden="true"></div>
-  <div class="wrap hero-inner">
-    <img class="hero-icon" src="assets/icon-256.png" alt="" width="96" height="96">
-    <h1>The browser that<br><span class="accent">stays out of your way.</span></h1>
+<section class="hero wrap" id="top">
+    <img class="hero-icon" src="assets/logo.svg" alt="" width="72" height="72">
+    <h1>The browser that stays out of your way.</h1>
     <p class="lede">SpacePenguin is a small, fast browser built on Qt and Chromium. It blocks ads
       and trackers — YouTube's included — skips sponsor segments, and runs on
       Windows, macOS, Linux, school Chromebooks — and Android and iPhone.</p>
     <p class="cta">
       <a class="button" href="#download">Download</a>
       <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin">View on GitHub</a>
+      <span class="fineprint">Free and open source · GPLv3 · Pre-release</span>
     </p>
-    <p class="fineprint">Free and open source · GPLv3 · Pre-release software</p>
     <picture class="shot">
       <source srcset="assets/screenshot-dark.webp" media="(prefers-color-scheme: dark)">
       <img src="assets/screenshot-light.webp" width="1200" height="780"
-           alt="SpacePenguin's window: a row of rounded tabs with the window buttons, an address bar, and the start page with a search box.">
+           alt="SpacePenguin's window: a row of tabs with the window buttons, an address bar, and the start page with a search box.">
     </picture>
-  </div>
 </section>
 
 <section id="features" class="wrap section">
   <h2>What you get</h2>
-  <div class="grid">
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">🛡️</div>
+  <div class="list">
+    <article>
       <h3>Ads blocked, YouTube too</h3>
       <p>Ad networks and trackers are stopped before they load. On YouTube the ad
         schedule is taken out of the player's own data, so videos start without the ad
         — and an ad that slips through is muted and skipped.</p>
     </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">⏭️</div>
+    <article>
       <h3>Sponsor segments skipped</h3>
       <p>Sponsor reads, self-promotion and "subscribe" reminders inside videos are skipped
         with <a href="https://sponsor.ajay.app">SponsorBlock</a>'s community timestamps —
         without telling anyone which video you watch.</p>
     </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">🪟</div>
+    <article>
       <h3>One clean row</h3>
       <p>Tabs and the window buttons share a single row; everything is rounded, from the
         tabs to the window's corners. Light, dark, or follow your system.</p>
     </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">🔒</div>
+    <article>
       <h3>Private windows</h3>
       <p>A private window writes nothing to disk — no history, cookies or cache — and
         forgets everything when it closes.</p>
     </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">💻</div>
+    <article>
       <h3>Light on small machines</h3>
       <p>On 4 GB laptops and Chromebooks it shares processes between tabs and switches on
         Chromium's low-end mode by itself. The window is up in about a third of a second.</p>
     </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">🧩</div>
+    <article>
       <h3>User-script extensions</h3>
       <p>Drop a JavaScript file into the extensions folder and it runs on the sites you
         choose. Simple, inspectable, no store required.</p>
     </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">🧱</div>
+    <article>
       <h3>Sandboxed, and honest about it</h3>
       <p>Pages run in Chromium's sandbox. If your system blocks it, SpacePenguin tells you
         why and how to fix it, instead of crashing or staying quiet.</p>
     </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">📖</div>
+    <article>
       <h3>Pages that explain themselves</h3>
       <p><code>about:version</code> shows what the browser is doing: the sandbox, the blocker,
         how it tuned itself for your device. <code>about:</code> pages cover history,
@@ -109,48 +99,42 @@
   </div>
 </section>
 
-<section id="download" class="band">
-  <div class="wrap section">
+<section id="download" class="wrap section">
     <h2>Download</h2>
     <p class="section-lede">Every package is built and launch-tested automatically on each
       platform. Packages are published on the
       <a href="https://github.com/developer1-vd/SpacePenguin/releases">Releases page</a>
       with each tagged version; until the first one is out, <a href="#build">build it
       yourself</a> in a few commands.</p>
-    <div class="grid downloads">
-      <article class="card download">
-        <h3>Windows</h3>
-        <p class="meta">Windows 10 and 11, 64-bit</p>
+    <div class="rows">
+      <article class="row">
+        <h3>Windows<span class="meta">Windows 10 and 11, 64-bit</span></h3>
         <p>An installer for just you (no administrator rights) or everyone, plus a portable
           zip.</p>
-        <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the installer</a>
+        <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the installer</a>
       </article>
-      <article class="card download">
-        <h3>macOS</h3>
-        <p class="meta">macOS 12 Monterey to 26 Tahoe · Apple silicon and Intel</p>
+      <article class="row">
+        <h3>macOS<span class="meta">macOS 12 Monterey to 26 Tahoe · Apple silicon and Intel</span></h3>
         <p>One universal app in a DMG: drag it to Applications.</p>
-        <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the DMG</a>
+        <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the DMG</a>
       </article>
-      <article class="card download">
-        <h3>Linux</h3>
-        <p class="meta">x86-64 and ARM64 · X11 and Wayland</p>
+      <article class="row">
+        <h3>Linux<span class="meta">x86-64 and ARM64 · X11 and Wayland</span></h3>
         <p>An AppImage that runs on almost any distribution, plus a Flatpak,
           <code>.deb</code>, <code>.rpm</code>, Arch package and Nix flake.</p>
-        <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the AppImage</a>
+        <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the AppImage</a>
       </article>
-      <article class="card download">
-        <h3>Android</h3>
-        <p class="meta">Android 9 and newer · ARM64</p>
+      <article class="row">
+        <h3>Android<span class="meta">Android 9 and newer · ARM64</span></h3>
         <p>A lighter app on your phone's own web engine: tabs, bookmarks, history,
           ad hiding and YouTube sponsor skipping.</p>
-        <a class="button small" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the APK</a>
+        <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the APK</a>
       </article>
-      <article class="card download">
-        <h3>iPhone and iPad</h3>
-        <p class="meta">iOS and iPadOS 16 and newer</p>
+      <article class="row">
+        <h3>iPhone and iPad<span class="meta">iOS and iPadOS 16 and newer</span></h3>
         <p>The same app as on Android, on Safari's engine. Build it on a Mac with
           <code>./build-ios.sh</code>; installing needs an Apple Developer account.</p>
-        <a class="button small ghost" href="https://github.com/developer1-vd/SpacePenguin#phones-android-and-ios">How to build it</a>
+        <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin#phones-android-and-ios">How to build it</a>
       </article>
     </div>
     <p class="note">On phones SpacePenguin uses the system's web engine, because Apple and Qt
@@ -170,10 +154,10 @@
         <li><strong>Flatpak</strong> — built from <code>packaging/flatpak/</code>.</li>
       </ul>
     </details>
-  </div>
 </section>
 
-<section id="chromebook" class="wrap section split">
+<section id="chromebook" class="wrap section">
+  <div class="split">
   <div>
     <h2>On a school Chromebook</h2>
     <p>SpacePenguin runs in ChromeOS's Linux environment, on Intel, AMD and ARM
@@ -195,10 +179,11 @@ bash install.sh</code></pre>
     <p class="fineprint">The installer needs a published release. It checks each
       download's SHA-256 and won't install a file that doesn't match.</p>
   </div>
+  </div>
 </section>
 
-<section id="privacy" class="band">
-  <div class="wrap section split">
+<section id="privacy" class="wrap section">
+  <div class="split">
     <div>
       <h2>Privacy, plainly</h2>
       <p>SpacePenguin has no account, no telemetry and no update pings. Apart from the
@@ -211,7 +196,7 @@ bash install.sh</code></pre>
           Settings.</li>
       </ul>
     </div>
-    <div class="card quiet">
+    <div class="aside">
       <h3>Where your data lives</h3>
       <p>History, bookmarks and settings stay on your computer:</p>
       <ul>
@@ -254,10 +239,9 @@ cmake --build build --config Release --parallel 2</code></pre>
     <a href="https://github.com/developer1-vd/SpacePenguin/blob/main/BUILD_SCRIPTS.md">BUILD_SCRIPTS.md</a>.</p>
 </section>
 
-<section id="limits" class="band">
-  <div class="wrap section">
+<section id="limits" class="wrap section">
     <h2>Good to know</h2>
-    <div class="grid two">
+    <div class="list">
       <div>
         <h3>It's pre-release</h3>
         <p>SpacePenguin is young. Expect rough edges, and please
@@ -279,14 +263,13 @@ cmake --build build --config Release --parallel 2</code></pre>
           <a href="https://github.com/developer1-vd/SpacePenguin/issues">open an issue</a>.</p>
       </div>
     </div>
-  </div>
 </section>
 
 </main>
 
 <footer class="site-footer">
   <div class="wrap footer-inner">
-    <p><img src="assets/favicon.png" alt="" width="20" height="20"> SpacePenguin · Free software
+    <p><img src="assets/logo.svg" alt="" width="20" height="20"> SpacePenguin · Free software
       under the <a href="https://github.com/developer1-vd/SpacePenguin/blob/main/LICENSE">GNU GPL v3</a></p>
     <p><a href="https://github.com/developer1-vd/SpacePenguin">Source</a> ·
       <a href="https://github.com/developer1-vd/SpacePenguin/issues">Issues</a> ·
