@@ -100,6 +100,8 @@ qt_add_executable(spacepenguin
     src/aboutpages.h
     src/browserwindow.cpp
     src/browserwindow.h
+    src/chromeextensions.cpp
+    src/chromeextensions.h
     src/logins.cpp
     src/logins.h
     src/notifications.cpp

@@ -1,5 +1,6 @@
 #include "profiles.h"
 
+#include "chromeextensions.h"
 #include "logins.h"
 #include "notifications.h"
 
@@ -194,6 +195,10 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     QObject::connect(blocker, &AdBlocker::pausedHostsChanged, blocker, installYouTube);
     QObject::connect(preferences, &Preferences::changed, blocker, installYouTube);
     installYouTube();
+
+    // QtWebEngine runs Chrome extensions only in profiles kept on disk.
+    if (!isPrivate)
+        services.extensions = new ChromeExtensions(services.profile, parent);
 
     services.userScripts = new UserScripts(services.profile, parent);
     if (!isPrivate)

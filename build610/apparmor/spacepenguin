@@ -1,0 +1,16 @@
+# AppArmor profile for SpacePenguin.
+#
+# Ubuntu 23.10 and later (kernel.apparmor_restrict_unprivileged_userns=1) only let
+# programs with a profile like this create the unprivileged user namespaces that
+# Chromium's renderer sandbox is built on. The profile confines nothing else
+# ("unconfined"); it exists to grant `userns`, as Ubuntu's own profiles for Chrome,
+# Firefox and other browsers do. Without it SpacePenguin still starts, but runs web
+# pages without the sandbox and says so in every window.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile spacepenguin "/usr/local/bin/SpacePenguin" flags=(unconfined) {
+  userns,
+
+  include if exists <local/spacepenguin>
+}

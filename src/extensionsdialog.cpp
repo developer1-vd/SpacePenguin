@@ -1,5 +1,6 @@
 #include "extensionsdialog.h"
 
+#include "chromeextensions.h"
 #include "icons.h"
 #include "userextensions.h"
 
@@ -18,12 +19,13 @@
 
 namespace spacepenguin {
 
-ExtensionsDialog::ExtensionsDialog(UserScripts *scripts, QWidget *parent)
+ExtensionsDialog::ExtensionsDialog(UserScripts *scripts, ChromeExtensions *chrome, QWidget *parent)
     : QDialog(parent)
     , m_scripts(scripts)
+    , m_chrome(chrome)
 {
     setWindowTitle(tr("Extensions"));
-    resize(600, 460);
+    resize(640, 640);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 18, 18, 12);
@@ -33,11 +35,93 @@ ExtensionsDialog::ExtensionsDialog(UserScripts *scripts, QWidget *parent)
     heading->setObjectName(QStringLiteral("pageTitle"));
     layout->addWidget(heading);
 
-    auto *intro = new QLabel(
-        tr("SpacePenguin runs JavaScript extensions inside every page. These are user "
-           "scripts, not Chrome extensions — Chrome extension support does not exist in "
-           "QtWebEngine and is not planned here."),
-        this);
+    // ---- Chrome extensions ----
+    auto *chromeTitle = new QLabel(tr("Chrome extensions"), this);
+    chromeTitle->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(chromeTitle);
+    QString chromeIntro;
+    if (!ChromeExtensions::isSupported())
+        chromeIntro = tr("This copy of SpacePenguin was built with a Qt older than 6.10, which "
+                         "cannot run Chrome extensions. The user scripts below still work.");
+    else if (!m_chrome)
+        chromeIntro = tr("Extensions do not run in private windows. Open a normal window to "
+                         "add or manage them.");
+    else
+        chromeIntro = tr("Manifest V3 extensions from the Chrome Web Store, or from a folder, "
+                         ".zip or .crx file. On a store page, the bar above the page offers to "
+                         "add the extension. Extensions do not run in private windows.");
+    auto *chromeLabel = new QLabel(chromeIntro, this);
+    chromeLabel->setWordWrap(true);
+    chromeLabel->setProperty("muted", true);
+    layout->addWidget(chromeLabel);
+
+    m_chromeList = new QListWidget(this);
+    m_chromeList->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_chromeList->setIconSize(QSize(20, 20));
+    m_chromeList->setEnabled(m_chrome != nullptr);
+    layout->addWidget(m_chromeList, 1);
+
+    auto *chromeButtons = new QHBoxLayout;
+    auto *store = new QPushButton(Icons::icon(Icons::Globe), tr("Chrome Web Store"), this);
+    store->setProperty("accent", true);
+    connect(store, &QPushButton::clicked, this, [this] {
+        emit webStoreRequested();
+        accept();
+    });
+    auto *addFile = new QPushButton(Icons::icon(Icons::Plus), tr("Add file…"), this);
+    connect(addFile, &QPushButton::clicked, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(
+            this, tr("Add a Chrome extension"), QDir::homePath(),
+            tr("Chrome extensions (*.crx *.zip)"));
+        if (!path.isEmpty())
+            m_chrome->install(path);
+    });
+    auto *addFolder = new QPushButton(Icons::icon(Icons::Folder), tr("Add folder…"), this);
+    addFolder->setToolTip(tr("An unpacked extension: a folder with a manifest.json"));
+    connect(addFolder, &QPushButton::clicked, this, [this] {
+        const QString path = QFileDialog::getExistingDirectory(this, tr("Add an unpacked extension"),
+                                                               QDir::homePath());
+        if (!path.isEmpty())
+            m_chrome->install(path);
+    });
+    m_chromeToggle = new QPushButton(tr("Disable"), this);
+    connect(m_chromeToggle, &QPushButton::clicked, this, [this] {
+        const QString id = selectedChromeId();
+        for (const ChromeExtensions::Extension &extension : m_chrome->extensions()) {
+            if (extension.id == id)
+                m_chrome->setEnabled(id, !extension.enabled);
+        }
+    });
+    m_chromeRemove = new QPushButton(Icons::icon(Icons::Trash), tr("Remove"), this);
+    connect(m_chromeRemove, &QPushButton::clicked, this, [this] {
+        const QString id = selectedChromeId();
+        if (!id.isEmpty())
+            m_chrome->uninstall(id);
+    });
+    for (QPushButton *button : {store, addFile, addFolder})
+        button->setEnabled(m_chrome != nullptr);
+    chromeButtons->addWidget(store);
+    chromeButtons->addWidget(addFile);
+    chromeButtons->addWidget(addFolder);
+    chromeButtons->addStretch(1);
+    chromeButtons->addWidget(m_chromeToggle);
+    chromeButtons->addWidget(m_chromeRemove);
+    layout->addLayout(chromeButtons);
+
+    if (m_chrome) {
+        connect(m_chrome, &ChromeExtensions::changed, this, &ExtensionsDialog::reloadChrome);
+        connect(m_chrome, &ChromeExtensions::failed, this,
+                [this](const QString &message) { QMessageBox::warning(this, tr("Extensions"), message); });
+    }
+    connect(m_chromeList, &QListWidget::itemSelectionChanged, this, &ExtensionsDialog::reloadChrome);
+
+    // ---- User scripts ----
+    auto *scriptsTitle = new QLabel(tr("User scripts"), this);
+    scriptsTitle->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(scriptsTitle);
+    auto *intro = new QLabel(tr("JavaScript files that run in the pages you choose, with "
+                                "Greasemonkey-style headers."),
+                             this);
     intro->setWordWrap(true);
     intro->setProperty("muted", true);
     layout->addWidget(intro);
@@ -109,6 +193,56 @@ ExtensionsDialog::ExtensionsDialog(UserScripts *scripts, QWidget *parent)
         button->setAutoDefault(false);
 
     reload();
+    reloadChrome();
+}
+
+QString ExtensionsDialog::selectedChromeId() const
+{
+    const auto items = m_chromeList->selectedItems();
+    return items.isEmpty() ? QString() : items.first()->data(Qt::UserRole).toString();
+}
+
+void ExtensionsDialog::reloadChrome()
+{
+    if (!m_chrome) {
+        m_chromeToggle->setEnabled(false);
+        m_chromeRemove->setEnabled(false);
+        return;
+    }
+    // Rebuilding the list would drop the selection that a click just made.
+    if (sender() != m_chromeList) {
+        const QString selected = selectedChromeId();
+        const QSignalBlocker blocker(m_chromeList);
+        m_chromeList->clear();
+        for (const ChromeExtensions::Extension &extension : m_chrome->extensions()) {
+            QString text = extension.name;
+            if (!extension.enabled)
+                text += tr("  (off)");
+            if (!extension.description.isEmpty())
+                text += QStringLiteral("\n") + extension.description;
+            if (!extension.error.isEmpty())
+                text += QStringLiteral("\n") + extension.error;
+            auto *item = new QListWidgetItem(
+                extension.icon.isNull() ? Icons::icon(Icons::Extensions) : extension.icon, text, m_chromeList);
+            item->setData(Qt::UserRole, extension.id);
+            item->setToolTip(QDir::toNativeSeparators(extension.path));
+            if (extension.id == selected)
+                item->setSelected(true);
+        }
+        if (m_chromeList->count() == 0) {
+            auto *empty = new QListWidgetItem(tr("No Chrome extensions yet."), m_chromeList);
+            empty->setFlags(Qt::NoItemFlags);
+        }
+    }
+    const QString id = selectedChromeId();
+    bool enabled = false;
+    for (const ChromeExtensions::Extension &extension : m_chrome->extensions()) {
+        if (extension.id == id)
+            enabled = extension.enabled;
+    }
+    m_chromeToggle->setEnabled(!id.isEmpty());
+    m_chromeToggle->setText(enabled || id.isEmpty() ? tr("Disable") : tr("Enable"));
+    m_chromeRemove->setEnabled(!id.isEmpty());
 }
 
 QString ExtensionsDialog::selectedId() const

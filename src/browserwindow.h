@@ -141,6 +141,11 @@ private:
     void showSavedLogins();
     void showSitePermissions();
 
+    // Chrome extensions.
+    void populateExtensionsMenu();
+    void showExtensionPopup(const QUrl &url);
+    void offerWebStoreExtension(WebView *view);
+
     // Tabs on the side, and tab groups.
     void setTabsOnSide(bool side);
     void syncSideTabs();
@@ -223,6 +228,8 @@ private:
     QToolButton *m_blockingButton = nullptr;
     QMenu *m_blockingMenu = nullptr;
     QToolButton *m_downloadsButton = nullptr;
+    QToolButton *m_extensionsButton = nullptr;
+    QMenu *m_extensionsMenu = nullptr;
     QToolButton *m_menuButton = nullptr;
     QLabel *m_zoomMenuLabel = nullptr;
 

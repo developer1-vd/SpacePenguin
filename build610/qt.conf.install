@@ -1,0 +1,8 @@
+[Paths]
+Prefix = /home/user/SpacePenguin/.qt/6.10.3/gcc_64
+Binaries = /home/user/SpacePenguin/.qt/6.10.3/gcc_64/bin
+Libraries = /home/user/SpacePenguin/.qt/6.10.3/gcc_64/lib
+Plugins = /home/user/SpacePenguin/.qt/6.10.3/gcc_64/plugins
+LibraryExecutables = /home/user/SpacePenguin/.qt/6.10.3/gcc_64/libexec
+Data = /home/user/SpacePenguin/.qt/6.10.3/gcc_64/.
+Translations = /home/user/SpacePenguin/.qt/6.10.3/gcc_64/translations

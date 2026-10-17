@@ -4,6 +4,7 @@
 #include "adblocker.h"
 #include "bookmarkmanager.h"
 #include "bookmarksdialog.h"
+#include "chromeextensions.h"
 #include "browserpage.h"
 #include "cookiemanager.h"
 #include "datasavermanager.h"
@@ -55,6 +56,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QProgressBar>
+#include <QRegularExpression>
 #include <QPushButton>
 #include <QSet>
 #include <QSettings>
@@ -70,6 +72,7 @@
 #include <QWebEngineFindTextResult>
 #include <QWebEngineHistory>
 #include <QWebEnginePage>
+#include <QWebEngineView>
 #include <QWebEnginePermission>
 #include <QWebEngineProfile>
 #include <QWebEngineScript>
@@ -221,6 +224,17 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
 
     if (m_services.logins)
         connect(m_services.logins, &LoginStore::changed, this, &BrowserWindow::updateLoginsAction);
+
+    if (m_services.extensions) {
+        connect(m_services.extensions, &ChromeExtensions::installed, this, [this](const QString &name) {
+            if (isActiveWindow())
+                showToast(tr("Added “%1”. Find it under the puzzle piece in the toolbar.").arg(name), 5000);
+        });
+        connect(m_services.extensions, &ChromeExtensions::failed, this, [this](const QString &message) {
+            if (isActiveWindow())
+                showToast(message, 8000);
+        });
+    }
 
     // A clicked notification brings its site's tab forward.
     connect(Notifications::instance(), &Notifications::clicked, this, [this](const QUrl &origin) {
@@ -727,6 +741,19 @@ QWidget *BrowserWindow::createNavigationBar()
     connect(m_blockingMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateBlockingMenu);
     layout->addWidget(m_blockingButton);
 
+    // Chrome extensions: their popups, and the way to manage them.
+    m_extensionsButton = new QToolButton;
+    m_extensionsButton->setIcon(Icons::icon(Icons::Extensions));
+    m_extensionsButton->setIconSize(QSize(18, 18));
+    m_extensionsButton->setToolTip(tr("Extensions"));
+    m_extensionsButton->setPopupMode(QToolButton::InstantPopup);
+    m_extensionsButton->setFocusPolicy(Qt::NoFocus);
+    m_extensionsMenu = new QMenu(this);
+    m_extensionsButton->setMenu(m_extensionsMenu);
+    connect(m_extensionsMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateExtensionsMenu);
+    m_extensionsButton->setVisible(ChromeExtensions::isSupported() && m_services.extensions);
+    layout->addWidget(m_extensionsButton);
+
     m_downloadsButton = chromeButton(m_downloadsAction);
     layout->addWidget(m_downloadsButton);
 
@@ -1056,7 +1083,10 @@ void BrowserWindow::showExtensionsDialog()
     if (!m_services.userScripts)
         return;
 
-    ExtensionsDialog dialog(m_services.userScripts, this);
+    ExtensionsDialog dialog(m_services.userScripts, m_services.extensions, this);
+    connect(&dialog, &ExtensionsDialog::webStoreRequested, this, [this] {
+        newTab(QUrl(QStringLiteral("https://chromewebstore.google.com/category/extensions")));
+    });
     dialog.exec();
 }
 
@@ -1963,6 +1993,79 @@ void BrowserWindow::showSitePermissions()
     dialog.exec();
 }
 
+// ---- Chrome extensions ---------------------------------------------------------------
+
+void BrowserWindow::populateExtensionsMenu()
+{
+    m_extensionsMenu->clear();
+    const QList<ChromeExtensions::Extension> extensions =
+        m_services.extensions ? m_services.extensions->extensions() : QList<ChromeExtensions::Extension>();
+    bool any = false;
+    for (const ChromeExtensions::Extension &extension : extensions) {
+        if (!extension.enabled)
+            continue;
+        any = true;
+        QAction *action = m_extensionsMenu->addAction(
+            extension.icon.isNull() ? Icons::icon(Icons::Extensions) : extension.icon, extension.name);
+        if (extension.popupUrl.isValid()) {
+            const QUrl popup = extension.popupUrl;
+            connect(action, &QAction::triggered, this, [this, popup] { showExtensionPopup(popup); });
+        } else {
+            action->setToolTip(tr("This extension works on pages by itself; it has no panel."));
+        }
+    }
+    if (!any)
+        m_extensionsMenu->addAction(tr("No extensions yet"))->setEnabled(false);
+    m_extensionsMenu->addSeparator();
+    connect(m_extensionsMenu->addAction(Icons::icon(Icons::Globe), tr("Chrome Web Store")),
+            &QAction::triggered, this, [this] {
+                newTab(QUrl(QStringLiteral("https://chromewebstore.google.com/category/extensions")));
+            });
+    m_extensionsMenu->addAction(m_extensionsAction);
+}
+
+void BrowserWindow::showExtensionPopup(const QUrl &url)
+{
+    // The extension's panel, as Chrome shows it under its toolbar button.
+    auto *popup = new QWidget(this, Qt::Popup);
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    auto *layout = new QVBoxLayout(popup);
+    layout->setContentsMargins(1, 1, 1, 1);
+    auto *view = new QWebEngineView(m_services.profile, popup);
+    layout->addWidget(view);
+    // Panels size themselves to their content, within reason.
+    connect(view->page(), &QWebEnginePage::contentsSizeChanged, popup, [popup](const QSizeF &size) {
+        popup->resize(qBound(240, int(size.width()) + 2, 800), qBound(120, int(size.height()) + 2, 600));
+    });
+    connect(view->page(), &QWebEnginePage::windowCloseRequested, popup, &QWidget::close);
+    view->setUrl(url);
+    popup->resize(360, 420);
+    const QPoint anchor = m_extensionsButton->mapToGlobal(QPoint(m_extensionsButton->width(),
+                                                                 m_extensionsButton->height()));
+    popup->move(anchor.x() - popup->width(), anchor.y() + 4);
+    popup->show();
+}
+
+void BrowserWindow::offerWebStoreExtension(WebView *view)
+{
+    ChromeExtensions *extensions = m_services.extensions;
+    const QString id = ChromeExtensions::webStoreId(view->url());
+    if (!extensions || !ChromeExtensions::isSupported() || id.isEmpty() || extensions->isInstalled(id))
+        return;
+    QString name = view->title();
+    name.remove(QRegularExpression(QStringLiteral("\\s*[-–]\\s*Chrome Web Store\\s*$")));
+    if (name.isEmpty())
+        name = tr("this extension");
+    Prompt prompt;
+    prompt.key = QStringLiteral("webstore:%1").arg(id);
+    prompt.icon = Icons::Extensions;
+    prompt.text = tr("Add <b>%1</b> to SpacePenguin?").arg(name.toHtmlEscaped());
+    prompt.buttons = {{tr("Add to SpacePenguin"), [extensions, id, name] {
+                           extensions->installFromWebStore(id, name);
+                       }}};
+    addPrompt(view, prompt);
+}
+
 // ---- Tabs on the side, and tab groups ---------------------------------------------
 
 void BrowserWindow::setTabsOnSide(bool side)
@@ -2582,6 +2685,7 @@ void BrowserWindow::connectView(WebView *view)
                 prompt.dismissed = [permission] { permission.deny(); };
                 addPrompt(view, prompt);
             });
+    connect(view, &QWebEngineView::loadFinished, this, [this, view] { offerWebStoreExtension(view); });
     connect(view->browserPage(), &BrowserPage::loginSubmitted, this,
             [this, view](const QString &username, const QString &password) {
                 offerToSaveLogin(view, username, password);
