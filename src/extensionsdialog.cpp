@@ -40,9 +40,14 @@ ExtensionsDialog::ExtensionsDialog(UserScripts *scripts, ChromeExtensions *chrom
     chromeTitle->setObjectName(QStringLiteral("sectionTitle"));
     layout->addWidget(chromeTitle);
     QString chromeIntro;
-    if (!ChromeExtensions::isSupported())
-        chromeIntro = tr("This copy of SpacePenguin was built with a Qt older than 6.10, which "
-                         "cannot run Chrome extensions. The user scripts below still work.");
+    if (!ChromeExtensions::isAvailable())
+        chromeIntro = tr("Not yet: Chrome extensions need SpacePenguin built with Qt 6.10 or "
+                         "newer. The user scripts below work now.");
+    else if (!ChromeExtensions::isSupported())
+        chromeIntro = tr("Not yet: in the Qt versions so far (6.10 and 6.11), turning a Chrome "
+                         "extension on crashes the browser, so they are switched off until Qt fixes "
+                         "it. To try them anyway, start SpacePenguin with "
+                         "SPACEPENGUIN_CHROME_EXTENSIONS=1. The user scripts below work now.");
     else if (!m_chrome)
         chromeIntro = tr("Extensions do not run in private windows. Open a normal window to "
                          "add or manage them.");

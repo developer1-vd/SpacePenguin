@@ -25,8 +25,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Qt 6.10+ brings Chrome extensions to the desktop app.
-  QT_VERSION: '6.11.3'
+  QT_VERSION: '6.8.3'
 
 jobs:
   desktop:
@@ -271,9 +270,6 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 75
-    # The phone apps stay on the Qt they are built and tested with.
-    env:
-      QT_VERSION: '6.8.3'
     strategy:
       fail-fast: false
       matrix:

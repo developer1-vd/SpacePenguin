@@ -120,13 +120,19 @@ ChromeExtensions::ChromeExtensions(QWebEngineProfile *profile, QObject *parent)
 #endif
 }
 
-bool ChromeExtensions::isSupported()
+bool ChromeExtensions::isAvailable()
 {
 #ifdef SPACEPENGUIN_EXTENSIONS
     return true;
 #else
     return false;
 #endif
+}
+
+bool ChromeExtensions::isSupported()
+{
+    static const bool enabled = qEnvironmentVariableIntValue("SPACEPENGUIN_CHROME_EXTENSIONS") == 1;
+    return isAvailable() && enabled;
 }
 
 QString ChromeExtensions::webStoreId(const QUrl &url)

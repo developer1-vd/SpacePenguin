@@ -87,6 +87,7 @@ if [[ -z "${QT_PREFIX}" ]]; then
 fi
 [[ -n "${QT_PREFIX}" && -d "${QT_PREFIX}" ]] ||
     die "no Qt found; run ./install-deps.sh or pass --qt /path/to/Qt/6.8.3/gcc_64"
+QT_PREFIX="$(cd "${QT_PREFIX}" && pwd)"   # linuxdeploy runs elsewhere; a relative --qt would break
 
 QMAKE="${QT_PREFIX}/bin/qmake"
 [[ -x "${QMAKE}" ]] || QMAKE="${QT_PREFIX}/bin/qmake6"
@@ -189,6 +190,19 @@ fi
     echo "warning: this Qt has no offscreen platform plugin" >&2
 EXTRA_PLATFORM_PLUGINS="$(IFS=';'; echo "${extra_plugins[*]}")"
 export EXTRA_PLATFORM_PLUGINS
+# The Wayland plugin also needs Qt's Wayland shell plugins (xdg-shell is what opens
+# a window), decorations and graphics integration. linuxdeploy's Qt plugin does not
+# bring these for a client, so they are copied here; without them Qt falls back to
+# XWayland on Wayland desktops.
+wayland_deps=()
+for folder in wayland-shell-integration wayland-decoration-client wayland-graphics-integration-client; do
+    if [[ -d "${QT_PLUGINS}/${folder}" ]]; then
+        mkdir -p "${APPDIR}/usr/plugins"
+        rm -rf "${APPDIR}/usr/plugins/${folder}"
+        cp -r "${QT_PLUGINS}/${folder}" "${APPDIR}/usr/plugins/${folder}"
+        wayland_deps+=(--deploy-deps-only "${APPDIR}/usr/plugins/${folder}")
+    fi
+done
 export LDAI_OUTPUT="${OUTPUT}"
 export APPIMAGE_EXTRACT_AND_RUN=1           # works in containers without FUSE
 export NO_STRIP=1                           # Qt's libraries are already stripped
@@ -200,6 +214,7 @@ PATH="${TOOLS_DIR}:${PATH}" "${TOOLS_DIR}/linuxdeploy-${ARCH}.AppImage" \
     --appdir "${APPDIR}" \
     --desktop-file "${APPDIR}/usr/share/applications/${APP_ID}.desktop" \
     --icon-file "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png" \
+    ${wayland_deps[@]+"${wayland_deps[@]}"} \
     --plugin qt \
     --output appimage
 

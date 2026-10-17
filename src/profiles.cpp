@@ -197,7 +197,7 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     installYouTube();
 
     // QtWebEngine runs Chrome extensions only in profiles kept on disk.
-    if (!isPrivate)
+    if (!isPrivate && ChromeExtensions::isSupported())
         services.extensions = new ChromeExtensions(services.profile, parent);
 
     services.userScripts = new UserScripts(services.profile, parent);
