@@ -172,6 +172,18 @@ packages_apt() {
     for library in libasound2 libglib2.0-0; do
         if apt_installable "${library}t64"; then PKGS+=("${library}t64"); else PKGS+=("${library}"); fi
     done
+    # Qt's ARM64 QtWebEngine takes these from the system, where the x86-64 build
+    # carries its own copies. Each entry lists a package's names, newest first.
+    if [[ ${QT_FROM_SYSTEM} -eq 0 && "${ARCH}" == aarch64 ]]; then
+        local names name
+        for names in "libevent-2.1-7t64 libevent-2.1-7" "libminizip1t64 libminizip1" libopus0 \
+                     libsnappy1v5 liblcms2-2 "libtiff6 libtiff5" libwebp7 libwebpdemux2 \
+                     libwebpmux3 libxml2 libxslt1.1 libbrotli1 libsm6 libice6 libzstd1; do
+            for name in ${names}; do
+                if apt_installable "${name}"; then PKGS+=("${name}"); break; fi
+            done
+        done
+    fi
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file dpkg-dev)
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-dev qt6-webengine-dev qt6-tools-dev
                                            qt6-base-dev-tools libgl-dev qt6-wayland)
