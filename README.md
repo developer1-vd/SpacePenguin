@@ -325,7 +325,7 @@ on each of them for every push.
 | Linux (X11 and Wayland), any distribution, x86-64 and ARM64 | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
 | ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `packaging/chromeos/install.sh` | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
 | Android 9+ (ARM64) | Qt Quick + QtWebView, Qt 6.8 | APK | a separate, smaller app on the phone's own web engine — see [Phones](#phones-android-and-ios) |
-| iOS and iPadOS 16+ | Qt Quick + QtWebView, Qt 6.8 | Simulator build; signed `.ipa` with your Apple team | as Android |
+| iOS and iPadOS 16+ | Qt Quick + QtWebView, Qt 6.8 | unsigned `.ipa` to sideload; signed `.ipa` with your Apple team | as Android |
 | Windows 10 and 11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
 | macOS 12 Monterey to 26 Tahoe, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | Tahoe-style icon, registered for `http`/`https`; ready to notarise |
 
@@ -460,14 +460,25 @@ Sponsor segments are skipped as on the desktop.
 ./build-android.sh          # dist/SpacePenguin-<version>-android-arm64.apk (debug key)
 ./build-ios.sh              # macOS + Xcode: a Simulator build
 ./build-ios.sh --team <ID>  # a signed .ipa for devices, with your Apple Developer team
+./build-ios.sh --unsigned   # an unsigned .ipa, to sideload with your own Apple ID
 ```
+
+Every CI run (the *build* workflow, also startable by hand from the Actions tab)
+makes both: the APK as *SpacePenguin-Android* and the unsigned `.ipa` as
+*SpacePenguin-iOS*, and a `v*` tag puts them in the release. Install the `.ipa`
+on an iPhone with [Sideloadly](https://sideloadly.io) or
+[AltStore](https://altstore.io), which sign it with a free Apple ID (such apps
+expire after 7 days and are signed again from the same tool). To have CI sign the
+APK with your own key, add the repository secrets `ANDROID_KEYSTORE_BASE64`
+(`base64 -w0 release.keystore`), `ANDROID_KEYSTORE_ALIAS` and
+`ANDROID_KEYSTORE_PASSWORD`.
 
 Both fetch what they need on first use (Qt for the phone and QtWebView into
 `.qt/`; for Android the SDK and NDK into `.cache/android-sdk`; Android also needs
 JDK 17+). Install the APK with `adb install -r` or by opening it on the phone.
 Publishing to Google Play needs your own signing key (`./build-android.sh
---release`) and Play's target-SDK requirement; installing on an iPhone or
-publishing to the App Store needs an Apple Developer account. To try the
+--release`) and Play's target-SDK requirement; publishing to the App Store needs
+an Apple Developer account. To try the
 interface without a phone, `cmake -S mobile -B build-mobile` builds it for the
 desktop.
 

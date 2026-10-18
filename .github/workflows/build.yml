@@ -274,13 +274,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Signed with your key when the ANDROID_KEYSTORE secrets are set, else a debug key.
           - name: Android (APK)
             os: ubuntu-24.04
-            script: ./build-android.sh
-          # Qt 6.8 supports Xcode 16, which this runner has.
-          - name: iOS (Simulator)
+            script: ./build-android.sh ${ANDROID_KEYSTORE_BASE64:+--release}
+          # Qt 6.8 supports Xcode 16, which this runner has. The unsigned .ipa is for
+          # sideloading; the Simulator build checks the app also runs there.
+          - name: iOS (iPhone and Simulator)
             os: macos-15
-            script: ./build-ios.sh
+            script: ./build-ios.sh --unsigned && ./build-ios.sh
     steps:
       - uses: actions/checkout@v4
 
@@ -297,16 +299,25 @@ jobs:
           key: qt-mobile-${{ env.QT_VERSION }}-${{ runner.os }}-${{ hashFiles('build-android.sh', 'build-ios.sh') }}
 
       - name: Build
-        run: ${{ matrix.script }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          QT_ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          QT_ANDROID_KEYSTORE_KEY_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "${ANDROID_KEYSTORE_BASE64}" ] && [ "${RUNNER_OS}" = Linux ]; then
+            export QT_ANDROID_KEYSTORE_PATH="${RUNNER_TEMP}/release.keystore"
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "${QT_ANDROID_KEYSTORE_PATH}"
+          fi
+          ${{ matrix.script }}
 
       - uses: actions/upload-artifact@v4
         with:
-          # The simulator build is a check, not a download: only the APK is released.
-          name: ${{ runner.os == 'Linux' && 'SpacePenguin-Android' || 'ci-iOS-simulator' }}
+          name: ${{ runner.os == 'Linux' && 'SpacePenguin-Android' || 'SpacePenguin-iOS' }}
           if-no-files-found: error
           path: |
             dist/*.apk
-            dist/*-ios-simulator.zip
+            dist/*.ipa
             dist/*.sha256
 
   release:

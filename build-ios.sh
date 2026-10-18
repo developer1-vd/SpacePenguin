@@ -5,6 +5,10 @@
 #                                       dist/SpacePenguin-<version>-ios-simulator.zip
 #   ./build-ios.sh --team ABCDE12345    a signed .ipa for real devices, with your
 #                                       Apple Developer team (Xcode must be signed in)
+#   ./build-ios.sh --unsigned           an unsigned .ipa for real devices:
+#                                       dist/SpacePenguin-<version>-ios-unsigned.ipa,
+#                                       for Sideloadly or AltStore to sign with your
+#                                       own Apple ID as they install it
 #   ./build-ios.sh --help               all options
 #
 # The iOS app is mobile/: a Qt Quick interface around QtWebView, which shows pages
@@ -20,6 +24,7 @@ QT_VERSION="${QT_VERSION:-6.8.3}"
 BUILD_DIR="${BUILD_DIR:-build-ios}"
 OUTPUT_DIR="dist"
 TEAM=""
+UNSIGNED=0
 EXPORT_METHOD="development"
 
 usage() {
@@ -27,6 +32,7 @@ usage() {
 Usage: ./build-ios.sh [options]
 
   --team <id>            sign for devices with this Apple Developer team ID
+  --unsigned             an unsigned .ipa for devices, to sideload (no Apple account here)
   --export-method <m>    with --team: development (default), ad-hoc or app-store
   --qt-version <x.y.z>   Qt version (default ${QT_VERSION})
   --build-dir <dir>      build directory (default ${BUILD_DIR})
@@ -38,6 +44,7 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --team) TEAM="$2"; shift 2 ;;
+        --unsigned) UNSIGNED=1; shift ;;
         --export-method) EXPORT_METHOD="$2"; shift 2 ;;
         --qt-version) QT_VERSION="$2"; shift 2 ;;
         --build-dir) BUILD_DIR="$2"; shift 2 ;;
@@ -53,6 +60,10 @@ die() { echo "error: $*" >&2; exit 1; }
 [[ "$(uname -s)" == Darwin ]] || die "iOS apps are built on macOS with Xcode"
 command -v xcodebuild >/dev/null || die "Xcode is missing (install it from the App Store, then run xcode-select --install)"
 for tool in cmake python3 ditto; do
+    command -v "${tool}" >/dev/null || die "${tool} is missing"
+done
+[[ ${UNSIGNED} -eq 1 && -n "${TEAM}" ]] && die "--unsigned and --team do not go together"
+for tool in zip; do
     command -v "${tool}" >/dev/null || die "${tool} is missing"
 done
 case "${EXPORT_METHOD}" in development|ad-hoc|app-store) ;; *) die "unknown export method ${EXPORT_METHOD}" ;; esac
@@ -88,7 +99,25 @@ signing=()
     ${signing[@]+"${signing[@]}"}
 
 mkdir -p "${OUTPUT_DIR}"
-if [[ -z "${TEAM}" ]]; then
+if [[ ${UNSIGNED} -eq 1 ]]; then
+    step "Building for devices, unsigned"
+    xcodebuild -project "${BUILD_DIR}/SpacePenguinMobile.xcodeproj" -scheme spacepenguin_mobile \
+        -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+        -derivedDataPath "${BUILD_DIR}/derived" \
+        CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+    app="$(find "${BUILD_DIR}" -name 'SpacePenguin.app' -path '*iphoneos*' -not -path '*.dSYM*' -type d | head -n1)"
+    [[ -n "${app}" ]] || die "no app was produced"
+    # An .ipa is a zip with the app in Payload/.
+    payload="${BUILD_DIR}/ipa"
+    rm -rf "${payload}"
+    mkdir -p "${payload}/Payload"
+    ditto "${app}" "${payload}/Payload/SpacePenguin.app"
+    OUTPUT="${OUTPUT_DIR}/SpacePenguin-${VERSION}-ios-unsigned.ipa"
+    rm -f "${OUTPUT}"
+    (cd "${payload}" && zip -qr -y "${ROOT}/${OUTPUT}" Payload)
+    step "Created ${OUTPUT}"
+    echo "    Install it with Sideloadly or AltStore, which sign it with your Apple ID."
+elif [[ -z "${TEAM}" ]]; then
     step "Building for the iOS Simulator"
     xcodebuild -project "${BUILD_DIR}/SpacePenguinMobile.xcodeproj" -scheme spacepenguin_mobile \
         -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
