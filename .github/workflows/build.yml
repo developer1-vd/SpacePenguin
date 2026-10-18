@@ -129,8 +129,8 @@ jobs:
               elif command -v zypper >/dev/null; then zypper --non-interactive --quiet install sudo shadow findutils >/dev/null
               else pacman -Sy --noconfirm --quiet sudo >/dev/null; fi
               useradd -m student && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student
-              su student -c "bash /src/install.sh --yes /src/dist/*.AppImage"
-              su student -c "QT_QPA_PLATFORM=offscreen ~/.local/bin/spacepenguin --version" | tee /dev/stderr | grep -q SpacePenguin'
+              sudo -iu student bash -c "bash /src/install.sh --yes /src/dist/*.AppImage"
+              sudo -iu student env QT_QPA_PLATFORM=offscreen /home/student/.local/bin/spacepenguin --version | tee /dev/stderr | grep -q SpacePenguin'
             echo "::endgroup::"
           done
 
