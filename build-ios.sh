@@ -59,13 +59,10 @@ die() { echo "error: $*" >&2; exit 1; }
 
 [[ "$(uname -s)" == Darwin ]] || die "iOS apps are built on macOS with Xcode"
 command -v xcodebuild >/dev/null || die "Xcode is missing (install it from the App Store, then run xcode-select --install)"
-for tool in cmake python3 ditto; do
+for tool in cmake python3 ditto zip; do
     command -v "${tool}" >/dev/null || die "${tool} is missing"
 done
 [[ ${UNSIGNED} -eq 1 && -n "${TEAM}" ]] && die "--unsigned and --team do not go together"
-for tool in zip; do
-    command -v "${tool}" >/dev/null || die "${tool} is missing"
-done
 case "${EXPORT_METHOD}" in development|ad-hoc|app-store) ;; *) die "unknown export method ${EXPORT_METHOD}" ;; esac
 
 # ---- Qt for iOS, and the macOS Qt its tools run from -------------------------------------
