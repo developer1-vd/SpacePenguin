@@ -8,6 +8,21 @@ A secure, lightweight, and usable browser written in Qt.
 way. Everything below is what actually exists in the tree today — no aspirational
 checkbox list.
 
+## Download
+
+Every push builds every package; get them from the latest run of the
+[build workflow](https://github.com/developer1-vd/SpacePenguin/actions/workflows/build.yml)
+(open the run, then *Artifacts*), or from [Releases](https://github.com/developer1-vd/SpacePenguin/releases)
+once a version is tagged.
+
+| On | Download | Install |
+| -- | -------- | ------- |
+| Windows | *SpacePenguin-Windows-X64* | run the `-setup.exe`, or unzip the portable zip |
+| macOS | *SpacePenguin-macOS-ARM64* (works on Intel Macs too) | open the DMG and drag SpacePenguin to Applications |
+| Linux | *SpacePenguin-Linux-X64* (or *-ARM64*) for the AppImage; *SpacePenguin-deb-…*, *-rpm-…*, *-pkg-…* for native packages | `chmod +x` the AppImage and run it |
+| Android | *SpacePenguin-Android* | open the `.apk` on the phone (allow installing from your browser or files app) |
+| iPhone and iPad | *SpacePenguin-iOS* | install the `-ios-unsigned.ipa` with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) and your Apple ID |
+
 ## What it does
 
 - **Tabs** — tab strip on top; new, close, middle-click to close, drag to reorder,
@@ -89,8 +104,10 @@ would be a lie in the UI.
 
 ## Extensions
 
-QtWebEngine does not load Chrome extensions and never will without a native
-Chromium build. SpacePenguin does not fake support. What it ships is
+Chrome extensions need Qt 6.10's extension manager, which still crashes when an
+extension is switched on, so SpacePenguin keeps them off: a build against Qt 6.10+
+started with `SPACEPENGUIN_CHROME_EXTENSIONS=1` shows them, for testing only. What
+it ships is
 **JavaScript user scripts**, installed as `QWebEngineScript` objects on the
 active profile.
 
@@ -207,8 +224,9 @@ memory and a little load time; if you notice it, use a smaller list.
 
 ### Pop-ups
 
-Actual pop-up windows are already refused by the security policy
-(`JavascriptCanOpenWindows` is off), and `$popup` rules are honoured for
+Pop-up windows a page opens by itself are refused by the security policy
+(`JavascriptCanOpenWindows` is off); ones you click for, such as a sign-in box,
+open in a small window titled with the site's name. `$popup` rules are honoured for
 anything a page tries to load as a document. In-page pop-ups — interstitials,
 "pop-out" players, overlay dialogs — are cosmetic, so they need `##` rules from
 your list.
@@ -624,6 +642,8 @@ it is on; CI builds them all and, for a `v*` tag, attaches them to a GitHub rele
 | Arch package | `makepkg -si` in `packaging/arch` | `spacepenguin-<v>-1-x86_64.pkg.tar.zst` | Arch, Manjaro, EndeavourOS, … |
 | macOS | `./build-dmg.sh --universal` | `SpacePenguin-<v>-macos.dmg` and `.zip` of the `.app` | macOS 12+, Apple silicon and Intel |
 | Windows | `powershell -ExecutionPolicy Bypass -File build-windows.ps1` | `SpacePenguin-<v>-windows-x64-setup.exe` and `-windows-x64.zip` | Windows 10/11 x64, nothing else needed |
+| Android | `./build-android.sh` (`--release` to sign with your key) | `SpacePenguin-<v>-android-arm64.apk` | Android 9+ on ARM64 |
+| iPhone and iPad | `./build-ios.sh --unsigned` (macOS with Xcode; `--team <ID>` to sign) | `SpacePenguin-<v>-ios-unsigned.ipa` | iOS 16+, sideloaded |
 
 Every script takes `--help` (`-Help` on Windows). Signing is optional:
 `build-appimage.sh --sign` (GPG), `build-dmg.sh --sign "Developer ID Application: …"
@@ -683,9 +703,11 @@ printed by default, since they come from the sites themselves; set
 - Bookmarks are a flat list; the backend's folders are not shown
 - No page-requested fullscreen (video players cannot go full screen); `F11`
   makes the whole window full screen
-- No `file://` support, no popups, no PDF viewer
-- No Chrome extension support — QtWebEngine cannot load them, so extensions are
-  user scripts instead (`// @name`, `// @match`)
+- No `file://` support, no PDF viewer
+- Chrome extensions are off (Qt 6.10's support crashes); extensions are user
+  scripts, whose `GM_getValue` settings are kept per site rather than shared
+  across sites, and whose `GM_xmlhttpRequest` cannot reach sites that refuse
+  other sites' requests
 - Blocking covers network rules and cosmetic element hiding, but not
   `$redirect`/`$removeparam` rewrites or `##+js(...)` scriptlets, so a few
   sites still show "ad" placeholders or count blocked requests
