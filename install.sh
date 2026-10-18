@@ -116,7 +116,7 @@ if [[ ${DEPS} -eq 1 ]]; then
         packages=(libegl1 libgl1 libopengl0 libfontconfig1 libfreetype6 libx11-6 libx11-xcb1
                   libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libwayland-egl1
                   libwayland-cursor0 libxcb-cursor0 libasound2 libnss3 libxshmfence1
-                  libgbm1 libdrm2 libglib2.0-0 libgpg-error0 libharfbuzz0b fonts-dejavu-core
+                  libgbm1 libdrm2 libglib2.0-0 libgpg-error0 libcom-err2 libgmp10 libharfbuzz0b fonts-dejavu-core
                   ca-certificates curl)
         # Ubuntu 24.04 and later renamed some of these with a t64 suffix.
         available=()
@@ -141,18 +141,19 @@ if [[ ${DEPS} -eq 1 ]]; then
         install_missing "rpm -q" dnf install -y -q -- \
             mesa-libEGL mesa-libGL libglvnd-opengl fontconfig freetype libX11 libX11-xcb \
             libxkbcommon libxkbcommon-x11 libwayland-client libwayland-egl libwayland-cursor \
-            xcb-util-cursor alsa-lib nss libxshmfence mesa-libgbm libdrm glib2 dejavu-sans-fonts \
+            xcb-util-cursor alsa-lib nss libxshmfence mesa-libgbm libdrm glib2 libgpg-error libcom_err gmp
+            dejavu-sans-fonts \
             ca-certificates curl
     elif command -v zypper >/dev/null; then
         install_missing "rpm -q" zypper --non-interactive --quiet install -- \
             libglvnd fontconfig libfreetype6 libX11-6 libX11-xcb1 \
             libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libwayland-egl1 \
             libwayland-cursor0 libxcb-cursor0 libasound2 mozilla-nss libxshmfence1 libgbm1 \
-            libdrm2 libglib-2_0-0 dejavu-fonts ca-certificates curl
+            libdrm2 libglib-2_0-0 libgpg-error0 libcom_err2 libgmp10 dejavu-fonts ca-certificates curl
     elif command -v pacman >/dev/null; then
         install_missing "pacman -Q" pacman -S --needed --noconfirm -- \
             libglvnd fontconfig freetype2 libx11 libxkbcommon libxkbcommon-x11 wayland \
-            xcb-util-cursor alsa-lib nss libxshmfence mesa libdrm glib2 ttf-dejavu \
+            xcb-util-cursor alsa-lib nss libxshmfence mesa libdrm glib2 libgpg-error e2fsprogs gmp ttf-dejavu \
             ca-certificates curl
     else
         echo "Unknown package manager: if SpacePenguin does not start, install your system's OpenGL, fontconfig, X11/Wayland and NSS libraries."
@@ -232,8 +233,12 @@ if command -v update-desktop-database >/dev/null; then
     update-desktop-database "$(dirname "${LAUNCHER}")" >/dev/null 2>&1 || true
 fi
 
-version="$(QT_QPA_PLATFORM=offscreen "${BIN_DIR}/spacepenguin" --version 2>/dev/null | tail -n1 || true)"
-[[ "${version}" == SpacePenguin* ]] || die "SpacePenguin was installed but does not start; run ${BIN_DIR}/spacepenguin in a terminal to see why"
+output="$(QT_QPA_PLATFORM=offscreen "${BIN_DIR}/spacepenguin" --version 2>&1 || true)"
+version="$(printf '%s\n' "${output}" | grep '^SpacePenguin' | tail -n1 || true)"
+if [[ "${version}" != SpacePenguin* ]]; then
+    printf '%s\n' "${output}" | tail -n 15 >&2
+    die "SpacePenguin was installed but does not start (above is why); run ${BIN_DIR}/spacepenguin in a terminal to try again"
+fi
 
 step "${version} is installed"
 echo "    Open it from your app menu, or run: spacepenguin"
