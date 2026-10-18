@@ -101,8 +101,14 @@ install_missing() {
     done
     [[ ${#missing[@]} -gt 0 ]] || return 0
     step "Installing ${#missing[@]} system libraries: ${missing[*]}"
-    ${sudo} "${install[@]}" "${missing[@]}" ||
-        echo "warning: could not install them; SpacePenguin may not start until they are installed" >&2
+    ${sudo} "${install[@]}" "${missing[@]}" && return 0
+    # One unknown name fails the whole batch; then try them one at a time.
+    local failed=()
+    for package in "${missing[@]}"; do
+        ${sudo} "${install[@]}" "${package}" >/dev/null 2>&1 || failed+=("${package}")
+    done
+    [[ ${#failed[@]} -eq 0 ]] ||
+        echo "warning: could not install ${failed[*]}; SpacePenguin may not start without them" >&2
 }
 
 if [[ ${DEPS} -eq 1 ]]; then
@@ -139,7 +145,7 @@ if [[ ${DEPS} -eq 1 ]]; then
             ca-certificates curl
     elif command -v zypper >/dev/null; then
         install_missing "rpm -q" zypper --non-interactive --quiet install -- \
-            libEGL1 libGL1 libOpenGL0 fontconfig libfreetype6 libX11-6 libX11-xcb1 \
+            libglvnd fontconfig libfreetype6 libX11-6 libX11-xcb1 \
             libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libwayland-egl1 \
             libwayland-cursor0 libxcb-cursor0 libasound2 mozilla-nss libxshmfence1 libgbm1 \
             libdrm2 libglib-2_0-0 dejavu-fonts ca-certificates curl
