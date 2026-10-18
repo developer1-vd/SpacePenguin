@@ -82,9 +82,16 @@
         Chromium's low-end mode by itself. The window is up in about a third of a second.</p>
     </article>
     <article>
-      <h3>User-script extensions</h3>
-      <p>Drop a JavaScript file into the extensions folder and it runs on the sites you
-        choose. Simple, inspectable, no store required.</p>
+      <h3>A store for extensions and themes</h3>
+      <p>The SpacePenguin Store searches Greasy Fork and OpenUserJS in one place, and adds
+        colour themes for the browser. Extensions ask before they run, and their settings
+        open from the puzzle-piece menu.</p>
+    </article>
+    <article>
+      <h3>Logins, permissions, pop-ups</h3>
+      <p>It offers to remember your logins and fills them in when you ask. Sites ask before
+        using your camera, location or notifications, and sign-in pop-ups open in a
+        window of their own.</p>
     </article>
     <article>
       <h3>Sandboxed, and honest about it</h3>
@@ -105,7 +112,9 @@
     <p class="section-lede">Every package is built and launch-tested automatically on each
       platform. Packages are published on the
       <a href="https://github.com/developer1-vd/SpacePenguin/releases">Releases page</a>
-      with each tagged version; until the first one is out, <a href="#build">build it
+      with each tagged version. Until the first one is out, every build is on the
+      <a href="https://github.com/developer1-vd/SpacePenguin/actions/workflows/build.yml">build
+      page</a> (open the latest run, then <em>Artifacts</em>), or <a href="#build">build it
       yourself</a> in a few commands.</p>
     <div class="rows">
       <article class="row">
@@ -133,9 +142,10 @@
       </article>
       <article class="row">
         <h3>iPhone and iPad<span class="meta">iOS and iPadOS 16 and newer</span></h3>
-        <p>The same app as on Android, on Safari's engine. Build it on a Mac with
-          <code>./build-ios.sh</code>; installing needs an Apple Developer account.</p>
-        <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin#phones-android-and-ios">How to build it</a>
+        <p>The same app as on Android, on Safari's engine. Install the <code>.ipa</code> with
+          <a href="https://sideloadly.io">Sideloadly</a> or <a href="https://altstore.io">AltStore</a>
+          and your own Apple ID — no developer account needed (with a free ID, reinstall every 7 days).</p>
+        <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the .ipa</a>
       </article>
     </div>
     <p class="note">On phones SpacePenguin uses the system's web engine, because Apple and Qt
@@ -236,7 +246,9 @@ cmake --build build --config Release --parallel 2</code></pre>
   </div>
   <p class="note"><code>tools/build-jobs.sh</code> runs only as many compiler jobs as your
     free memory allows — each needs about 500 MB, and running too many at once can freeze a
-    small laptop. Packaging scripts for the AppImage, DMG and Windows installer are described in
+    small laptop. Phone apps come from <code>./build-android.sh</code> (an APK) and, on a Mac,
+    <code>./build-ios.sh --unsigned</code> (an <code>.ipa</code> to sideload). Packaging scripts for
+    the AppImage, DMG and Windows installer are described in
     <a href="https://github.com/developer1-vd/SpacePenguin/blob/main/BUILD_SCRIPTS.md">BUILD_SCRIPTS.md</a>.</p>
 </section>
 
@@ -249,9 +261,9 @@ cmake --build build --config Release --parallel 2</code></pre>
           <a href="https://github.com/developer1-vd/SpacePenguin/issues">report what you find</a>.</p>
       </div>
       <div>
-        <h3>No Chrome Web Store</h3>
-        <p>QtWebEngine can't run Chrome extensions, so SpacePenguin uses JavaScript user
-          scripts instead — and has the blocker built in.</p>
+        <h3>No Chrome Web Store yet</h3>
+        <p>Qt's support for Chrome extensions still crashes, so they stay off. Extensions are
+          user scripts from the SpacePenguin Store instead — and the blocker is built in.</p>
       </div>
       <div>
         <h3>Chromium underneath</h3>
