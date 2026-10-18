@@ -19,9 +19,21 @@ once a version is tagged.
 | -- | -------- | ------- |
 | Windows | *SpacePenguin-Windows-X64* | run the `-setup.exe`, or unzip the portable zip |
 | macOS | *SpacePenguin-macOS-ARM64* (works on Intel Macs too) | open the DMG and drag SpacePenguin to Applications |
-| Linux | *SpacePenguin-Linux-X64* (or *-ARM64*) for the AppImage; *SpacePenguin-deb-…*, *-rpm-…*, *-pkg-…* for native packages | `chmod +x` the AppImage and run it |
+| Linux | the installer below, or *SpacePenguin-Linux-X64* (or *-ARM64*) for the AppImage; *SpacePenguin-deb-…*, *-rpm-…*, *-pkg-…* for native packages | the installer, or `chmod +x` the AppImage and run it |
 | Android | *SpacePenguin-Android* | open the `.apk` on the phone (allow installing from your browser or files app) |
 | iPhone and iPad | *SpacePenguin-iOS* | install the `-ios-unsigned.ipa` with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) and your Apple ID |
+
+On Linux, one command installs it for you, with an app-menu entry; run it again to
+update:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/install.sh | bash
+```
+
+It downloads the newest AppImage (before the first release, the newest build of
+`main`, published as the *nightly* pre-release), checks its SHA-256, installs any
+missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
+`~/.local/opt/spacepenguin`. `bash install.sh --uninstall` removes it.
 
 ## What it does
 
@@ -341,7 +353,7 @@ on each of them for every push.
 | Platform | Built with | Packages | Notes |
 | -------- | ---------- | -------- | ----- |
 | Linux (X11 and Wayland), any distribution, x86-64 and ARM64 | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
-| ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `packaging/chromeos/install.sh` | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
+| ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `install.sh` (or `packaging/chromeos/install.sh`) | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
 | Android 9+ (ARM64) | Qt Quick + QtWebView, Qt 6.8 | APK | a separate, smaller app on the phone's own web engine — see [Phones](#phones-android-and-ios) |
 | iOS and iPadOS 16+ | Qt Quick + QtWebView, Qt 6.8 | unsigned `.ipa` to sideload; signed `.ipa` with your Apple team | as Android |
 | Windows 10 and 11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
@@ -666,7 +678,7 @@ sudo packaging/linux/install-apparmor-profile.sh   # then restart SpacePenguin
 
 It writes `/etc/apparmor.d/spacepenguin-local`, which grants `userns` to this
 checkout's builds, its `.qt/` QtWebEngine helper, `/usr/local/bin/SpacePenguin` and
-an AppImage installed with `packaging/chromeos/install.sh`, and nothing else;
+an AppImage installed with `install.sh`, and nothing else;
 `--remove` takes it out again. It never names paths under `/tmp`, where anyone
 could put a program, so an AppImage run straight from its file stays unsandboxed:
 install it first. The `.deb` and `.rpm`

@@ -17,7 +17,7 @@
 # directory there, and a pattern such as /tmp/.mount_* would hand the user
 # namespaces that Ubuntu restricts on purpose to whatever program they put in it.
 # A running AppImage lives in such a directory, so install it first
-# (packaging/chromeos/install.sh unpacks it into ~/.local/opt/spacepenguin).
+# (install.sh unpacks it into ~/.local/opt/spacepenguin).
 set -euo pipefail
 
 PROFILE=/etc/apparmor.d/spacepenguin-local
@@ -60,7 +60,7 @@ else
                    "${ROOT}"/.qt/*/*/libexec/QtWebEngineProcess; do
         PROGRAMS+=("$(realpath "${program}")")
     done
-    # An AppImage installed by packaging/chromeos/install.sh for the user running sudo.
+    # An AppImage installed by install.sh for the user running sudo.
     home="$(getent passwd "${SUDO_USER:-root}" | cut -d: -f6)"
     for program in "${home}"/.local/opt/spacepenguin/usr/bin/SpacePenguin \
                    "${home}"/.local/opt/spacepenguin/usr/libexec/QtWebEngineProcess; do

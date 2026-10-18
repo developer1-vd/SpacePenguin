@@ -95,7 +95,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get install -y --no-install-recommends shellcheck
-          shellcheck install-deps.sh build-*.sh .github/scripts/*.sh packaging/chromeos/*.sh tools/*.sh
+          shellcheck install.sh install-deps.sh build-*.sh .github/scripts/*.sh packaging/chromeos/*.sh tools/*.sh
           desktop-file-validate packaging/linux/org.spacepenguin.SpacePenguin.desktop
           appstreamcli validate --no-net build/org.spacepenguin.SpacePenguin.metainfo.xml
 
@@ -115,6 +115,24 @@ jobs:
             su student -c "bash /src/packaging/chromeos/install.sh --yes /src/dist/*.AppImage"
             su student -c "QT_QPA_PLATFORM=offscreen ~/.local/bin/spacepenguin --version" | tee /dev/stderr | grep -q SpacePenguin
             su student -c "bash /src/packaging/chromeos/install.sh --uninstall"'
+
+      # The Linux installer, as a user with sudo, on stock systems of the other
+      # package managers: it installs the libraries they lack, then SpacePenguin.
+      - name: Check the Linux installer on Fedora, openSUSE and Arch
+        if: runner.os == 'Linux' && runner.arch == 'X64'
+        run: |
+          for image in fedora:latest opensuse/tumbleweed:latest archlinux:latest; do
+            echo "::group::${image}"
+            docker run --rm -v "$PWD:/src:ro" "${image}" sh -c '
+              set -e
+              if command -v dnf >/dev/null; then dnf install -y -q sudo shadow-utils findutils >/dev/null
+              elif command -v zypper >/dev/null; then zypper --non-interactive --quiet install sudo shadow findutils >/dev/null
+              else pacman -Sy --noconfirm --quiet sudo >/dev/null; fi
+              useradd -m student && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student
+              su student -c "bash /src/install.sh --yes /src/dist/*.AppImage"
+              su student -c "QT_QPA_PLATFORM=offscreen ~/.local/bin/spacepenguin --version" | tee /dev/stderr | grep -q SpacePenguin'
+            echo "::endgroup::"
+          done
 
       - name: Package .app and DMG
         if: runner.os == 'macOS'
@@ -338,3 +356,33 @@ jobs:
         with:
           files: packages/*
           generate_release_notes: true
+
+  # The newest build of main as the "nightly" pre-release, which install.sh falls
+  # back to while there is no release. Only the Linux AppImages: the installer's.
+  nightly:
+    name: Nightly
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [desktop]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          pattern: SpacePenguin-Linux-*
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls packages
+          # Move the tag to this build, then replace the files.
+          gh api -X PATCH "repos/${GH_REPO}/git/refs/tags/nightly" -f sha="${GITHUB_SHA}" -F force=true ||
+            gh api -X POST "repos/${GH_REPO}/git/refs" -f ref=refs/tags/nightly -f sha="${GITHUB_SHA}"
+          gh release view nightly >/dev/null 2>&1 ||
+            gh release create nightly --prerelease --title "Nightly" \
+              --notes "The newest build of main, for install.sh until the first release. Not a release: expect bugs."
+          gh release upload nightly packages/*.AppImage packages/*.AppImage.sha256 --clobber

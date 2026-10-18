@@ -14,7 +14,7 @@
 | `build-android.sh` | Linux, macOS | `dist/SpacePenguin-<version>-android-arm64.apk` (the phone app in `mobile/`) |
 | `build-ios.sh` | macOS with Xcode | an iOS Simulator build, or a signed `.ipa` with `--team` |
 | `build-all.sh` | any | whichever of the above this machine can make |
-| `packaging/chromeos/install.sh` | ChromeOS Linux, Debian, Ubuntu | the AppImage installed per user, with a launcher entry |
+| `install.sh` | any Linux, ChromeOS Linux | the AppImage installed per user, with an app-menu entry (`packaging/chromeos/install.sh` runs it) |
 | `tools/build-jobs.sh` | Linux, macOS | the number of compiler jobs this machine has memory for |
 
 Every packaging script reads the version from `CMakeLists.txt` unless given one,
@@ -110,20 +110,23 @@ machine's, which is why CI builds it on Ubuntu 22.04. The ARM64 AppImage is buil
 on Ubuntu 24.04, because Qt's ARM64 Linux binaries need glibc 2.38; it runs on
 Ubuntu 24.04, Debian 13, Fedora 39 and newer.
 
-## packaging/chromeos/install.sh
+## install.sh
 
 ```bash
-bash install.sh [--yes] [SpacePenguin-<version>-<arch>.AppImage]
+curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/install.sh | bash
+bash install.sh [--yes] [--no-deps] [SpacePenguin-<version>-<arch>.AppImage]
 bash install.sh --uninstall
 ```
 
-For Chromebooks (and any Debian or Ubuntu user without root for the rest):
-installs the libraries the AppImage takes from the system with apt, downloads the
-newest release's AppImage for this CPU (checking its `.sha256`) unless given one,
+The Linux installer, for any distribution and for Chromebooks
+(`packaging/chromeos/install.sh` runs it): installs the libraries the AppImage
+takes from the system with apt, dnf, zypper or pacman, downloads the newest
+release's AppImage for this CPU — or, before there is a release, the *nightly*
+pre-release that CI publishes from `main` — (checking its `.sha256`) unless given one,
 unpacks it into `~/.local/opt/spacepenguin`, links `~/.local/bin/spacepenguin`,
 installs the launcher entry and icon — which ChromeOS copies into its own
-launcher — and checks it starts. CI runs it in a stock Debian 12 container, the
-base of ChromeOS's Linux environment.
+launcher — and checks it starts. CI runs it in stock Debian containers, the
+base of ChromeOS's Linux environment, and in Fedora, openSUSE Tumbleweed and Arch.
 
 ## build-linux-packages.sh
 
