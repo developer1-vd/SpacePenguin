@@ -24,6 +24,7 @@ class QLineEdit;
 class QNetworkAccessManager;
 class QMenu;
 class QProgressBar;
+class QShortcut;
 class QStackedWidget;
 class QStandardItemModel;
 class QToolBar;
@@ -169,6 +170,8 @@ private:
     AboutPageContext aboutContext() const;
     void goHome();
     void toggleFullScreen();
+    void setPageFullScreen(bool on);
+    void exitPageFullScreen();
 
     void setZoom(qreal factor);
     qreal currentZoom() const;
@@ -202,6 +205,13 @@ private:
 
     ProfileServices m_services;
     bool m_isPrivate = false;
+    // A page (a video player) filling the screen.
+    bool m_pageFullScreen = false;
+    bool m_wasFullScreen = false;
+    bool m_wasMaximized = false;
+    QPointer<WebView> m_fullScreenView;
+    QList<QPointer<QWidget>> m_hiddenForFullScreen;
+    QShortcut *m_exitFullScreenShortcut = nullptr;
     UrlResolver m_resolver;
 
     // Chrome.

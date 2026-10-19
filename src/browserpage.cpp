@@ -21,7 +21,8 @@ BrowserPage::BrowserPage(QWebEngineProfile *profile, QObject *parent)
     settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, false);
     settings()->setAttribute(QWebEngineSettings::AllowRunningInsecureContent, false);
     settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, false);
-    settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, false);
+    // Video players may fill the screen; the window takes them there (see BrowserWindow).
+    settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
 
     // Remember the internal link last under the pointer. The hover is cleared just
     // before a click navigates, so keep it for a moment afterwards.

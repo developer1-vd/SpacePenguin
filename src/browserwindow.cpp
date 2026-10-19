@@ -75,6 +75,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QWebEngineFindTextResult>
+#include <QWebEngineFullScreenRequest>
 #include <QWebEngineHistory>
 #include <QWebEnginePage>
 #include <QWebEngineView>
@@ -401,6 +402,10 @@ void BrowserWindow::createActions()
 
     m_zoomResetAction = makeAction(tr("Reset Zoom"), Shortcuts::keys(Shortcuts::ZoomReset));
     connect(m_zoomResetAction, &QAction::triggered, this, [this] { setZoom(1.0); });
+
+    m_exitFullScreenShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    m_exitFullScreenShortcut->setEnabled(false);
+    connect(m_exitFullScreenShortcut, &QShortcut::activated, this, &BrowserWindow::exitPageFullScreen);
 
     m_fullScreenAction = makeAction(tr("Full Screen"), Shortcuts::keys(Shortcuts::FullScreen));
     m_fullScreenAction->setCheckable(true);
@@ -2590,6 +2595,10 @@ void BrowserWindow::onOmniboxReturnPressed()
 
 void BrowserWindow::toggleFullScreen()
 {
+    if (m_pageFullScreen) {
+        exitPageFullScreen();
+        return;
+    }
     if (isFullScreen()) {
         showNormal();
         m_fullScreenAction->setChecked(false);
@@ -2597,6 +2606,56 @@ void BrowserWindow::toggleFullScreen()
         showFullScreen();
         m_fullScreenAction->setChecked(true);
     }
+}
+
+void BrowserWindow::setPageFullScreen(bool on)
+{
+    if (on == m_pageFullScreen)
+        return;
+    m_pageFullScreen = on;
+    if (on) {
+        // Only the page: every bar above and below it, and the side tabs, step aside.
+        m_wasFullScreen = isFullScreen();
+        m_wasMaximized = isMaximized();
+        m_hiddenForFullScreen.clear();
+        QLayout *layout = centralWidget()->layout();
+        for (int i = 0; i < layout->count(); ++i) {
+            QWidget *widget = layout->itemAt(i)->widget();
+            if (widget && widget->isVisible()) {
+                m_hiddenForFullScreen.append(widget);
+                widget->hide();
+            }
+        }
+        if (m_sideTabs->isVisible()) {
+            m_hiddenForFullScreen.append(m_sideTabs);
+            m_sideTabs->hide();
+        }
+        m_progressBar->hide();
+        showFullScreen();
+        showToast(tr("Press Esc to leave full screen"), 3000);
+    } else {
+        for (const QPointer<QWidget> &widget : std::as_const(m_hiddenForFullScreen)) {
+            if (widget)
+                widget->show();
+        }
+        m_hiddenForFullScreen.clear();
+        if (!m_wasFullScreen) {
+            if (m_wasMaximized)
+                showMaximized();
+            else
+                showNormal();
+        }
+    }
+    m_exitFullScreenShortcut->setEnabled(on);
+}
+
+void BrowserWindow::exitPageFullScreen()
+{
+    if (m_fullScreenView)
+        m_fullScreenView->triggerPageAction(QWebEnginePage::ExitFullScreen);
+    // A page that is gone, or does not answer, is left anyway.
+    m_fullScreenView = nullptr;
+    setPageFullScreen(false);
 }
 
 void BrowserWindow::setZoom(qreal factor)
@@ -2860,6 +2919,17 @@ void BrowserWindow::connectView(WebView *view)
         if (view == currentView())
             onLinkHovered(url);
     });
+    connect(view->page(), &QWebEnginePage::fullScreenRequested, this,
+            [this, view](QWebEngineFullScreenRequest request) {
+                // Only the tab in front may take the screen.
+                if (request.toggleOn() && view != currentView()) {
+                    request.reject();
+                    return;
+                }
+                request.accept();
+                m_fullScreenView = request.toggleOn() ? view : nullptr;
+                setPageFullScreen(request.toggleOn());
+            });
     connect(view->page(), &QWebEnginePage::windowCloseRequested, this,
             [this, view] { closeTab(indexOfView(view)); });
     connect(view->browserPage(), &BrowserPage::internalPageRequested, this,
@@ -2921,6 +2991,9 @@ void BrowserWindow::onCurrentTabChanged(int index)
     if (const int group = m_groups->groupOf(view); m_groups->isCollapsed(group))
         m_groups->setCollapsed(group, false);
 
+    // Another tab coming forward ends a video's full screen.
+    if (m_pageFullScreen && m_fullScreenView != view)
+        exitPageFullScreen();
     m_stack->setCurrentWidget(view);
     m_linkPreview->hide();
     m_omniboxEdited = false;
