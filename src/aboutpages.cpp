@@ -4,6 +4,8 @@
 #include <QStringList>
 #include <QtGlobal>
 
+#include <iterator>
+
 #ifndef SPACEPENGUIN_BUILD_TYPE
 #    define SPACEPENGUIN_BUILD_TYPE "unknown"
 #endif
@@ -39,8 +41,8 @@ const PageDefinition kPages[] = {
       "Do. Or do not. There is no try.", true },
     { "about:hyperdrive", "Punch It",
       "Making the jump to lightspeed.", true },
-    { "about:mozilla", "Book of Mozilla",
-      "An ancient text describing the evolution of browsers, verse by verse.", true },
+    { "about:mozilla", "The Book of Mozilla",
+      "The verses Netscape and Firefox have kept since 1995.", true },
     { "about:firefox", "Phoenix Rising",
       "From the ashes of Netscape, a browser for everyone.", true },
     { "about:servo", "Fearless Concurrency",
@@ -279,36 +281,69 @@ QString hyperdriveBody()
         "The Falcon did it in less than twelve.</p>");
 }
 
-QString mozillaBody()
+// The Book of Mozilla, the verses Netscape and Firefox have shown at about:mozilla
+// since 1995. Text by Mozilla, under the Mozilla Public License 2.0.
+struct Verse {
+    const char *reference;
+    const char *text;
+};
+
+const Verse kBookOfMozilla[] = {
+    { "12:10",
+      "And the beast shall come forth surrounded by a roiling cloud of vengeance. "
+      "The house of the unbelievers shall be razed and they shall be scorched to the earth. "
+      "Their tags shall blink until the end of days." },
+    { "3:31",
+      "And the beast shall be made legion. Its numbers shall be increased a thousand "
+      "thousand fold. The din of a million keyboards like unto a great storm shall cover "
+      "the earth, and the followers of Mammon shall tremble." },
+    { "7:15",
+      "And so at last the beast fell and the unbelievers rejoiced. But all was not lost, "
+      "for from the ash rose a great bird. The bird gazed down upon the unbelievers and cast "
+      "fire and thunder upon them. For the beast had been reborn with its strength renewed, "
+      "and the followers of Mammon cowered in horror." },
+    { "8:20",
+      "The Beast adopted new raiment and studied the ways of Time and Space and Light and "
+      "the Flow of energy through the Universe. From its studies, the Beast fashioned new "
+      "structures from oxidised metal and proclaimed their glories. And the Beast's "
+      "followers rejoiced, finding renewed purpose in these teachings." },
+    { "11:9",
+      "Mammon slept. And the beast reborn spread over the earth and its numbers grew legion. "
+      "And they proclaimed the times and sacrificed crops unto the fire, with the cunning of "
+      "foxes. And they built a new world in their own image as promised by the sacred words, "
+      "and spoke of the beast with their children. Mammon awoke, and lo! it was naught but a "
+      "follower." },
+};
+
+QString mozillaPage()
 {
+    // As Firefox shows it: the newest verse, white on red; the older ones follow.
+    QString verses;
+    const int count = int(std::size(kBookOfMozilla));
+    for (int i = count - 1; i >= 0; --i) {
+        verses += QStringLiteral("<section%1><p>%2</p><p class=\"from\">from <b>The Book of Mozilla,</b> %3</p></section>")
+                      .arg(i == count - 1 ? QString() : QStringLiteral(" class=\"older\""),
+                           escape(QString::fromUtf8(kBookOfMozilla[i].text)),
+                           QString::fromLatin1(kBookOfMozilla[i].reference));
+    }
     return QStringLiteral(
-        "<h1>Book of Mozilla</h1>"
-        "<pre class=\"art\">"
-        "      __    \n"
-        "     /  \\   \n"
-        "    | :: |   \n"
-        "     \\__/    \n"
-        "    /    \\   \n"
-        "   /______\\  \n"
-        "</pre>"
-        "<p><b>Chapter 7, Verse 47</b></p>"
-        "<blockquote><p>The beast rose from the sea, and its mark was 666. "
-        "But mankind, in its pride and folly, had already built its own destruction. "
-        "The browser wars had begun, and only one would survive.</p></blockquote>"
-        "<p><b>Chapter 8, Verse 1</b></p>"
-        "<blockquote><p>And it came to pass that the survivor was reborn, "
-        "rising from the ashes of Netscape, clothed in open source, "
-        "to bring light unto the darkness of the web.</p></blockquote>"
-        "<p><b>Chapter 9, Verse 3</b></p>"
-        "<blockquote><p>But lo, the reborn browser was tempted by the siren song of "
-        "proprietary software, and it was torn asunder. From its fragments arose "
-        "a phoenix, and it was called Firefox, and it brought cross-platform salvation.</p></blockquote>"
-        "<p><b>Chapter 10, Verse 5</b></p>"
-        "<blockquote><p>And the phoenix multiplied, and its offspring spread across "
-        "every desktop and mobile device. But in its success, it forgot the old ways, "
-        "and the gears of progress turned ever faster.</p></blockquote>"
-        "<p class=\"hint\">Mozilla. Mankind's last hope for an open web. "
-        "Since 1998.</p>");
+               "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+               "<title>The Book of Mozilla — SpacePenguin</title>"
+               "<style>"
+               "html{background:#800000;color:#fff;color-scheme:dark}"
+               "body{margin:0;min-height:100vh;padding:12vh 1.5rem 4rem;"
+               "font:1.35rem/1.6 Georgia,'Times New Roman',serif}"
+               "section{max-width:36rem;margin:0 auto 4rem}"
+               "section p{margin:0}"
+               ".from{text-align:right;font-style:italic;margin-top:1rem}"
+               ".older{opacity:.6;font-size:1rem}"
+               ".credit{max-width:36rem;margin:0 auto;font:.8rem/1.5 system-ui,sans-serif;opacity:.6}"
+               ".credit a{color:#fff}"
+               "</style></head><body>%1"
+               "<p class=\"credit\">The Book of Mozilla is by Mozilla, under the "
+               "<a href=\"https://www.mozilla.org/MPL/2.0/\">Mozilla Public License 2.0</a>.</p>"
+               "</body></html>")
+        .arg(verses);
 }
 
 QString firefoxBody()
@@ -575,7 +610,7 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
     if (normalized == QLatin1String("about:hyperdrive"))
         return htmlShell(pageTitle(id), hyperdriveBody());
     if (normalized == QLatin1String("about:mozilla"))
-        return htmlShell(pageTitle(id), mozillaBody());
+        return mozillaPage();
     if (normalized == QLatin1String("about:firefox"))
         return htmlShell(pageTitle(id), firefoxBody());
     if (normalized == QLatin1String("about:servo"))
