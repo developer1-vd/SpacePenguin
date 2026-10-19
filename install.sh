@@ -141,7 +141,7 @@ if [[ ${DEPS} -eq 1 ]]; then
         install_missing "rpm -q" dnf install -y -q -- \
             mesa-libEGL mesa-libGL libglvnd-opengl fontconfig freetype libX11 libX11-xcb \
             libxkbcommon libxkbcommon-x11 libwayland-client libwayland-egl libwayland-cursor \
-            xcb-util-cursor alsa-lib nss libxshmfence mesa-libgbm libdrm glib2 libgpg-error libcom_err gmp
+            xcb-util-cursor alsa-lib nss libxshmfence mesa-libgbm libdrm glib2 libgpg-error libcom_err gmp \
             dejavu-sans-fonts \
             ca-certificates curl
     elif command -v zypper >/dev/null; then
