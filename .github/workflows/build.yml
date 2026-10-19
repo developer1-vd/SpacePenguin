@@ -95,7 +95,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get install -y --no-install-recommends shellcheck
-          shellcheck install-deps.sh build-*.sh .github/scripts/*.sh packaging/chromeos/*.sh tools/*.sh
+          shellcheck install.sh install-deps.sh build-*.sh .github/scripts/*.sh packaging/chromeos/*.sh tools/*.sh
           desktop-file-validate packaging/linux/org.spacepenguin.SpacePenguin.desktop
           appstreamcli validate --no-net build/org.spacepenguin.SpacePenguin.metainfo.xml
 
@@ -115,6 +115,24 @@ jobs:
             su student -c "bash /src/packaging/chromeos/install.sh --yes /src/dist/*.AppImage"
             su student -c "QT_QPA_PLATFORM=offscreen ~/.local/bin/spacepenguin --version" | tee /dev/stderr | grep -q SpacePenguin
             su student -c "bash /src/packaging/chromeos/install.sh --uninstall"'
+
+      # The Linux installer, as a user with sudo, on stock systems of the other
+      # package managers: it installs the libraries they lack, then SpacePenguin.
+      - name: Check the Linux installer on Fedora, openSUSE and Arch
+        if: runner.os == 'Linux' && runner.arch == 'X64'
+        run: |
+          for image in fedora:latest opensuse/tumbleweed:latest archlinux:latest; do
+            echo "::group::${image}"
+            docker run --rm -v "$PWD:/src:ro" "${image}" sh -c '
+              set -e
+              if command -v dnf >/dev/null; then dnf install -y -q sudo shadow-utils findutils >/dev/null
+              elif command -v zypper >/dev/null; then zypper --non-interactive --quiet install sudo shadow findutils >/dev/null
+              else pacman -Sy --noconfirm --quiet sudo >/dev/null; fi
+              useradd -m student && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student
+              sudo -iu student bash -c "bash /src/install.sh --yes /src/dist/*.AppImage"
+              sudo -iu student env QT_QPA_PLATFORM=offscreen /home/student/.local/bin/spacepenguin --version | tee /dev/stderr | grep -q SpacePenguin'
+            echo "::endgroup::"
+          done
 
       - name: Package .app and DMG
         if: runner.os == 'macOS'
@@ -266,10 +284,64 @@ jobs:
           bundle: SpacePenguin.flatpak
           cache-key: flatpak-builder-${{ github.sha }}
 
+  mobile:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Signed with your key when the ANDROID_KEYSTORE secrets are set, else a debug key.
+          - name: Android (APK)
+            os: ubuntu-24.04
+            script: ./build-android.sh ${ANDROID_KEYSTORE_BASE64:+--release}
+          # Qt 6.8 supports Xcode 16, which this runner has. The unsigned .ipa is for
+          # sideloading; the Simulator build checks the app also runs there.
+          - name: iOS (iPhone and Simulator)
+            os: macos-15
+            script: ./build-ios.sh --unsigned && ./build-ios.sh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        if: runner.os == 'Linux'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: .qt
+          key: qt-mobile-${{ env.QT_VERSION }}-${{ runner.os }}-${{ hashFiles('build-android.sh', 'build-ios.sh') }}
+
+      - name: Build
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          QT_ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          QT_ANDROID_KEYSTORE_KEY_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "${ANDROID_KEYSTORE_BASE64}" ] && [ "${RUNNER_OS}" = Linux ]; then
+            export QT_ANDROID_KEYSTORE_PATH="${RUNNER_TEMP}/release.keystore"
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "${QT_ANDROID_KEYSTORE_PATH}"
+          fi
+          ${{ matrix.script }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os == 'Linux' && 'SpacePenguin-Android' || 'SpacePenguin-iOS' }}
+          if-no-files-found: error
+          path: |
+            dist/*.apk
+            dist/*.ipa
+            dist/*.sha256
+
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [desktop, distro, nix, flatpak]
+    needs: [desktop, distro, nix, flatpak, mobile]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -277,9 +349,40 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: packages
+          pattern: SpacePenguin-*
           merge-multiple: true
 
       - uses: softprops/action-gh-release@v2
         with:
           files: packages/*
           generate_release_notes: true
+
+  # The newest build of main as the "nightly" pre-release, which install.sh falls
+  # back to while there is no release. Only the Linux AppImages: the installer's.
+  nightly:
+    name: Nightly
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [desktop]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          pattern: SpacePenguin-Linux-*
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls packages
+          # Move the tag to this build, then replace the files.
+          gh api -X PATCH "repos/${GH_REPO}/git/refs/tags/nightly" -f sha="${GITHUB_SHA}" -F force=true ||
+            gh api -X POST "repos/${GH_REPO}/git/refs" -f ref=refs/tags/nightly -f sha="${GITHUB_SHA}"
+          gh release view nightly >/dev/null 2>&1 ||
+            gh release create nightly --prerelease --title "Nightly" \
+              --notes "The newest build of main, for install.sh until the first release. Not a release: expect bugs."
+          gh release upload nightly packages/*.AppImage packages/*.AppImage.sha256 --clobber

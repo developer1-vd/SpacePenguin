@@ -34,6 +34,21 @@ public:
         QColor success;
     };
 
+    /** A colour theme over light and dark: its accent, and the chrome tinted with it. */
+    struct Palette {
+        QString id;
+        QString name;
+        QColor lightAccent;
+        QColor darkAccent;
+        qreal tint = 0.0; // how much of the accent goes into the tab strip and window
+    };
+    static QList<Palette> palettes();
+    static Palette palette(const QString &id);
+    static QString storedPalette();
+    /** CSS that gives a page's --accent the colour theme's, in light and dark. */
+    static QByteArray accentCss();
+    static void storePalette(const QString &id);
+
     static QList<Mode> modes();
     static QString modeKey(Mode mode);
     static QString modeLabel(Mode mode);

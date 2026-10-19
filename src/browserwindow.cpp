@@ -4,6 +4,7 @@
 #include "adblocker.h"
 #include "bookmarkmanager.h"
 #include "bookmarksdialog.h"
+#include "chromeextensions.h"
 #include "browserpage.h"
 #include "cookiemanager.h"
 #include "datasavermanager.h"
@@ -12,13 +13,18 @@
 #include "extensionsdialog.h"
 #include "historydialog.h"
 #include "historymanager.h"
+#include "logins.h"
+#include "notifications.h"
 #include "icons.h"
 #include "preferences.h"
 #include "devicetuning.h"
 #include "sandbox.h"
 #include "settingsdialog.h"
 #include "shortcuts.h"
+#include "sidetabs.h"
+#include "sitepermissions.h"
 #include "startuptrace.h"
+#include "tabgroups.h"
 #include "userextensions.h"
 #include "webview.h"
 #include "windowframe.h"
@@ -29,12 +35,20 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QCompleter>
+#include <QCursor>
 #include <QDateTime>
 #include <QDialog>
+#include <QPointer>
+#include <QFile>
+#include <QDir>
 #include <QDialogButtonBox>
+#include <QFocusEvent>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
@@ -43,7 +57,12 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QProgressBar>
+#include <QRegularExpression>
+#include <QPushButton>
 #include <QSet>
 #include <QSettings>
 #include <QShortcut>
@@ -58,9 +77,15 @@
 #include <QWebEngineFindTextResult>
 #include <QWebEngineHistory>
 #include <QWebEnginePage>
+#include <QWebEngineView>
+#include <QWebEnginePermission>
+#include <QWebEngineProfile>
+#include <QWebEngineScript>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
 #include <QWidgetAction>
+
+#include <memory>
 
 namespace spacepenguin {
 namespace {
@@ -70,8 +95,6 @@ constexpr qreal kMaximumZoom = 2.0;
 constexpr qreal kZoomStep = 0.1;
 constexpr int kMaximumRestoredTabs = 32;
 constexpr int kMaximumClosedTabs = 16;
-constexpr int kMinimumTabWidth = 72;
-constexpr int kMaximumTabWidth = 240;
 constexpr int kMaximumCompletions = 400;
 constexpr int kLinkPreviewMargin = 6;
 
@@ -123,8 +146,10 @@ bool isWebScheme(const QUrl &url)
 
 bool isStartPage(const QUrl &url)
 {
-    return url.scheme() == QLatin1String("sp");
+    return url.scheme() == QLatin1String("sp") && url.host() != QLatin1String("store");
 }
+
+const QUrl kStoreUrl(QStringLiteral("sp://store/"));
 
 QToolButton *chromeButton(QAction *action, QWidget *parent = nullptr)
 {
@@ -142,39 +167,6 @@ QString formatPercent(qreal factor)
 }
 
 } // namespace
-
-// ---- TabBar ---------------------------------------------------------------
-
-TabBar::TabBar(QWidget *parent)
-    : QTabBar(parent)
-{
-    setObjectName(QStringLiteral("tabBar"));
-    setExpanding(false);
-    setMovable(true);
-    setTabsClosable(false); // each tab gets its own themed close button
-    setUsesScrollButtons(true);
-    setElideMode(Qt::ElideRight);
-    setDocumentMode(true);
-    setDrawBase(false);
-    setIconSize(QSize(16, 16));
-    setFocusPolicy(Qt::NoFocus);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-}
-
-QSize TabBar::tabSizeHint(int index) const
-{
-    QSize hint = QTabBar::tabSizeHint(index);
-    const int tabs = qMax(1, count());
-    hint.setWidth(qBound(kMinimumTabWidth, width() / tabs, kMaximumTabWidth));
-    return hint;
-}
-
-QSize TabBar::minimumTabSizeHint(int index) const
-{
-    QSize hint = QTabBar::minimumTabSizeHint(index);
-    hint.setWidth(kMinimumTabWidth);
-    return hint;
-}
 
 // ---- BrowserWindow ----------------------------------------------------------
 
@@ -199,6 +191,9 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
     m_frame = new WindowFrame(this);
 
     Theme::apply(Theme::storedMode());
+
+    m_groups = new TabGroups(this);
+    connect(m_groups, &TabGroups::changed, this, &BrowserWindow::refreshGroups);
 
     createActions();
     createChrome();
@@ -235,6 +230,39 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
         connect(m_services.historyManager, &HistoryManager::visitRemoved, this, historyChanged);
         connect(m_services.historyManager, &HistoryManager::historyCleared, this, historyChanged);
     }
+
+    if (m_services.logins)
+        connect(m_services.logins, &LoginStore::changed, this, &BrowserWindow::updateLoginsAction);
+
+    if (m_services.extensions) {
+        connect(m_services.extensions, &ChromeExtensions::installed, this, [this](const QString &name) {
+            if (isActiveWindow())
+                showToast(tr("Added “%1”. Find it under the puzzle piece in the toolbar.").arg(name), 5000);
+        });
+        connect(m_services.extensions, &ChromeExtensions::failed, this, [this](const QString &message) {
+            if (isActiveWindow())
+                showToast(message, 8000);
+        });
+    }
+
+    // A clicked notification brings its site's tab forward.
+    connect(Notifications::instance(), &Notifications::clicked, this, [this](const QUrl &origin) {
+        for (int i = 0; i < m_tabBar->count(); ++i) {
+            const WebView *view = viewAt(i);
+            if (view && view->url().host() == origin.host() && view->url().scheme() == origin.scheme()) {
+                m_tabBar->setCurrentIndex(i);
+                showNormal();
+                raise();
+                activateWindow();
+                return;
+            }
+        }
+    });
+    connect(Notifications::instance(), &Notifications::shownInWindow, this,
+            [this](const QString &title, const QString &message) {
+                if (isActiveWindow())
+                    showToast(message.isEmpty() ? title : QStringLiteral("%1 — %2").arg(title, message), 6000);
+            });
 
     if (m_services.downloadManager) {
         connect(m_services.downloadManager, &DownloadManager::downloadStarted, this,
@@ -389,6 +417,13 @@ void BrowserWindow::createActions()
     connect(m_bookmarksBarAction, &QAction::triggered, this,
             [](bool checked) { Preferences::instance()->setShowBookmarksBar(checked); });
 
+    m_sideTabsAction = makeAction(tr("Tabs on the Side"), Shortcuts::keys(Shortcuts::SideTabs),
+                                  Icons::icon(Icons::SideTabs));
+    m_sideTabsAction->setCheckable(true);
+    m_sideTabsAction->setToolTip(tr("Show tabs on the side (%1)").arg(Shortcuts::text(Shortcuts::SideTabs)));
+    connect(m_sideTabsAction, &QAction::triggered, this,
+            [](bool checked) { Preferences::instance()->setSideTabs(checked); });
+
     m_menuBarAction = makeAction(tr("Show Menu Bar"));
     m_menuBarAction->setCheckable(true);
     connect(m_menuBarAction, &QAction::triggered, this,
@@ -470,6 +505,8 @@ void BrowserWindow::createChrome()
         layout->addWidget(bannerHolder);
     }
 
+    layout->addWidget(createPromptBar());
+
     m_progressBar = new QProgressBar;
     m_progressBar->setObjectName(QStringLiteral("loadProgress"));
     m_progressBar->setTextVisible(false);
@@ -492,7 +529,23 @@ void BrowserWindow::createChrome()
     m_linkPreview->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_linkPreview->hide();
 
-    layout->addWidget(content, 1);
+    m_sideTabs = new SideTabs(m_tabBar, m_groups, m_newTabAction, m_isPrivate);
+    m_sideTabs->hide();
+    connect(m_sideTabs, &SideTabs::closeRequested, this, &BrowserWindow::closeTab);
+    connect(m_sideTabs, &SideTabs::contextMenuRequested, this, &BrowserWindow::showTabMenu);
+    connect(m_sideTabs, &SideTabs::groupToggleRequested, this, &BrowserWindow::toggleGroupCollapsed);
+    connect(m_sideTabs, &SideTabs::groupMenuRequested, this, &BrowserWindow::showGroupMenu);
+    connect(m_sideTabs, &SideTabs::collapseRequested, this,
+            [](bool collapsed) { Preferences::instance()->setSideTabsCollapsed(collapsed); });
+    connect(m_sideTabs, &SideTabs::topTabsRequested, this,
+            [] { Preferences::instance()->setSideTabs(false); });
+
+    auto *body = new QHBoxLayout;
+    body->setContentsMargins(0, 0, 0, 0);
+    body->setSpacing(0);
+    body->addWidget(m_sideTabs);
+    body->addWidget(content, 1);
+    layout->addLayout(body, 1);
     layout->addWidget(createFindBar());
 
     setCentralWidget(central);
@@ -509,7 +562,13 @@ QWidget *BrowserWindow::createTabStrip()
     layout->setContentsMargins(6, 0, 6, 0);
     layout->setSpacing(2);
 
+    // Edge's place for it: the first thing in the row.
+    auto *sideTabsButton = chromeButton(m_sideTabsAction);
+    sideTabsButton->setCheckable(false);
+    layout->addWidget(sideTabsButton, 0, Qt::AlignVCenter);
+
     m_tabBar = new TabBar;
+    m_tabBar->setGroups(m_groups);
     m_tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
     m_tabBar->installEventFilter(this);
     m_tabStrip->installEventFilter(this);
@@ -540,6 +599,12 @@ QWidget *BrowserWindow::createTabStrip()
     });
 
     connect(m_tabBar, &QTabBar::currentChanged, this, &BrowserWindow::onCurrentTabChanged);
+    connect(m_tabBar, &QTabBar::currentChanged, this, &BrowserWindow::syncSideTabs);
+    connect(m_tabBar, &QTabBar::tabMoved, this, &BrowserWindow::syncSideTabs);
+    connect(m_tabBar, &TabBar::tabsChanged, this, &BrowserWindow::syncSideTabs);
+    connect(m_tabBar, &TabBar::dragFinished, this, &BrowserWindow::onTabDragFinished);
+    connect(m_tabBar, &TabBar::groupChipClicked, this, &BrowserWindow::toggleGroupCollapsed);
+    connect(m_tabBar, &TabBar::groupMenuRequested, this, &BrowserWindow::showGroupMenu);
     connect(m_tabBar, &QTabBar::customContextMenuRequested, this,
             &BrowserWindow::showTabContextMenu);
     connect(m_tabBar, &QTabBar::tabBarDoubleClicked, this, [this](int index) {
@@ -600,6 +665,25 @@ QWidget *BrowserWindow::createNavigationBar()
                 });
             }
         }
+        if (WebView *view = currentView(); view && m_services.profile) {
+            const QUrl origin = view->url().adjusted(QUrl::RemovePath | QUrl::RemoveQuery
+                                                     | QUrl::RemoveFragment);
+            bool first = true;
+            for (const QWebEnginePermission &permission : m_services.profile->listPermissionsForOrigin(origin)) {
+                if (permission.state() == QWebEnginePermission::State::Ask)
+                    continue;
+                if (first)
+                    menu.addSeparator();
+                first = false;
+                QAction *reset = menu.addAction(tr("%1: %2 — ask again")
+                                                    .arg(SitePermissions::name(permission.permissionType()),
+                                                         SitePermissions::stateName(permission.state())));
+                connect(reset, &QAction::triggered, this, [permission] { permission.reset(); });
+            }
+            menu.addSeparator();
+            connect(menu.addAction(tr("Site permissions…")), &QAction::triggered, this,
+                    &BrowserWindow::showSitePermissions);
+        }
         menu.exec(m_omnibox->mapToGlobal(QPoint(0, m_omnibox->height())));
     });
 
@@ -614,6 +698,12 @@ QWidget *BrowserWindow::createNavigationBar()
         updateBookmarkStar();
         toggleBookmarkForCurrentPage();
     });
+
+    // Shown when the site has saved logins: pick one to fill it in.
+    m_loginsAction = m_omnibox->addAction(Icons::icon(Icons::Key), QLineEdit::TrailingPosition);
+    m_loginsAction->setToolTip(tr("Fill in a saved login"));
+    m_loginsAction->setVisible(false);
+    connect(m_loginsAction, &QAction::triggered, this, &BrowserWindow::showLoginsMenu);
 
     m_completionModel = new QStandardItemModel(this);
     m_completer = new QCompleter(m_completionModel, this);
@@ -660,6 +750,20 @@ QWidget *BrowserWindow::createNavigationBar()
     connect(m_blockingMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateBlockingMenu);
     layout->addWidget(m_blockingButton);
 
+    // Chrome extensions: their popups, and the way to manage them.
+    m_extensionsButton = new QToolButton;
+    m_extensionsButton->setIcon(Icons::icon(Icons::Extensions));
+    m_extensionsButton->setIconSize(QSize(18, 18));
+    m_extensionsButton->setToolTip(tr("Extensions"));
+    m_extensionsButton->setPopupMode(QToolButton::InstantPopup);
+    m_extensionsButton->setFocusPolicy(Qt::NoFocus);
+    m_extensionsMenu = new QMenu(this);
+    m_extensionsButton->setMenu(m_extensionsMenu);
+    connect(m_extensionsMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateExtensionsMenu);
+    // User scripts work in every normal window; Chrome extensions where Qt allows them.
+    m_extensionsButton->setVisible(!m_isPrivate && m_services.userScripts);
+    layout->addWidget(m_extensionsButton);
+
     m_downloadsButton = chromeButton(m_downloadsAction);
     layout->addWidget(m_downloadsButton);
 
@@ -672,6 +776,10 @@ QWidget *BrowserWindow::createNavigationBar()
     m_menuButton->setFocusPolicy(Qt::NoFocus);
     m_menuButton->setMenu(createAppMenu());
     layout->addWidget(m_menuButton);
+
+    // With the tabs on the side this row is the title bar: the window buttons move
+    // here and its empty part moves the window.
+    m_frame->addDragArea(m_navBar, [this](const QPoint &) { return m_tabsOnSide; });
 
     return m_navBar;
 }
@@ -827,6 +935,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_extensionsAction);
     menu->addAction(m_settingsAction);
     menu->addSeparator();
+    menu->addAction(m_sideTabsAction);
     menu->addAction(m_menuBarAction);
 
     QMenu *help = menu->addMenu(tr("Help"));
@@ -874,6 +983,7 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_fullScreenAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_bookmarksBarAction);
+    viewMenu->addAction(m_sideTabsAction);
     viewMenu->addAction(m_menuBarAction);
     QMenu *themeMenu = viewMenu->addMenu(tr("Theme"));
     themeMenu->addActions(m_themeGroup->actions());
@@ -937,8 +1047,12 @@ void BrowserWindow::applyPreferences()
     m_menuBarAction->setChecked(preferences->showMenuBar());
 #endif
     m_frame->setCustomTitleBar(!preferences->useSystemTitleBar());
+    setTabsOnSide(preferences->sideTabs());
+    m_sideTabs->setCollapsed(preferences->sideTabsCollapsed());
 
     syncThemeMenu();
+    // The groups' colours follow the theme.
+    refreshGroups();
     updateBlockingIndicator();
 }
 
@@ -979,7 +1093,11 @@ void BrowserWindow::showExtensionsDialog()
     if (!m_services.userScripts)
         return;
 
-    ExtensionsDialog dialog(m_services.userScripts, this);
+    ExtensionsDialog dialog(m_services.userScripts, m_services.extensions, this);
+    connect(&dialog, &ExtensionsDialog::scriptStoreRequested, this, [this] { newTab(kStoreUrl); });
+    connect(&dialog, &ExtensionsDialog::webStoreRequested, this, [this] {
+        newTab(QUrl(QStringLiteral("https://chromewebstore.google.com/category/extensions")));
+    });
     dialog.exec();
 }
 
@@ -997,6 +1115,9 @@ void BrowserWindow::showSettings()
     dialog.setProfile(m_services.profile);
     connect(&dialog, &SettingsDialog::extensionsRequested, this,
             &BrowserWindow::showExtensionsDialog);
+    connect(&dialog, &SettingsDialog::savedLoginsRequested, this, &BrowserWindow::showSavedLogins);
+    connect(&dialog, &SettingsDialog::sitePermissionsRequested, this,
+            &BrowserWindow::showSitePermissions);
     dialog.exec();
 }
 
@@ -1318,6 +1439,30 @@ void BrowserWindow::restoreSession()
                                int(urls.size()) - 1);
     for (const QString &url : urls)
         newTab(QUrl(url));
+
+    const QJsonObject saved =
+        QJsonDocument::fromJson(settings.value(QStringLiteral("session/groups")).toString().toUtf8())
+            .object();
+    const QJsonArray groupList = saved.value(QStringLiteral("groups")).toArray();
+    const QJsonArray tabGroups = saved.value(QStringLiteral("tabs")).toArray();
+    QHash<int, int> ids; // place in the saved list -> new group
+    for (int index = 0; index < tabGroups.size() && index < m_tabBar->count(); ++index) {
+        const int place = tabGroups.at(index).toInt(-1);
+        if (place < 0 || place >= groupList.size())
+            continue;
+        if (!ids.contains(place)) {
+            const QJsonObject group = groupList.at(place).toObject();
+            ids.insert(place, m_groups->create(group.value(QStringLiteral("title")).toString(),
+                                               group.value(QStringLiteral("color")).toInt()));
+        }
+        m_groups->setGroupOf(viewAt(index), ids.value(place));
+    }
+    for (auto it = ids.cbegin(); it != ids.cend(); ++it) {
+        m_groups->setCollapsed(it.value(),
+                               groupList.at(it.key()).toObject().value(QStringLiteral("collapsed")).toBool());
+    }
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
     m_tabBar->setCurrentIndex(current);
 }
 
@@ -1330,13 +1475,34 @@ void BrowserWindow::saveSession() const
 
     QStringList urls;
     urls.reserve(m_tabBar->count());
+    // Each saved tab's group, as a place in the list of groups; -1 for none.
+    const QList<TabGroup> groups = m_groups->groups();
+    QJsonArray tabGroups;
     for (int index = 0; index < m_tabBar->count(); ++index) {
         const WebView *view = viewAt(index);
-        if (view && view->url().isValid() && !view->url().isEmpty())
+        if (view && view->url().isValid() && !view->url().isEmpty()) {
             urls.append(view->url().toString());
+            const int group = m_groups->groupOf(view);
+            int place = -1;
+            for (int i = 0; i < groups.size(); ++i) {
+                if (groups.at(i).id == group)
+                    place = i;
+            }
+            tabGroups.append(place);
+        }
+    }
+    QJsonArray groupList;
+    for (const TabGroup &group : groups) {
+        groupList.append(QJsonObject{{QStringLiteral("title"), group.title},
+                                     {QStringLiteral("color"), group.color},
+                                     {QStringLiteral("collapsed"), group.collapsed}});
     }
 
     settings.setValue(QStringLiteral("session/urls"), urls);
+    settings.setValue(QStringLiteral("session/groups"),
+                      QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("groups"), groupList},
+                                                                  {QStringLiteral("tabs"), tabGroups}})
+                                            .toJson(QJsonDocument::Compact)));
     settings.setValue(QStringLiteral("session/currentTab"), m_tabBar->currentIndex());
     settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
 }
@@ -1384,6 +1550,7 @@ WebView *BrowserWindow::addTab(bool background)
     const int insertAt = current < 0 ? 0 : (background ? current + 1 : m_tabBar->count());
     const int index = m_tabBar->insertTab(insertAt, Icons::icon(Icons::Globe), tr("New Tab"));
     m_tabBar->setTabData(index, QVariant::fromValue(static_cast<QObject *>(view)));
+    m_tabBar->setLabel(index, {tr("New Tab"), Icons::icon(Icons::Globe), tr("New Tab")});
 
     auto *closeButton = new QToolButton;
     closeButton->setObjectName(QStringLiteral("tabClose"));
@@ -1396,8 +1563,15 @@ WebView *BrowserWindow::addTab(bool background)
     connect(closeButton, &QToolButton::clicked, this, [this, view] { closeTab(indexOfView(view)); });
     m_tabBar->setTabButton(index, QTabBar::RightSide, closeButton);
 
+    // A link opened in the background from a grouped tab joins its group, as in
+    // other browsers; any other new tab stays out of the groups it lands among.
+    if (background && current >= 0)
+        m_groups->setGroupOf(view, m_groups->groupOf(tabObject(m_tabBar, current)));
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
+
     if (!background || m_tabBar->count() == 1)
-        m_tabBar->setCurrentIndex(index);
+        m_tabBar->setCurrentIndex(indexOfView(view));
 
     return view;
 }
@@ -1478,9 +1652,12 @@ void BrowserWindow::closeTab(int index)
         return;
     }
 
+    m_tabBar->releaseChip(index);
     m_tabBar->removeTab(index);
     m_stack->removeWidget(view);
+    m_groups->forget(view);
     view->deleteLater();
+    refreshGroups();
 }
 
 void BrowserWindow::closeOtherTabs(int index)
@@ -1513,14 +1690,23 @@ void BrowserWindow::reopenClosedTab()
     const int to = qBound(0, closed.index, m_tabBar->count() - 1);
     if (from != to)
         m_tabBar->moveTab(from, to);
-    m_tabBar->setCurrentIndex(to);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
+    m_tabBar->setCurrentIndex(indexOfView(view));
 }
 
 void BrowserWindow::selectTabByOffset(int offset)
 {
     if (m_tabBar->count() < 2)
         return;
-    const int index = (m_tabBar->currentIndex() + offset + m_tabBar->count()) % m_tabBar->count();
+    // Tabs in collapsed groups are skipped, as in other browsers.
+    const int count = m_tabBar->count();
+    int index = m_tabBar->currentIndex();
+    for (int step = 0; step < count; ++step) {
+        index = (index + offset + count) % count;
+        if (!m_groups->isCollapsed(m_groups->groupOf(tabObject(m_tabBar, index))))
+            break;
+    }
     m_tabBar->setCurrentIndex(index);
 }
 
@@ -1532,7 +1718,11 @@ void BrowserWindow::selectTabByIndex(int index)
 
 void BrowserWindow::showTabContextMenu(const QPoint &pos)
 {
-    const int index = m_tabBar->tabAt(pos);
+    showTabMenu(m_tabBar->tabAt(pos), m_tabBar->mapToGlobal(pos));
+}
+
+void BrowserWindow::showTabMenu(int index, const QPoint &globalPosition)
+{
     QMenu menu(this);
     menu.addAction(m_newTabAction);
     if (index >= 0) {
@@ -1541,6 +1731,44 @@ void BrowserWindow::showTabContextMenu(const QPoint &pos)
                 this, [this, index] { if (WebView *view = viewAt(index)) view->reload(); });
         connect(menu.addAction(tr("Duplicate")), &QAction::triggered, this,
                 [this, index] { duplicateTab(index); });
+
+        menu.addSeparator();
+        QObject *tab = tabObject(m_tabBar, index);
+        const int ownGroup = m_groups->groupOf(tab);
+        connect(menu.addAction(tr("Add Tab to New Group")), &QAction::triggered, this,
+                [this, index] { addTabToNewGroup(index); });
+        const QList<TabGroup> groups = m_groups->groups();
+        if (groups.size() > (ownGroup ? 1 : 0)) {
+            QMenu *addTo = menu.addMenu(tr("Add Tab to Group"));
+            for (const TabGroup &group : groups) {
+                if (group.id == ownGroup)
+                    continue;
+                QPixmap swatch(12, 12);
+                swatch.fill(Qt::transparent);
+                QPainter painter(&swatch);
+                painter.setRenderHint(QPainter::Antialiasing);
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(TabGroups::color(group.color, Theme::isDark()));
+                painter.drawEllipse(QRectF(1, 1, 10, 10));
+                painter.end();
+                const QString name = group.title.isEmpty() ? tr("Unnamed group") : group.title;
+                connect(addTo->addAction(QIcon(swatch), name), &QAction::triggered, this,
+                        [this, tab, id = group.id] {
+                            m_groups->setGroupOf(tab, id);
+                            m_groups->arrange(m_tabBar);
+                            refreshGroups();
+                        });
+            }
+        }
+        if (ownGroup) {
+            connect(menu.addAction(tr("Remove from Group")), &QAction::triggered, this, [this, tab] {
+                // Keeping the group together moves the tab out of its run of tabs.
+                m_groups->setGroupOf(tab, 0);
+                m_groups->arrange(m_tabBar);
+                refreshGroups();
+            });
+        }
+
         menu.addSeparator();
         connect(menu.addAction(Icons::icon(Icons::Close), tr("Close Tab")), &QAction::triggered,
                 this, [this, index] { closeTab(index); });
@@ -1549,7 +1777,9 @@ void BrowserWindow::showTabContextMenu(const QPoint &pos)
         connect(others, &QAction::triggered, this, [this, index] { closeOtherTabs(index); });
     }
     menu.addAction(m_reopenTabAction);
-    menu.exec(m_tabBar->mapToGlobal(pos));
+    menu.addSeparator();
+    menu.addAction(m_sideTabsAction);
+    menu.exec(globalPosition);
 }
 
 void BrowserWindow::updateTabLabel(WebView *view)
@@ -1573,16 +1803,662 @@ void BrowserWindow::updateTabLabel(WebView *view)
             title = tr("New Tab");
     }
 
-    m_tabBar->setTabText(index, title);
-    m_tabBar->setTabToolTip(index, url.isEmpty() ? title
-                                                 : QStringLiteral("%1\n%2").arg(title, url.toDisplayString()));
+    const QString toolTip = url.isEmpty() ? title
+                                          : QStringLiteral("%1\n%2").arg(title, url.toDisplayString());
 
     QIcon icon = view->icon();
-    if (isStartPage(url) || url.scheme() == QLatin1String("about"))
+    if (url.scheme() == QLatin1String("sp") || url.scheme() == QLatin1String("about"))
         icon = Icons::icon(Icons::Penguin);
     else if (icon.isNull())
         icon = Icons::icon(Icons::Globe);
-    m_tabBar->setTabIcon(index, icon);
+    m_tabBar->setLabel(index, {title, icon, toolTip});
+    syncSideTabs();
+}
+
+// ---- Questions above the page --------------------------------------------------------
+
+QWidget *BrowserWindow::createPromptBar()
+{
+    auto *bar = new QWidget;
+    bar->setObjectName(QStringLiteral("promptBar"));
+    bar->setAttribute(Qt::WA_StyledBackground);
+    auto *barLayout = new QHBoxLayout(bar);
+    barLayout->setContentsMargins(12, 6, 6, 6);
+    barLayout->setSpacing(10);
+    m_promptIcon = new QLabel;
+    barLayout->addWidget(m_promptIcon);
+    m_promptText = new QLabel;
+    m_promptText->setWordWrap(true);
+    barLayout->addWidget(m_promptText, 1);
+    m_promptButtons = new QWidget;
+    auto *buttons = new QHBoxLayout(m_promptButtons);
+    buttons->setContentsMargins(0, 0, 0, 0);
+    buttons->setSpacing(6);
+    barLayout->addWidget(m_promptButtons);
+    auto *dismiss = new QToolButton;
+    dismiss->setIcon(Icons::icon(Icons::Close));
+    dismiss->setAutoRaise(true);
+    dismiss->setToolTip(tr("Not now"));
+    connect(dismiss, &QToolButton::clicked, this, [this] { answerPrompt(-1); });
+    barLayout->addWidget(dismiss);
+
+    // A card that keeps clear of the window's edges, like the sandbox notice.
+    m_promptBar = new QWidget;
+    auto *holder = new QVBoxLayout(m_promptBar);
+    holder->setContentsMargins(8, 6, 8, 2);
+    holder->addWidget(bar);
+    m_promptBar->hide();
+    return m_promptBar;
+}
+
+void BrowserWindow::addPrompt(WebView *view, Prompt prompt)
+{
+    QList<Prompt> &queue = m_prompts[view];
+    for (const Prompt &queued : std::as_const(queue)) {
+        if (queued.key == prompt.key)
+            return;
+    }
+    queue.append(std::move(prompt));
+    if (view == currentView())
+        showPrompt();
+}
+
+void BrowserWindow::dropPrompts(WebView *view, const QString &key)
+{
+    auto found = m_prompts.find(view);
+    if (found == m_prompts.end())
+        return;
+    found->removeIf([&key](const Prompt &prompt) { return prompt.key == key; });
+    if (view == currentView())
+        showPrompt();
+}
+
+void BrowserWindow::showPrompt()
+{
+    if (!m_promptBar)
+        return;
+    const QList<Prompt> queue = m_prompts.value(currentView());
+    if (queue.isEmpty()) {
+        m_promptBar->hide();
+        return;
+    }
+    const Prompt &prompt = queue.first();
+    m_promptIcon->setPixmap(Icons::icon(prompt.icon).pixmap(18, 18));
+    m_promptText->setText(prompt.text);
+    QLayout *layout = m_promptButtons->layout();
+    while (QLayoutItem *item = layout->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    for (int i = 0; i < prompt.buttons.size(); ++i) {
+        auto *button = new QPushButton(prompt.buttons.at(i).first);
+        button->setAutoDefault(false);
+        button->setProperty("accent", i == 0);
+        connect(button, &QPushButton::clicked, this, [this, i] { answerPrompt(i); });
+        layout->addWidget(button);
+    }
+    m_promptBar->show();
+}
+
+void BrowserWindow::answerPrompt(int button)
+{
+    auto found = m_prompts.find(currentView());
+    if (found == m_prompts.end() || found->isEmpty())
+        return;
+    const Prompt prompt = found->takeFirst();
+    if (button >= 0 && button < prompt.buttons.size()) {
+        if (prompt.buttons.at(button).second)
+            prompt.buttons.at(button).second();
+    } else if (prompt.dismissed) {
+        prompt.dismissed();
+    }
+    showPrompt();
+}
+
+void BrowserWindow::offerToSaveLogin(WebView *view, const QString &username, const QString &password)
+{
+    LoginStore *logins = m_services.logins;
+    const QString origin = LoginStore::originOf(view->url());
+    if (!logins || m_isPrivate || origin.isEmpty() || !Preferences::instance()->offerToSaveLogins()
+        || logins->isNeverSaved(origin) || logins->contains(origin, username, password)) {
+        return;
+    }
+    bool update = false;
+    for (const Login &login : logins->loginsFor(origin))
+        update = update || login.username == username;
+
+    const QString site = SitePermissions::siteName(QUrl(origin)).toHtmlEscaped();
+    const QString who = username.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(username.toHtmlEscaped());
+    Prompt prompt;
+    prompt.key = QStringLiteral("login:%1:%2").arg(origin, username);
+    prompt.icon = Icons::Key;
+    if (update) {
+        prompt.text = tr("Update the saved password for <b>%1</b>%2?").arg(site, who);
+        prompt.buttons = {{tr("Update"), [logins, origin, username, password] {
+                               logins->save(origin, username, password);
+                           }}};
+    } else {
+        prompt.text = tr("Save your login for <b>%1</b>%2?").arg(site, who);
+        prompt.buttons = {{tr("Save"), [logins, origin, username, password] {
+                               logins->save(origin, username, password);
+                           }},
+                          {tr("Never for this site"), [logins, origin] {
+                               logins->setNeverSave(origin, true);
+                           }}};
+    }
+    // The sign-in usually opens a new page; ask on the tab wherever it went.
+    dropPrompts(view, prompt.key);
+    addPrompt(view, prompt);
+}
+
+void BrowserWindow::updateLoginsAction()
+{
+    if (!m_loginsAction)
+        return;
+    const WebView *view = currentView();
+    const QString origin = view ? LoginStore::originOf(view->url()) : QString();
+    m_loginsAction->setVisible(m_services.logins && !origin.isEmpty()
+                               && !m_services.logins->loginsFor(origin).isEmpty());
+}
+
+void BrowserWindow::showLoginsMenu()
+{
+    WebView *view = currentView();
+    if (!view || !m_services.logins)
+        return;
+    const QString origin = LoginStore::originOf(view->url());
+    QMenu menu(this);
+    menu.addAction(tr("Fill in a saved login"))->setEnabled(false);
+    menu.addSeparator();
+    for (const Login &login : m_services.logins->loginsFor(origin)) {
+        QAction *fill = menu.addAction(Icons::icon(Icons::Key),
+                                       login.username.isEmpty() ? tr("(no username)") : login.username);
+        connect(fill, &QAction::triggered, this, [this, view, login] {
+            if (!m_tabBar || indexOfView(view) < 0)
+                return;
+            // Into the page's sign-in form, from the same isolated world the capture runs in.
+            view->page()->runJavaScript(LoginStore::fillScript(login.username, login.password),
+                                        QWebEngineScript::ApplicationWorld);
+            m_services.logins->markUsed(login.origin, login.username);
+        });
+    }
+    menu.addSeparator();
+    connect(menu.addAction(tr("Manage saved logins…")), &QAction::triggered, this,
+            &BrowserWindow::showSavedLogins);
+    menu.exec(m_omnibox->mapToGlobal(QPoint(m_omnibox->width() - 240, m_omnibox->height())));
+}
+
+void BrowserWindow::showSavedLogins()
+{
+    if (!m_services.logins)
+        return;
+    LoginsDialog dialog(m_services.logins, this);
+    dialog.exec();
+}
+
+void BrowserWindow::showSitePermissions()
+{
+    if (!m_services.profile)
+        return;
+    SitePermissionsDialog dialog(m_services.profile, this);
+    dialog.exec();
+}
+
+// ---- Chrome extensions ---------------------------------------------------------------
+
+void BrowserWindow::populateExtensionsMenu()
+{
+    m_extensionsMenu->clear();
+    const QList<ChromeExtensions::Extension> extensions =
+        m_services.extensions ? m_services.extensions->extensions() : QList<ChromeExtensions::Extension>();
+    bool any = false;
+    for (const ChromeExtensions::Extension &extension : extensions) {
+        if (!extension.enabled)
+            continue;
+        any = true;
+        QAction *action = m_extensionsMenu->addAction(
+            extension.icon.isNull() ? Icons::icon(Icons::Extensions) : extension.icon, extension.name);
+        if (extension.popupUrl.isValid()) {
+            const QUrl popup = extension.popupUrl;
+            connect(action, &QAction::triggered, this, [this, popup] { showExtensionPopup(popup); });
+        } else {
+            action->setToolTip(tr("This extension works on pages by itself; it has no panel."));
+        }
+    }
+    // User scripts: tick to switch one on or off.
+    if (UserScripts *scripts = m_services.userScripts) {
+        for (const UserScript &script : scripts->scripts()) {
+            any = true;
+            QAction *toggle = m_extensionsMenu->addAction(Icons::icon(Icons::Extensions), script.name);
+            toggle->setCheckable(true);
+            toggle->setChecked(scripts->isEnabled(script.id));
+            const QString id = script.id;
+            connect(toggle, &QAction::toggled, this,
+                    [scripts, id](bool on) { scripts->setScriptEnabled(id, on); });
+        }
+    }
+    if (!any)
+        m_extensionsMenu->addAction(tr("No extensions yet"))->setEnabled(false);
+    QAction *storeSeparator = m_extensionsMenu->addSeparator();
+    // The commands this page's scripts offer, such as their settings, come in when the page answers.
+    if (WebView *view = currentView(); view && m_services.userScripts && !m_services.userScripts->scripts().isEmpty()) {
+        QPointer<QMenu> menu = m_extensionsMenu;
+        QPointer<WebView> page = view;
+        QPointer<QAction> before = storeSeparator;
+        view->page()->runJavaScript(
+            UserScripts::menuCommandsScript(), QWebEngineScript::ApplicationWorld,
+            [this, menu, page, before](const QVariant &result) {
+                if (!menu || !page || !before || !menu->isVisible())
+                    return;
+                QString section;
+                for (const QVariant &entry : result.toList()) {
+                    const QVariantList command = entry.toList();
+                    if (command.size() != 3)
+                        continue;
+                    if (command.at(1).toString() != section) {
+                        section = command.at(1).toString();
+                        menu->insertSection(before, section);
+                    }
+                    QAction *action = new QAction(command.at(2).toString(), menu);
+                    menu->insertAction(before, action);
+                    const int id = command.at(0).toInt();
+                    connect(action, &QAction::triggered, this, [page, id] {
+                        if (page)
+                            page->page()->runJavaScript(UserScripts::runMenuCommandScript(id),
+                                                        QWebEngineScript::ApplicationWorld);
+                    });
+                }
+                menu->adjustSize();
+            });
+    }
+    connect(m_extensionsMenu->addAction(Icons::icon(Icons::Penguin), tr("SpacePenguin Store")),
+            &QAction::triggered, this, [this] { newTab(kStoreUrl); });
+    if (ChromeExtensions::isSupported() && m_services.extensions) {
+        connect(m_extensionsMenu->addAction(Icons::icon(Icons::Globe), tr("Chrome Web Store")),
+                &QAction::triggered, this, [this] {
+                    newTab(QUrl(QStringLiteral("https://chromewebstore.google.com/category/extensions")));
+                });
+    }
+    m_extensionsMenu->addAction(m_extensionsAction);
+}
+
+void BrowserWindow::showExtensionPopup(const QUrl &url)
+{
+    // The extension's panel, as Chrome shows it under its toolbar button.
+    auto *popup = new QWidget(this, Qt::Popup);
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    auto *layout = new QVBoxLayout(popup);
+    layout->setContentsMargins(1, 1, 1, 1);
+    auto *view = new QWebEngineView(m_services.profile, popup);
+    layout->addWidget(view);
+    // Panels size themselves to their content, within reason.
+    connect(view->page(), &QWebEnginePage::contentsSizeChanged, popup, [popup](const QSizeF &size) {
+        popup->resize(qBound(240, int(size.width()) + 2, 800), qBound(120, int(size.height()) + 2, 600));
+    });
+    connect(view->page(), &QWebEnginePage::windowCloseRequested, popup, &QWidget::close);
+    view->setUrl(url);
+    popup->resize(360, 420);
+    const QPoint anchor = m_extensionsButton->mapToGlobal(QPoint(m_extensionsButton->width(),
+                                                                 m_extensionsButton->height()));
+    popup->move(anchor.x() - popup->width(), anchor.y() + 4);
+    popup->show();
+}
+
+void BrowserWindow::offerUserScript(WebView *view, const QUrl &url, bool quiet)
+{
+    UserScripts *scripts = m_services.userScripts;
+    if (!scripts || m_isPrivate || scripts->directory().isEmpty()) {
+        if (!quiet)
+            showToast(tr("Extensions are added from a normal window, not a private one."), 5000);
+        return;
+    }
+    if (!m_network)
+        m_network = new QNetworkAccessManager(this);
+    QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply *reply = m_network->get(request);
+    QPointer<WebView> target(view);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, target, url, quiet, scripts] {
+        reply->deleteLater();
+        const QString source = QString::fromUtf8(reply->readAll());
+        if (!target || indexOfView(target) < 0)
+            return;
+        if (reply->error() != QNetworkReply::NoError || !source.contains(QLatin1String("==UserScript=="))) {
+            if (!quiet)
+                showToast(tr("Could not get the extension: %1").arg(reply->errorString()), 6000);
+            return;
+        }
+        const QString fileName = QUrl::fromPercentEncoding(url.fileName().toUtf8());
+        const QString name = UserScripts::parseName(source, fileName.section(QLatin1Char('.'), 0, 0));
+        for (const UserScript &existing : scripts->scripts()) {
+            if (existing.name == name)
+                return; // already added
+        }
+
+        // Say where it will run: a user script can read and change those sites.
+        QStringList sites;
+        for (const QString &pattern : UserScripts::parseMatchPatterns(source)) {
+            static const QRegularExpression hostOf(QStringLiteral("^[^:]*://([^/]+)"));
+            QString host = hostOf.match(pattern).captured(1);
+            if (pattern == QLatin1String("<all_urls>") || pattern == QLatin1String("*") || host == QLatin1String("*")) {
+                sites = {tr("every website")};
+                break;
+            }
+            host.remove(QRegularExpression(QStringLiteral("^(\\*\\.|www\\.)")));
+            if (!host.isEmpty() && !sites.contains(host))
+                sites.append(host);
+        }
+        QString where = sites.isEmpty() ? tr("the sites it chooses") : sites.mid(0, 3).join(QStringLiteral(", "));
+        if (sites.size() > 3)
+            where += tr(" and %n more", nullptr, int(sites.size() - 3));
+
+        Prompt prompt;
+        prompt.key = QStringLiteral("userscript:%1").arg(name);
+        prompt.icon = Icons::Extensions;
+        prompt.text = tr("Add <b>%1</b> to SpacePenguin? It can read and change %2.")
+                          .arg(name.toHtmlEscaped(), where.toHtmlEscaped());
+        prompt.buttons = {{tr("Add to SpacePenguin"), [this, scripts, source, fileName, name] {
+                               fetchRequires(source, [this, scripts, source, fileName, name](const QString &failure) {
+                                   if (!failure.isEmpty()) {
+                                       showToast(tr("Could not add “%1”: %2").arg(name, failure), 6000);
+                                       return;
+                                   }
+                                   const QString folder = QDir(QDir::tempPath()).filePath(QStringLiteral("spacepenguin-scripts"));
+                                   QDir().mkpath(folder);
+                                   QString safe = fileName;
+                                   safe.replace(QRegularExpression(QStringLiteral("[^\\w.-]")), QStringLiteral("_"));
+                                   if (!safe.endsWith(QLatin1String(".js")))
+                                       safe += QStringLiteral(".user.js");
+                                   const QString path = QDir(folder).filePath(safe);
+                                   QFile file(path);
+                                   QString error;
+                                   if (!file.open(QIODevice::WriteOnly) || file.write(source.toUtf8()) < 0) {
+                                       error = file.errorString();
+                                   } else {
+                                       file.close();
+                                       scripts->addScript(path, &error);
+                                       QFile::remove(path);
+                                   }
+                                   showToast(error.isEmpty() ? tr("Added “%1”. Reload a page for it to run there.").arg(name)
+                                                             : tr("Could not add “%1”: %2").arg(name, error),
+                                             6000);
+                               });
+                           }}};
+        addPrompt(target, prompt);
+    });
+}
+
+void BrowserWindow::fetchRequires(const QString &source, std::function<void(const QString &failure)> done)
+{
+    UserScripts *scripts = m_services.userScripts;
+    const QList<QUrl> missing = scripts ? scripts->missingRequires(source) : QList<QUrl>();
+    if (missing.isEmpty()) {
+        done(QString());
+        return;
+    }
+    if (!m_network)
+        m_network = new QNetworkAccessManager(this);
+    // The libraries a script asks for (often a settings dialog) are kept beside it.
+    auto pending = std::make_shared<int>(int(missing.size()));
+    auto failure = std::make_shared<QString>();
+    for (const QUrl &url : missing) {
+        QNetworkRequest request(url);
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                             QNetworkRequest::NoLessSafeRedirectPolicy);
+        QNetworkReply *reply = m_network->get(request);
+        const QString path = scripts->requireFile(url);
+        connect(reply, &QNetworkReply::finished, this, [reply, path, url, pending, failure, done] {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) {
+                *failure = tr("its library %1 could not be downloaded.").arg(url.toDisplayString());
+            } else {
+                QDir().mkpath(QFileInfo(path).path());
+                QFile file(path);
+                if (!file.open(QIODevice::WriteOnly) || file.write(reply->readAll()) < 0)
+                    *failure = file.errorString();
+            }
+            if (--*pending == 0)
+                done(*failure);
+        });
+    }
+}
+
+void BrowserWindow::offerWebStoreExtension(WebView *view)
+{
+    // Greasy Fork's script pages: offer the script without a trip through Install.
+    static const QRegularExpression greasyFork(QStringLiteral("^/(?:[a-zA-Z-]+/)?scripts/(\\d+)(?:-[^/]*)?/?$"));
+    const QRegularExpressionMatch script = greasyFork.match(view->url().path());
+    if ((view->url().host() == QLatin1String("greasyfork.org") || view->url().host() == QLatin1String("sleazyfork.org"))
+        && script.hasMatch() && !m_offeredScripts.contains(view->url().host() + script.captured(1))) {
+        m_offeredScripts.insert(view->url().host() + script.captured(1));
+        offerUserScript(view, QUrl(QStringLiteral("https://%1/scripts/%2/code/script.user.js")
+                                       .arg(view->url().host(), script.captured(1))),
+                        true);
+    }
+
+    ChromeExtensions *extensions = m_services.extensions;
+    const QString id = ChromeExtensions::webStoreId(view->url());
+    // An offer for the extension of a page the tab has left goes with it.
+    for (const Prompt &prompt : m_prompts.value(view)) {
+        if (prompt.key.startsWith(QStringLiteral("webstore:")) && prompt.key != QStringLiteral("webstore:%1").arg(id))
+            dropPrompts(view, prompt.key);
+    }
+    if (!extensions || !ChromeExtensions::isSupported() || id.isEmpty() || extensions->isInstalled(id))
+        return;
+    // Only once the store's page is really there: its title is "<name> - Chrome Web Store".
+    static const QRegularExpression storeTitle(QStringLiteral("^(.+?)\\s*[-–]\\s*Chrome Web Store\\s*$"));
+    const QRegularExpressionMatch match = storeTitle.match(view->title());
+    if (!match.hasMatch())
+        return;
+    const QString name = match.captured(1);
+    Prompt prompt;
+    prompt.key = QStringLiteral("webstore:%1").arg(id);
+    prompt.icon = Icons::Extensions;
+    prompt.text = tr("Add <b>%1</b> to SpacePenguin?").arg(name.toHtmlEscaped());
+    prompt.buttons = {{tr("Add to SpacePenguin"), [extensions, id, name] {
+                           extensions->installFromWebStore(id, name);
+                       }}};
+    addPrompt(view, prompt);
+}
+
+// ---- Tabs on the side, and tab groups ---------------------------------------------
+
+void BrowserWindow::setTabsOnSide(bool side)
+{
+    m_sideTabsAction->setChecked(side);
+    if (side == m_tabsOnSide && m_sideTabs->isHidden() == !side)
+        return;
+    m_tabsOnSide = side;
+    m_tabStrip->setVisible(!side);
+    m_sideTabs->setVisible(side);
+    // The window buttons go where the title bar is: the tab row, or with the tabs on
+    // the side, the toolbar, as in Firefox.
+    auto *row = static_cast<QBoxLayout *>((side ? m_navBar : m_tabStrip)->layout());
+    row->addWidget(m_frame->controls());
+    if (side)
+        m_sideTabs->sync();
+}
+
+void BrowserWindow::syncSideTabs()
+{
+    if (m_sideTabs)
+        m_sideTabs->sync();
+}
+
+void BrowserWindow::refreshGroups()
+{
+    if (!m_tabBar)
+        return;
+    m_tabBar->refreshGroups();
+    syncSideTabs();
+}
+
+void BrowserWindow::addTabToNewGroup(int index)
+{
+    QObject *tab = tabObject(m_tabBar, index);
+    if (!tab)
+        return;
+    const int group = m_groups->create();
+    m_groups->setGroupOf(tab, group);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
+
+    // Ask for a name straight away, by the group's chip, as other browsers do.
+    QPoint position = QCursor::pos();
+    if (!m_tabsOnSide) {
+        for (int i = 0; i < m_tabBar->count(); ++i) {
+            if (m_groups->groupOf(tabObject(m_tabBar, i)) == group) {
+                position = m_tabBar->mapToGlobal(m_tabBar->tabRect(i).bottomLeft());
+                break;
+            }
+        }
+    }
+    QTimer::singleShot(0, this, [this, group, position] { showGroupMenu(group, position); });
+}
+
+void BrowserWindow::toggleGroupCollapsed(int group)
+{
+    const bool collapse = !m_groups->isCollapsed(group);
+    const int current = m_tabBar->currentIndex();
+    if (collapse && m_groups->groupOf(tabObject(m_tabBar, current)) == group) {
+        // Step off the group first, to the nearest tab outside it, or a new tab.
+        int target = -1;
+        for (int distance = 1; distance < m_tabBar->count() && target < 0; ++distance) {
+            for (const int candidate : {current + distance, current - distance}) {
+                if (candidate < 0 || candidate >= m_tabBar->count())
+                    continue;
+                const int other = m_groups->groupOf(tabObject(m_tabBar, candidate));
+                if (other != group && !m_groups->isCollapsed(other)) {
+                    target = candidate;
+                    break;
+                }
+            }
+        }
+        if (target < 0)
+            newTab();
+        else
+            m_tabBar->setCurrentIndex(target);
+    }
+    m_groups->setCollapsed(group, collapse);
+}
+
+void BrowserWindow::showGroupMenu(int group, const QPoint &globalPosition)
+{
+    const TabGroup *info = m_groups->group(group);
+    if (!info)
+        return;
+
+    QMenu menu(this);
+
+    // The name and colour, edited in place at the top of the menu.
+    auto *editor = new QWidget(&menu);
+    auto *editorLayout = new QVBoxLayout(editor);
+    editorLayout->setContentsMargins(12, 8, 12, 6);
+    editorLayout->setSpacing(8);
+    auto *name = new QLineEdit(info->title, editor);
+    name->setPlaceholderText(tr("Name this group"));
+    name->setClearButtonEnabled(true);
+    connect(name, &QLineEdit::textChanged, this,
+            [this, group](const QString &text) { m_groups->setTitle(group, text.trimmed()); });
+    connect(name, &QLineEdit::returnPressed, &menu, &QMenu::close);
+    editorLayout->addWidget(name);
+
+    auto *swatches = new QHBoxLayout;
+    swatches->setSpacing(6);
+    const QStringList colorNames = TabGroups::colorNames();
+    const Theme::Colors colors = Theme::currentColors();
+    for (int i = 0; i < colorNames.size(); ++i) {
+        auto *swatch = new QToolButton(editor);
+        swatch->setToolTip(colorNames.at(i));
+        swatch->setAccessibleName(colorNames.at(i));
+        swatch->setFixedSize(22, 22);
+        swatch->setFocusPolicy(Qt::NoFocus);
+        const QString ring = i == info->color ? QStringLiteral("2px solid %1").arg(colors.text.name())
+                                              : QStringLiteral("none");
+        swatch->setStyleSheet(QStringLiteral("QToolButton { background: %1; border: %2; border-radius: 11px; }")
+                                  .arg(TabGroups::color(i, colors.dark).name(), ring));
+        connect(swatch, &QToolButton::clicked, &menu, [this, group, i, &menu] {
+            m_groups->setColor(group, i);
+            menu.close();
+        });
+        swatches->addWidget(swatch);
+    }
+    swatches->addStretch(1);
+    editorLayout->addLayout(swatches);
+    auto *editorAction = new QWidgetAction(&menu);
+    editorAction->setDefaultWidget(editor);
+    menu.addAction(editorAction);
+    menu.addSeparator();
+
+    connect(menu.addAction(Icons::icon(Icons::Plus), tr("New Tab in Group")), &QAction::triggered,
+            this, [this, group] { newTabInGroup(group); });
+    connect(menu.addAction(info->collapsed ? tr("Expand Group") : tr("Collapse Group")),
+            &QAction::triggered, this, [this, group] { toggleGroupCollapsed(group); });
+    connect(menu.addAction(tr("Ungroup")), &QAction::triggered, this,
+            [this, group] { m_groups->ungroup(group); });
+    connect(menu.addAction(Icons::icon(Icons::Close), tr("Close Group")), &QAction::triggered,
+            this, [this, group] { closeGroup(group); });
+
+    QTimer::singleShot(0, name, [name] {
+        name->setFocus();
+        name->selectAll();
+    });
+    menu.exec(globalPosition);
+}
+
+void BrowserWindow::newTabInGroup(int group)
+{
+    WebView *view = newTab();
+    // The new tab is last; keeping the group together puts it at the group's end.
+    m_groups->setGroupOf(view, group);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
+    m_tabBar->setCurrentIndex(indexOfView(view));
+    m_omnibox->setFocus();
+}
+
+void BrowserWindow::closeGroup(int group)
+{
+    for (int i = m_tabBar->count() - 1; i >= 0; --i) {
+        if (m_groups->groupOf(tabObject(m_tabBar, i)) == group)
+            closeTab(i);
+    }
+}
+
+void BrowserWindow::onTabDragFinished(QObject *tab)
+{
+    const int index = indexOfView(qobject_cast<WebView *>(tab));
+    if (index < 0)
+        return;
+
+    // Dropped between two tabs of an open group, a tab joins it; dropped next to its
+    // own group, it stays; anywhere else, it leaves its group. A collapsed group's
+    // chip keeps its group wherever it goes.
+    const int own = m_groups->groupOf(tab);
+    int group = 0;
+    if (own && m_groups->isCollapsed(own)) {
+        group = own;
+    } else {
+        const auto neighbour = [this, index](int step) {
+            for (int i = index + step; i >= 0 && i < m_tabBar->count(); i += step) {
+                if (m_tabBar->isTabVisible(i)) {
+                    const int other = m_groups->groupOf(tabObject(m_tabBar, i));
+                    return m_groups->isCollapsed(other) ? 0 : other;
+                }
+            }
+            return 0;
+        };
+        const int left = neighbour(-1);
+        const int right = neighbour(1);
+        if (left && left == right)
+            group = left;
+        else if (own && (own == left || own == right))
+            group = own;
+    }
+    m_groups->setGroupOf(tab, group);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
 }
 
 // ---- Navigation ---------------------------------------------------------------
@@ -1854,7 +2730,13 @@ void BrowserWindow::refreshCompletions()
 bool BrowserWindow::eventFilter(QObject *watched, QEvent *event)
 {
     if (watched == m_omnibox) {
-        if (event->type() == QEvent::FocusIn) {
+        // The suggestions popup takes focus and gives it back while you type; that
+        // is not the box being focused or left, and must not select what was typed.
+        const bool popup = (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut)
+            && static_cast<QFocusEvent *>(event)->reason() == Qt::PopupFocusReason;
+        if (popup) {
+            // Nothing to do.
+        } else if (event->type() == QEvent::FocusIn) {
             refreshCompletions();
             QTimer::singleShot(0, m_omnibox, &QLineEdit::selectAll);
         } else if (event->type() == QEvent::FocusOut) {
@@ -1983,6 +2865,47 @@ void BrowserWindow::connectView(WebView *view)
     connect(view->browserPage(), &BrowserPage::internalPageRequested, this,
             [this, view](const QUrl &url) { loadAboutPage(view, url.toString()); });
 
+    connect(view->page(), &QWebEnginePage::permissionRequested, this,
+            [this, view](QWebEnginePermission permission) {
+                const QString site = SitePermissions::siteName(permission.origin());
+                Prompt prompt;
+                prompt.key = QStringLiteral("permission:%1:%2")
+                                 .arg(permission.origin().toString())
+                                 .arg(int(permission.permissionType()));
+                prompt.icon = Icons::Shield;
+                prompt.text = tr("<b>%1</b> wants to %2.")
+                                  .arg(site.toHtmlEscaped(),
+                                       SitePermissions::request(permission.permissionType()));
+                prompt.buttons = {{tr("Allow"), [permission] { permission.grant(); }},
+                                  {tr("Block"), [permission] { permission.deny(); }}};
+                prompt.dismissed = [permission] { permission.deny(); };
+                addPrompt(view, prompt);
+            });
+    // The Chrome Web Store moves between pages without loading them, so its
+    // address and title changes count too; the title names the extension.
+    connect(view, &QWebEngineView::loadFinished, this, [this, view] { offerWebStoreExtension(view); });
+    connect(view, &QWebEngineView::titleChanged, this, [this, view] { offerWebStoreExtension(view); });
+    connect(view->browserPage(), &BrowserPage::userScriptRequested, this,
+            [this, view](const QUrl &url) { offerUserScript(view, url, false); });
+    connect(view->browserPage(), &BrowserPage::loginSubmitted, this,
+            [this, view](const QString &username, const QString &password) {
+                offerToSaveLogin(view, username, password);
+            });
+    // A question about a page is moot once the tab has gone somewhere else.
+    connect(view, &QWebEngineView::urlChanged, this, [this, view](const QUrl &url) {
+        const QString origin = url.adjusted(QUrl::RemovePath | QUrl::RemoveQuery
+                                            | QUrl::RemoveFragment).toString();
+        for (const Prompt &prompt : m_prompts.value(view)) {
+            if (prompt.key.startsWith(QStringLiteral("permission:"))
+                && !prompt.key.startsWith(QStringLiteral("permission:%1:").arg(origin)))
+                dropPrompts(view, prompt.key);
+        }
+    });
+    connect(view, &QObject::destroyed, this, [this, view] {
+        m_prompts.remove(view);
+        showPrompt();
+    });
+
     view->setTabFactory([this](bool background) { return addTab(background); });
     YouTube::attach(view);
 }
@@ -1992,6 +2915,11 @@ void BrowserWindow::onCurrentTabChanged(int index)
     WebView *view = viewAt(index);
     if (!view)
         return;
+
+    // A tab chosen in a collapsed group (with the keyboard, or on its chip-only
+    // tab) opens the group.
+    if (const int group = m_groups->groupOf(view); m_groups->isCollapsed(group))
+        m_groups->setCollapsed(group, false);
 
     m_stack->setCurrentWidget(view);
     m_linkPreview->hide();
@@ -2008,6 +2936,8 @@ void BrowserWindow::onCurrentTabChanged(int index)
     updateSecurityIndicator();
     updateBookmarkStar();
     updateZoomIndicator();
+    updateLoginsAction();
+    showPrompt();
 
     if (m_findBar->isVisible())
         findNext(false);
@@ -2021,6 +2951,8 @@ void BrowserWindow::onUrlChanged(WebView *view, const QUrl &url)
     updateTabLabel(view);
     if (view != currentView())
         return;
+
+    updateLoginsAction();
 
     syncOmnibox(url);
     updateSecurityIndicator();

@@ -28,99 +28,123 @@ QPainterPath star(qreal cx, qreal cy, qreal outer, qreal inner)
     return path;
 }
 
-void drawPenguinFigure(QPainter *p);
+/*
+ * The mark: a padlock. A black hole's accretion disc is the shackle, a penguin
+ * peeks out of the lock's body, and the body holds the Earth. Flat colours only,
+ * drawn on a 100-unit grid; html/start.html and docs/assets/logo.svg carry the
+ * same shapes as SVG.
+ */
+const QColor kInk(0x16, 0x17, 0x1d);
+const QColor kSnow(0xff, 0xff, 0xff);
+const QColor kRim(0xff, 0xff, 0xff); // outlines the black parts, for dark backgrounds
+const QColor kBeak(0xff, 0xb2, 0x1f);
+const QColor kDisc(0xff, 0x7a, 0x1a);
+const QColor kOcean(0x6a, 0x4f, 0xe0);
+const QColor kLand(0x2f, 0xb7, 0xa3);
 
+/** A shape with straight sides and a round top: the head, the face, the shackle. */
+QPainterPath arch(qreal left, qreal right, qreal top, qreal bottom, bool close = true)
+{
+    const qreal width = right - left;
+    QPainterPath path;
+    path.moveTo(left, bottom);
+    path.lineTo(left, top + width / 2);
+    path.arcTo(QRectF(left, top, width, width), 180, -180);
+    path.lineTo(right, bottom);
+    if (close)
+        path.closeSubpath();
+    return path;
+}
+
+QPainterPath land()
+{
+    QPainterPath path;
+    path.moveTo(33, 64);
+    path.cubicTo(37, 61, 43, 61, 46, 64);
+    path.cubicTo(48, 67, 45, 69, 45, 72);
+    path.cubicTo(45, 76, 49, 78, 48, 82);
+    path.cubicTo(47, 87, 42, 89, 39, 87);
+    path.cubicTo(36, 85, 37, 80, 34, 77);
+    path.cubicTo(31, 74, 28, 71, 29, 68);
+    path.cubicTo(30, 66, 31, 65, 33, 64);
+    path.closeSubpath();
+    path.moveTo(56, 61);
+    path.cubicTo(61, 60, 67, 62, 69, 66);
+    path.cubicTo(70, 69, 68, 71, 65, 71);
+    path.cubicTo(62, 72, 62, 75, 63, 78);
+    path.cubicTo(65, 82, 64, 86, 60, 88);
+    path.cubicTo(56, 89, 55, 85, 54, 81);
+    path.cubicTo(53, 76, 50, 73, 50, 68);
+    path.cubicTo(50, 64, 52, 62, 56, 61);
+    path.closeSubpath();
+    return path;
+}
+
+/** Draws the mark into the 24-unit square at the painter's origin. */
 void drawPenguin(QPainter *p)
 {
-    // 24x24 design grid. A penguin in a space-blue disc with a couple of stars.
+    p->save();
+    p->scale(0.24, 0.24);
+    p->translate(50, 50); // centre the drawing's bounds in the square
+    p->scale(0.92, 0.92);
+    p->translate(-50, -53.25);
+
+    // The shackle.
+    p->setBrush(Qt::NoBrush);
+    p->setPen(QPen(kDisc, 7, Qt::SolidLine, Qt::FlatCap));
+    p->drawPath(arch(25.5, 74.5, 10.5, 54, false));
+
+    // The head and the lock's body, as one black shape with a light rim.
+    QPainterPath body;
+    body.addRoundedRect(QRectF(17, 47, 66, 50), 14, 14);
+    body = body.united(arch(32, 68, 17, 50));
+    p->setPen(QPen(kRim, 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p->setBrush(kInk);
+    p->drawPath(body);
+    p->setPen(Qt::NoPen);
+    p->drawPath(body);
+
+    // The face.
+    p->setBrush(kSnow);
+    p->drawPath(arch(37, 63, 23, 47));
+    p->setBrush(kInk);
+    p->drawEllipse(QPointF(45, 34), 2.6, 2.6);
+    p->drawEllipse(QPointF(55, 34), 2.6, 2.6);
+    p->setPen(QPen(kBeak, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p->setBrush(kBeak);
+    p->drawPolygon(QPolygonF({QPointF(47, 38.5), QPointF(53, 38.5), QPointF(50, 42.5)}));
     p->setPen(Qt::NoPen);
 
-    QRadialGradient sky(QPointF(9, 7), 18);
-    sky.setColorAt(0, QColor(0x3d, 0x5a, 0xd6));
-    sky.setColorAt(1, QColor(0x14, 0x1a, 0x45));
-    p->setBrush(sky);
-    p->drawEllipse(QRectF(0.5, 0.5, 23, 23));
-
-    drawPenguinFigure(p);
+    // The Earth.
+    QPainterPath globe;
+    globe.addEllipse(QPointF(50, 72), 20, 20);
+    p->setBrush(kOcean);
+    p->drawPath(globe);
+    p->setBrush(kLand);
+    p->drawPath(land().intersected(globe));
+    p->restore();
 }
 
 /**
  * The macOS shape: since Big Sur, and enforced by macOS 26 Tahoe, an app icon is a
- * rounded square filling 824 of 1024 units, centred, with a soft shadow below.
- * Icons that leave the shape empty are shown inside a grey tile by Tahoe.
+ * rounded square filling 824 of 1024 units, centred. Icons that leave the shape
+ * empty are shown inside a grey tile by Tahoe. A flat white tile with the mark on it.
  */
 void drawMacPenguin(QPainter *p)
 {
-    // Work on Apple's 1024 grid, then draw the 24-unit penguin scaled into it.
     p->save();
     p->scale(24.0 / 1024.0, 24.0 / 1024.0);
     p->setPen(Qt::NoPen);
-
-    const QRectF tile(100, 100, 824, 824);
-    const qreal radius = 185.4;
-
-    // Shadow: a few soft layers offset downwards.
-    for (int i = 6; i >= 1; --i) {
-        p->setBrush(QColor(0, 0, 0, 10));
-        p->drawRoundedRect(tile.adjusted(-i * 1.5, -i * 1.0 + 12, i * 1.5, i * 2.5 + 12),
-                           radius + i * 2, radius + i * 2);
-    }
-
-    QLinearGradient sky(tile.topLeft(), tile.bottomRight());
-    sky.setColorAt(0, QColor(0x45, 0x63, 0xe0));
-    sky.setColorAt(0.55, QColor(0x22, 0x2c, 0x7a));
-    sky.setColorAt(1, QColor(0x10, 0x14, 0x38));
-    p->setBrush(sky);
-    p->drawRoundedRect(tile, radius, radius);
-
-    // A faint highlight along the top edge, as on system icons.
-    QLinearGradient sheen(tile.topLeft(), QPointF(tile.left(), tile.top() + 300));
-    sheen.setColorAt(0, QColor(255, 255, 255, 46));
-    sheen.setColorAt(1, QColor(255, 255, 255, 0));
-    p->setBrush(sheen);
-    p->drawRoundedRect(tile, radius, radius);
+    p->setBrush(Qt::white);
+    p->drawRoundedRect(QRectF(100, 100, 824, 824), 185.4, 185.4);
     p->restore();
 
-    // The penguin, a little larger than in the disc version.
     p->save();
-    p->translate(12, 12.6);
-    p->scale(0.9, 0.9);
+    p->translate(12, 12);
+    p->scale(0.62, 0.62);
     p->translate(-12, -12);
-    drawPenguinFigure(p);
+    drawPenguin(p);
     p->restore();
-}
-
-void drawPenguinFigure(QPainter *p)
-{
-    p->setPen(Qt::NoPen);
-    p->setBrush(QColor(255, 255, 255, 220));
-    p->drawPath(star(5.2, 6.2, 1.3, 0.5));
-    p->drawPath(star(19.2, 5.0, 0.9, 0.35));
-    p->drawEllipse(QPointF(18.5, 9.6), 0.45, 0.45);
-
-    // Body.
-    p->setBrush(QColor(0x10, 0x12, 0x1c));
-    p->drawEllipse(QRectF(6.6, 5.0, 10.8, 16.4));
-    // Belly.
-    p->setBrush(QColor(0xf4, 0xf6, 0xfb));
-    p->drawEllipse(QRectF(8.4, 9.6, 7.2, 11.0));
-    // Face.
-    p->drawEllipse(QRectF(8.6, 7.2, 3.6, 3.8));
-    p->drawEllipse(QRectF(11.8, 7.2, 3.6, 3.8));
-    // Eyes.
-    p->setBrush(QColor(0x10, 0x12, 0x1c));
-    p->drawEllipse(QPointF(10.6, 9.1), 0.75, 0.85);
-    p->drawEllipse(QPointF(13.4, 9.1), 0.75, 0.85);
-    // Beak and feet.
-    p->setBrush(QColor(0xff, 0xb0, 0x2e));
-    QPainterPath beak;
-    beak.moveTo(10.7, 10.6);
-    beak.lineTo(13.3, 10.6);
-    beak.lineTo(12.0, 12.4);
-    beak.closeSubpath();
-    p->drawPath(beak);
-    p->drawEllipse(QRectF(8.3, 20.0, 3.2, 1.6));
-    p->drawEllipse(QRectF(12.5, 20.0, 3.2, 1.6));
 }
 
 void drawGlyph(QPainter *p, Icons::Glyph glyph, const QColor &color, const QColor &accent, bool on)
@@ -244,6 +268,25 @@ void drawGlyph(QPainter *p, Icons::Glyph glyph, const QColor &color, const QColo
         break;
     case Icons::ChevronDown:
         p->drawPolyline(QPolygonF({QPointF(6, 9), QPointF(12, 15), QPointF(18, 9)}));
+        break;
+    case Icons::ChevronLeft:
+        p->drawPolyline(QPolygonF({QPointF(15, 6), QPointF(9, 12), QPointF(15, 18)}));
+        break;
+    case Icons::ChevronRight:
+        p->drawPolyline(QPolygonF({QPointF(9, 6), QPointF(15, 12), QPointF(9, 18)}));
+        break;
+    case Icons::Key:
+        p->drawEllipse(QPointF(8, 12), 3.8, 3.8);
+        p->drawLine(QPointF(11.8, 12), QPointF(20.5, 12));
+        p->drawLine(QPointF(17.5, 12), QPointF(17.5, 15));
+        p->drawLine(QPointF(20.5, 12), QPointF(20.5, 14.5));
+        break;
+    case Icons::SideTabs:
+        p->drawRoundedRect(QRectF(3.5, 5, 17, 14), 2.5, 2.5);
+        p->drawLine(QPointF(9.5, 5), QPointF(9.5, 19));
+        p->drawLine(QPointF(5.8, 9), QPointF(7.2, 9));
+        p->drawLine(QPointF(5.8, 12), QPointF(7.2, 12));
+        p->drawLine(QPointF(5.8, 15), QPointF(7.2, 15));
         break;
     case Icons::History:
         p->drawEllipse(QPointF(12, 12), 8.2, 8.2);

@@ -43,6 +43,8 @@ public:
 
 signals:
     void extensionsRequested();
+    void savedLoginsRequested();
+    void sitePermissionsRequested();
 
 private:
     void setupTabs();

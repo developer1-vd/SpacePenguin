@@ -38,7 +38,8 @@ int main(int argc, char *argv[])
     // The start page scheme must be known to Chromium before the first profile exists.
     QWebEngineUrlScheme startScheme(QByteArrayLiteral("sp"));
     startScheme.setSyntax(QWebEngineUrlScheme::Syntax::Host);
-    startScheme.setFlags(QWebEngineUrlScheme::SecureScheme);
+    // The store page asks sp://store/api/… for its data with fetch().
+    startScheme.setFlags(QWebEngineUrlScheme::SecureScheme | QWebEngineUrlScheme::FetchApiAllowed);
     QWebEngineUrlScheme::registerScheme(startScheme);
 
     spacepenguin::StartupTrace::mark("sandbox and device checks done");

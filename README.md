@@ -2,15 +2,65 @@
 
 A secure, lightweight, and usable browser written in Qt.
 
+**Website:** <https://developer1-vd.github.io/SpacePenguin/> (from [`docs/`](docs/))
+
 **Status: pre-alpha (v0.0.1).** It opens web pages in tabs and gets out of the
 way. Everything below is what actually exists in the tree today — no aspirational
 checkbox list.
+
+## Download
+
+Every push builds every package; get them from the latest run of the
+[build workflow](https://github.com/developer1-vd/SpacePenguin/actions/workflows/build.yml)
+(open the run, then *Artifacts*), or from [Releases](https://github.com/developer1-vd/SpacePenguin/releases)
+once a version is tagged.
+
+| On | Download | Install |
+| -- | -------- | ------- |
+| Windows | *SpacePenguin-Windows-X64* | run the `-setup.exe`, or unzip the portable zip |
+| macOS | *SpacePenguin-macOS-ARM64* (works on Intel Macs too) | open the DMG and drag SpacePenguin to Applications |
+| Linux | the installer below, or *SpacePenguin-Linux-X64* (or *-ARM64*) for the AppImage; *SpacePenguin-deb-…*, *-rpm-…*, *-pkg-…* for native packages | the installer, or `chmod +x` the AppImage and run it |
+| Android | *SpacePenguin-Android* | open the `.apk` on the phone (allow installing from your browser or files app) |
+| iPhone and iPad | *SpacePenguin-iOS* | install the `-ios-unsigned.ipa` with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) and your Apple ID |
+
+On Linux, one command installs it for you, with an app-menu entry; run it again to
+update:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/install.sh | bash
+```
+
+It downloads the newest AppImage (before the first release, the newest build of
+`main`, published as the *nightly* pre-release), checks its SHA-256, installs any
+missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
+`~/.local/opt/spacepenguin`. `bash install.sh --uninstall` removes it.
 
 ## What it does
 
 - **Tabs** — tab strip on top; new, close, middle-click to close, drag to reorder,
   duplicate, close others, reopen closed, session restored on restart. Links that ask
   for a new tab or window (`target=_blank`, "Open link in new tab") open as tabs
+- **Tabs on the side** — the button at the start of the tab row (or *View › Tabs on
+  the Side*) moves the tabs into a panel down the left of the window, as in Edge and
+  Firefox; the window buttons move onto the toolbar. The panel's arrow narrows it
+  to the tabs' icons
+- **Tab groups** — right-click a tab › *Add Tab to New Group*, then name it and pick
+  a colour. A group shows as a coloured chip with a line under its tabs (on the
+  side, a header row); click the chip or header to collapse the group, right-click
+  it to rename, recolour, add a tab, ungroup or close it. Dragging a tab between
+  two of a group's tabs adds it; dragging it away takes it out. Groups are saved
+  with the session
+- **Saved logins** — after you sign in, a bar offers to save the login; on the site
+  again, the key in the address bar fills it in (only when you pick it, so a page
+  never gets it unasked). *Settings › Privacy › Saved logins* shows, copies and
+  deletes them. On Windows they are encrypted with your Windows account; elsewhere
+  they are in a file only your account can read
+- **Site permissions** — a site that wants your camera, microphone, location,
+  notifications, clipboard or screen asks in a bar above the page; answers are kept
+  per site (in private windows, until they close) and can be reset from the address
+  bar's site menu or *Settings › Privacy › Site permissions*
+- **Notifications** — from sites you allowed, shown as desktop notifications;
+  clicking one brings its tab forward
 - **Address bar** — takes URLs, `about:` pages and plain-language queries; anything
   that isn't a URL becomes a search on the chosen engine (DuckDuckGo by default).
   Suggests matching bookmarks and history as you type; shows a lock, warning or info
@@ -37,8 +87,18 @@ checkbox list.
   runs
 - **Content blocking** — an Adblock Plus style filter list, applied through a
   request interceptor
+- **SpacePenguin Store** — `sp://store`, from the puzzle piece in the toolbar: one
+  search over the user-script extensions of Greasy Fork and OpenUserJS, most installed
+  first and in your language first, and colour themes for SpacePenguin (Penguin,
+  Aurora, Ember, Orchid, Forest, Rose, Midnight; also in *Settings › Appearance*).
+  Adding an extension asks first, in a bar above the page that names the sites it can
+  read and change. The Install buttons on greasyfork.org and openuserjs.org work too
 - **Extensions** — JavaScript user scripts, installed per profile and managed
-  from `Tools → Extensions…`
+  from `Tools → Extensions…`. Scripts get the `GM_` functions of Tampermonkey
+  (saved settings, styles, menu commands and more), so their settings dialogs open
+  from the puzzle-piece menu
+- **Site pop-ups** — sign-in boxes and other small windows a site opens when you
+  click open in a window of their own, titled with the site's name
 
 ## Theme
 
@@ -56,8 +116,10 @@ would be a lie in the UI.
 
 ## Extensions
 
-QtWebEngine does not load Chrome extensions and never will without a native
-Chromium build. SpacePenguin does not fake support. What it ships is
+Chrome extensions need Qt 6.10's extension manager, which still crashes when an
+extension is switched on, so SpacePenguin keeps them off: a build against Qt 6.10+
+started with `SPACEPENGUIN_CHROME_EXTENSIONS=1` shows them, for testing only. What
+it ships is
 **JavaScript user scripts**, installed as `QWebEngineScript` objects on the
 active profile.
 
@@ -72,10 +134,19 @@ console.log('running on', location.hostname);
 ```
 
 - `// @name` — the label shown in the manager; defaults to the file name
-- `// @match` — comma-separated host patterns; without it the script runs on
-  every page
-- The script body is wrapped in a guard that checks `location.hostname` against
+- `// @match`, `// @include` — address patterns, one per line (or comma-separated);
+  without them the script runs on every page. `// @exclude` leaves pages out
+- `// @require` — libraries (such as GM_config) downloaded when the script is
+  added and run before it
+- `// @run-at` — `document-start`, `document-end`, or by default once the page
+  has loaded
+- The script body is wrapped in a guard that checks `location.href` against
   the patterns and reports failures to the page console instead of throwing
+- Scripts get `GM_info`, `GM_getValue`/`GM_setValue`/`GM_deleteValue`/`GM_listValues`
+  (kept in the site's storage), `GM_addStyle`, `GM_addElement`,
+  `GM_registerMenuCommand` (shown in the puzzle-piece menu), `GM_openInTab`,
+  `GM_setClipboard`, `GM_notification`, `GM_xmlhttpRequest` (as the page's own
+  `fetch`, so other sites must allow it) and the `GM.` promise forms
 
 Private windows run no user scripts: the extension directory is not attached to
 an off-the-record profile.
@@ -165,8 +236,9 @@ memory and a little load time; if you notice it, use a smaller list.
 
 ### Pop-ups
 
-Actual pop-up windows are already refused by the security policy
-(`JavascriptCanOpenWindows` is off), and `$popup` rules are honoured for
+Pop-up windows a page opens by itself are refused by the security policy
+(`JavascriptCanOpenWindows` is off); ones you click for, such as a sign-in box,
+open in a small window titled with the site's name. `$popup` rules are honoured for
 anything a page tries to load as a document. In-page pop-ups — interstitials,
 "pop-out" players, overlay dialogs — are cosmetic, so they need `##` rules from
 your list.
@@ -261,6 +333,7 @@ the desktop — macOS gets the binding Safari and Chrome use there instead.
 | Full screen           | `F11`                           | `⌃⌘F`                         |
 | Bookmark this page    | `Ctrl+D`                        | `⌘D`                          |
 | Show bookmarks bar    | `Ctrl+Shift+B`                  | `⇧⌘B`                         |
+| Tabs on the side      | `Ctrl+Shift+,`                  | `⇧⌘,`                         |
 | Bookmarks             | `Ctrl+Shift+O`                  | `⌥⌘B`                         |
 | History               | `Ctrl+H`                        | `⌘Y`                          |
 | Downloads             | `Ctrl+J`                        | `⌥⌘L`                         |
@@ -280,7 +353,9 @@ on each of them for every push.
 | Platform | Built with | Packages | Notes |
 | -------- | ---------- | -------- | ----- |
 | Linux (X11 and Wayland), any distribution, x86-64 and ARM64 | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
-| ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `packaging/chromeos/install.sh` | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
+| ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `install.sh` (or `packaging/chromeos/install.sh`) | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
+| Android 9+ (ARM64) | Qt Quick + QtWebView, Qt 6.8 | APK | a separate, smaller app on the phone's own web engine — see [Phones](#phones-android-and-ios) |
+| iOS and iPadOS 16+ | Qt Quick + QtWebView, Qt 6.8 | unsigned `.ipa` to sideload; signed `.ipa` with your Apple team | as Android |
 | Windows 10 and 11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
 | macOS 12 Monterey to 26 Tahoe, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | Tahoe-style icon, registered for `http`/`https`; ready to notarise |
 
@@ -378,8 +453,64 @@ QtWebEngine code takes about 500 MB per compiler job. If you do,
 `tools/build-jobs.sh` picks a job count that fits (usually 1 or 2 there).
 
 Platform data locations come from `QStandardPaths`, so the profile lands in
-`~/.local/share/SpacePenguin` on Linux, `~/Library/Application Support` on
-macOS, and `%APPDATA%` on Windows.
+`~/.local/share/SpacePenguin/SpacePenguin` on Linux,
+`~/Library/Application Support/SpacePenguin/SpacePenguin` on macOS, and
+`%APPDATA%\SpacePenguin\SpacePenguin` on Windows (organisation, then application).
+
+### Phones (Android and iOS)
+
+QtWebEngine, the Chromium that the desktop app is built on, does not exist for
+Android or iOS — and iOS allows no engine but its own. So the phone version in
+[`mobile/`](mobile/) is a separate, smaller app: a Qt Quick interface around
+QtWebView, which shows pages with the phone's engine (Android System WebView,
+iOS WKWebView). It shares the address handling, settings and the
+YouTube/SponsorBlock code with the desktop app (`src/sponsorblock.*`,
+`src/youtubescripts.*`, `src/urlresolver.*`, `src/preferences.*`).
+
+It has tabs with tab groups (touch and hold a tab on the tabs screen to group it;
+tap a group's header to collapse it, ⋮ to rename, recolour, add a tab, ungroup
+or close it), a start page with your bookmarks, bookmarks and history, a bottom
+toolbar within thumb reach, light and dark, and the choice of search engine.
+Android's Back button closes what is open, then goes back. Tabs and groups last
+until the app closes; the phone app does not restore a session.
+
+What the phone engines do not allow, and so it does not do:
+
+- **Request blocking.** An app cannot see a web view's network requests through
+  Qt, so ads are hidden (the filter list's element rules, and YouTube's ad boxes)
+  and YouTube ads that start are muted and skipped — but they are still downloaded.
+- **YouTube ad removal before playback.** That needs a script that runs before the
+  page's own, which the phone web views do not offer; the desktop app does it.
+- **Private tabs.** All tabs share the web view's storage; *Settings › Clear
+  history and cookies* is the way to forget.
+
+Sponsor segments are skipped as on the desktop.
+
+```sh
+./build-android.sh          # dist/SpacePenguin-<version>-android-arm64.apk (debug key)
+./build-ios.sh              # macOS + Xcode: a Simulator build
+./build-ios.sh --team <ID>  # a signed .ipa for devices, with your Apple Developer team
+./build-ios.sh --unsigned   # an unsigned .ipa, to sideload with your own Apple ID
+```
+
+Every CI run (the *build* workflow, also startable by hand from the Actions tab)
+makes both: the APK as *SpacePenguin-Android* and the unsigned `.ipa` as
+*SpacePenguin-iOS*, and a `v*` tag puts them in the release. Install the `.ipa`
+on an iPhone with [Sideloadly](https://sideloadly.io) or
+[AltStore](https://altstore.io), which sign it with a free Apple ID (such apps
+expire after 7 days and are signed again from the same tool). To have CI sign the
+APK with your own key, add the repository secrets `ANDROID_KEYSTORE_BASE64`
+(`base64 -w0 release.keystore`), `ANDROID_KEYSTORE_ALIAS` and
+`ANDROID_KEYSTORE_PASSWORD`.
+
+Both fetch what they need on first use (Qt for the phone and QtWebView into
+`.qt/`; for Android the SDK and NDK into `.cache/android-sdk`; Android also needs
+JDK 17+). Install the APK with `adb install -r` or by opening it on the phone.
+Publishing to Google Play needs your own signing key (`./build-android.sh
+--release`) and Play's target-SDK requirement; publishing to the App Store needs
+an Apple Developer account. To try the
+interface without a phone, `cmake -S mobile -B build-mobile` builds it for the
+desktop.
 
 ## Building
 
@@ -523,6 +654,8 @@ it is on; CI builds them all and, for a `v*` tag, attaches them to a GitHub rele
 | Arch package | `makepkg -si` in `packaging/arch` | `spacepenguin-<v>-1-x86_64.pkg.tar.zst` | Arch, Manjaro, EndeavourOS, … |
 | macOS | `./build-dmg.sh --universal` | `SpacePenguin-<v>-macos.dmg` and `.zip` of the `.app` | macOS 12+, Apple silicon and Intel |
 | Windows | `powershell -ExecutionPolicy Bypass -File build-windows.ps1` | `SpacePenguin-<v>-windows-x64-setup.exe` and `-windows-x64.zip` | Windows 10/11 x64, nothing else needed |
+| Android | `./build-android.sh` (`--release` to sign with your key) | `SpacePenguin-<v>-android-arm64.apk` | Android 9+ on ARM64 |
+| iPhone and iPad | `./build-ios.sh --unsigned` (macOS with Xcode; `--team <ID>` to sign) | `SpacePenguin-<v>-ios-unsigned.ipa` | iOS 16+, sideloaded |
 
 Every script takes `--help` (`-Help` on Windows). Signing is optional:
 `build-appimage.sh --sign` (GPG), `build-dmg.sh --sign "Developer ID Application: …"
@@ -545,7 +678,7 @@ sudo packaging/linux/install-apparmor-profile.sh   # then restart SpacePenguin
 
 It writes `/etc/apparmor.d/spacepenguin-local`, which grants `userns` to this
 checkout's builds, its `.qt/` QtWebEngine helper, `/usr/local/bin/SpacePenguin` and
-an AppImage installed with `packaging/chromeos/install.sh`, and nothing else;
+an AppImage installed with `install.sh`, and nothing else;
 `--remove` takes it out again. It never names paths under `/tmp`, where anyone
 could put a program, so an AppImage run straight from its file stays unsandboxed:
 install it first. The `.deb` and `.rpm`
@@ -582,9 +715,11 @@ printed by default, since they come from the sites themselves; set
 - Bookmarks are a flat list; the backend's folders are not shown
 - No page-requested fullscreen (video players cannot go full screen); `F11`
   makes the whole window full screen
-- No `file://` support, no popups, no PDF viewer
-- No Chrome extension support — QtWebEngine cannot load them, so extensions are
-  user scripts instead (`// @name`, `// @match`)
+- No `file://` support, no PDF viewer
+- Chrome extensions are off (Qt 6.10's support crashes); extensions are user
+  scripts, whose `GM_getValue` settings are kept per site rather than shared
+  across sites, and whose `GM_xmlhttpRequest` cannot reach sites that refuse
+  other sites' requests
 - Blocking covers network rules and cosmetic element hiding, but not
   `$redirect`/`$removeparam` rewrites or `##+js(...)` scriptlets, so a few
   sites still show "ad" placeholders or count blocked requests

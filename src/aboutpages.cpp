@@ -4,6 +4,8 @@
 #include <QStringList>
 #include <QtGlobal>
 
+#include <iterator>
+
 #ifndef SPACEPENGUIN_BUILD_TYPE
 #    define SPACEPENGUIN_BUILD_TYPE "unknown"
 #endif
@@ -39,8 +41,8 @@ const PageDefinition kPages[] = {
       "Do. Or do not. There is no try.", true },
     { "about:hyperdrive", "Punch It",
       "Making the jump to lightspeed.", true },
-    { "about:mozilla", "Book of Mozilla",
-      "An ancient text describing the evolution of browsers, verse by verse.", true },
+    { "about:mozilla", "The Book of Mozilla",
+      "The verses Netscape and Firefox have kept since 1995.", true },
     { "about:firefox", "Phoenix Rising",
       "From the ashes of Netscape, a browser for everyone.", true },
     { "about:servo", "Fearless Concurrency",
@@ -279,36 +281,69 @@ QString hyperdriveBody()
         "The Falcon did it in less than twelve.</p>");
 }
 
-QString mozillaBody()
+// The Book of Mozilla, the verses Netscape and Firefox have shown at about:mozilla
+// since 1995. Text by Mozilla, under the Mozilla Public License 2.0.
+struct Verse {
+    const char *reference;
+    const char *text;
+};
+
+const Verse kBookOfMozilla[] = {
+    { "12:10",
+      "And the beast shall come forth surrounded by a roiling cloud of vengeance. "
+      "The house of the unbelievers shall be razed and they shall be scorched to the earth. "
+      "Their tags shall blink until the end of days." },
+    { "3:31",
+      "And the beast shall be made legion. Its numbers shall be increased a thousand "
+      "thousand fold. The din of a million keyboards like unto a great storm shall cover "
+      "the earth, and the followers of Mammon shall tremble." },
+    { "7:15",
+      "And so at last the beast fell and the unbelievers rejoiced. But all was not lost, "
+      "for from the ash rose a great bird. The bird gazed down upon the unbelievers and cast "
+      "fire and thunder upon them. For the beast had been reborn with its strength renewed, "
+      "and the followers of Mammon cowered in horror." },
+    { "8:20",
+      "The Beast adopted new raiment and studied the ways of Time and Space and Light and "
+      "the Flow of energy through the Universe. From its studies, the Beast fashioned new "
+      "structures from oxidised metal and proclaimed their glories. And the Beast's "
+      "followers rejoiced, finding renewed purpose in these teachings." },
+    { "11:9",
+      "Mammon slept. And the beast reborn spread over the earth and its numbers grew legion. "
+      "And they proclaimed the times and sacrificed crops unto the fire, with the cunning of "
+      "foxes. And they built a new world in their own image as promised by the sacred words, "
+      "and spoke of the beast with their children. Mammon awoke, and lo! it was naught but a "
+      "follower." },
+};
+
+QString mozillaPage()
 {
+    // As Firefox shows it: the newest verse, white on red; the older ones follow.
+    QString verses;
+    const int count = int(std::size(kBookOfMozilla));
+    for (int i = count - 1; i >= 0; --i) {
+        verses += QStringLiteral("<section%1><p>%2</p><p class=\"from\">from <b>The Book of Mozilla,</b> %3</p></section>")
+                      .arg(i == count - 1 ? QString() : QStringLiteral(" class=\"older\""),
+                           escape(QString::fromUtf8(kBookOfMozilla[i].text)),
+                           QString::fromLatin1(kBookOfMozilla[i].reference));
+    }
     return QStringLiteral(
-        "<h1>Book of Mozilla</h1>"
-        "<pre class=\"art\">"
-        "      __    \n"
-        "     /  \\   \n"
-        "    | :: |   \n"
-        "     \\__/    \n"
-        "    /    \\   \n"
-        "   /______\\  \n"
-        "</pre>"
-        "<p><b>Chapter 7, Verse 47</b></p>"
-        "<blockquote><p>The beast rose from the sea, and its mark was 666. "
-        "But mankind, in its pride and folly, had already built its own destruction. "
-        "The browser wars had begun, and only one would survive.</p></blockquote>"
-        "<p><b>Chapter 8, Verse 1</b></p>"
-        "<blockquote><p>And it came to pass that the survivor was reborn, "
-        "rising from the ashes of Netscape, clothed in open source, "
-        "to bring light unto the darkness of the web.</p></blockquote>"
-        "<p><b>Chapter 9, Verse 3</b></p>"
-        "<blockquote><p>But lo, the reborn browser was tempted by the siren song of "
-        "proprietary software, and it was torn asunder. From its fragments arose "
-        "a phoenix, and it was called Firefox, and it brought cross-platform salvation.</p></blockquote>"
-        "<p><b>Chapter 10, Verse 5</b></p>"
-        "<blockquote><p>And the phoenix multiplied, and its offspring spread across "
-        "every desktop and mobile device. But in its success, it forgot the old ways, "
-        "and the gears of progress turned ever faster.</p></blockquote>"
-        "<p class=\"hint\">Mozilla. Mankind's last hope for an open web. "
-        "Since 1998.</p>");
+               "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+               "<title>The Book of Mozilla — SpacePenguin</title>"
+               "<style>"
+               "html{background:#800000;color:#fff;color-scheme:dark}"
+               "body{margin:0;min-height:100vh;padding:12vh 1.5rem 4rem;"
+               "font:1.35rem/1.6 Georgia,'Times New Roman',serif}"
+               "section{max-width:36rem;margin:0 auto 4rem}"
+               "section p{margin:0}"
+               ".from{text-align:right;font-style:italic;margin-top:1rem}"
+               ".older{opacity:.6;font-size:1rem}"
+               ".credit{max-width:36rem;margin:0 auto;font:.8rem/1.5 system-ui,sans-serif;opacity:.6}"
+               ".credit a{color:#fff}"
+               "</style></head><body>%1"
+               "<p class=\"credit\">The Book of Mozilla is by Mozilla, under the "
+               "<a href=\"https://www.mozilla.org/MPL/2.0/\">Mozilla Public License 2.0</a>.</p>"
+               "</body></html>")
+        .arg(verses);
 }
 
 QString firefoxBody()
@@ -575,7 +610,7 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
     if (normalized == QLatin1String("about:hyperdrive"))
         return htmlShell(pageTitle(id), hyperdriveBody());
     if (normalized == QLatin1String("about:mozilla"))
-        return htmlShell(pageTitle(id), mozillaBody());
+        return mozillaPage();
     if (normalized == QLatin1String("about:firefox"))
         return htmlShell(pageTitle(id), firefoxBody());
     if (normalized == QLatin1String("about:servo"))
@@ -633,7 +668,7 @@ QString AboutPages::htmlShell(const QString &pageTitle, const QString &bodyHtml)
                "gap:.6rem;color:var(--muted);font-weight:600;letter-spacing:.02em}"
                "header svg{width:28px;height:28px}"
                "main{max-width:52rem;margin:0 auto;background:var(--card);border:1px solid var(--line);"
-               "border-radius:18px;padding:2.25rem 2.5rem;box-shadow:0 10px 30px rgba(0,0,0,.06)}"
+               "border-radius:18px;padding:2.25rem 2.5rem}"
                "h1{font-size:1.9rem;margin:0 0 1rem;letter-spacing:-.02em}"
                "h2{font-size:1.05rem;margin:2rem 0 .5rem}"
                "p{margin:0 0 1rem}"
@@ -659,15 +694,18 @@ QString AboutPages::htmlShell(const QString &pageTitle, const QString &bodyHtml)
                "pre.art{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;line-height:1.15;"
                "background:var(--chip);padding:1rem 1.25rem;border-radius:12px;overflow-x:auto}"
                "</style></head><body>"
-               "<header><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">"
-               "<circle cx=\"12\" cy=\"12\" r=\"11.5\" fill=\"#24307a\"/>"
-               "<ellipse cx=\"12\" cy=\"13.2\" rx=\"5.4\" ry=\"8.2\" fill=\"#10121c\"/>"
-               "<ellipse cx=\"12\" cy=\"15.1\" rx=\"3.6\" ry=\"5.5\" fill=\"#f4f6fb\"/>"
-               "<circle cx=\"10.4\" cy=\"9.1\" r=\"1.9\" fill=\"#f4f6fb\"/>"
-               "<circle cx=\"13.6\" cy=\"9.1\" r=\"1.9\" fill=\"#f4f6fb\"/>"
-               "<circle cx=\"10.6\" cy=\"9.1\" r=\".8\" fill=\"#10121c\"/>"
-               "<circle cx=\"13.4\" cy=\"9.1\" r=\".8\" fill=\"#10121c\"/>"
-               "<path d=\"M10.7 10.6h2.6L12 12.4z\" fill=\"#ffb02e\"/></svg>"
+               "<header><svg viewBox=\"0 0 100 100\" aria-hidden=\"true\"><clipPath id=\"g\">"
+               "<circle cx=\"50\" cy=\"72\" r=\"20\"/></clipPath>"
+               "<g transform=\"translate(50 50) scale(.92) translate(-50 -53.25)\">"
+               "<path d=\"M25.5 54V35a24.5 24.5 0 0 1 49 0v19\" fill=\"none\" stroke=\"#ff7a1a\" stroke-width=\"7\"/>"
+               "<path d=\"M32 47V35a18 18 0 0 1 36 0v12h1a14 14 0 0 1 14 14v22a14 14 0 0 1-14 14H31a14 14 0 0 1-14-14V61a14 14 0 0 1 14-14z\" fill=\"#16171d\" stroke=\"#fff\" stroke-width=\"5\" stroke-linejoin=\"round\" paint-order=\"stroke\"/>"
+               "<path d=\"M37 47V36a13 13 0 0 1 26 0v11z\" fill=\"#fff\"/>"
+               "<circle cx=\"45\" cy=\"34\" r=\"2.6\" fill=\"#16171d\"/>"
+               "<circle cx=\"55\" cy=\"34\" r=\"2.6\" fill=\"#16171d\"/>"
+               "<path d=\"M47 38.5h6l-3 4z\" fill=\"#ffb21f\" stroke=\"#ffb21f\" stroke-width=\"1.5\" stroke-linejoin=\"round\"/>"
+               "<circle cx=\"50\" cy=\"72\" r=\"20\" fill=\"#6a4fe0\"/>"
+               "<path d=\"M33 64c4-3 10-3 13 0 2 3-1 5-1 8 0 4 4 6 3 10-1 5-6 7-9 5-3-2-2-7-5-10-3-3-6-6-5-9 1-2 2-3 4-4zM56 61c5-1 11 1 13 5 1 3-1 5-4 5-3 1-3 4-2 7 2 4 1 8-3 10-4 1-5-3-6-7-1-5-4-8-4-13 0-4 2-6 6-7z\" fill=\"#2fb7a3\" clip-path=\"url(#g)\"/>"
+               "</g></svg>"
                "SpacePenguin</header>"
                "<main>%2</main></body></html>")
         .arg(escape(pageTitle), bodyHtml);

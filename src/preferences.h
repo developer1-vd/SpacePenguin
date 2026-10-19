@@ -42,6 +42,14 @@ public:
     bool showMenuBar() const;
     void setShowMenuBar(bool show);
 
+    /** Show the tabs in a panel down the side of the window instead of in a row on top. */
+    bool sideTabs() const;
+    void setSideTabs(bool side);
+
+    /** The side panel shows only the tabs' icons. */
+    bool sideTabsCollapsed() const;
+    void setSideTabsCollapsed(bool collapsed);
+
     /** Use the system's title bar instead of putting the window buttons in the tab strip. */
     bool useSystemTitleBar() const;
     void setUseSystemTitleBar(bool use);
@@ -51,6 +59,10 @@ public:
 
     bool blockingEnabled() const;
     void setBlockingEnabled(bool enabled);
+
+    /** Offer to save a login when one is used to sign in to a site. */
+    bool offerToSaveLogins() const;
+    void setOfferToSaveLogins(bool offer);
 
     /** Skip sponsor segments in YouTube videos, with SponsorBlock's data. */
     bool skipSponsors() const;

@@ -15,10 +15,13 @@ const QString kRestore = QStringLiteral("browser/restoreSession");
 const QString kHomeButton = QStringLiteral("appearance/showHomeButton");
 const QString kBookmarksBar = QStringLiteral("appearance/showBookmarksBar");
 const QString kMenuBar = QStringLiteral("appearance/showMenuBar");
+const QString kSideTabs = QStringLiteral("appearance/sideTabs");
+const QString kSideTabsCollapsed = QStringLiteral("appearance/sideTabsCollapsed");
 const QString kSystemTitleBar = QStringLiteral("appearance/systemTitleBar");
 const QString kDownloads = QStringLiteral("downloads/directory");
 const QString kBlocking = QStringLiteral("adblock/enabled");
 const QString kSponsors = QStringLiteral("adblock/skipSponsors");
+const QString kSaveLogins = QStringLiteral("privacy/offerToSaveLogins");
 
 } // namespace
 
@@ -121,6 +124,36 @@ bool Preferences::showMenuBar() const
 void Preferences::setShowMenuBar(bool show)
 {
     write(kMenuBar, show);
+}
+
+bool Preferences::offerToSaveLogins() const
+{
+    return QSettings().value(kSaveLogins, true).toBool();
+}
+
+void Preferences::setOfferToSaveLogins(bool offer)
+{
+    write(kSaveLogins, offer);
+}
+
+bool Preferences::sideTabs() const
+{
+    return QSettings().value(kSideTabs, false).toBool();
+}
+
+void Preferences::setSideTabs(bool side)
+{
+    write(kSideTabs, side);
+}
+
+bool Preferences::sideTabsCollapsed() const
+{
+    return QSettings().value(kSideTabsCollapsed, false).toBool();
+}
+
+void Preferences::setSideTabsCollapsed(bool collapsed)
+{
+    write(kSideTabsCollapsed, collapsed);
 }
 
 bool Preferences::useSystemTitleBar() const

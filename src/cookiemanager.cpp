@@ -37,6 +37,7 @@ QList<Cookie> CookieManager::allCookies() const
 
 QList<Cookie> CookieManager::cookiesForUrl(const QUrl &url) const
 {
+    Q_UNUSED(url)
     QList<Cookie> result;
     if (!m_cookieStore) {
         return result;
@@ -86,6 +87,7 @@ void CookieManager::deleteSessionCookies()
 
 void CookieManager::deleteCookiesForUrl(const QUrl &url)
 {
+    Q_UNUSED(url)
     if (!m_cookieStore) {
         return;
     }

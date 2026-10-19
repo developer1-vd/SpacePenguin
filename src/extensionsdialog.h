@@ -8,6 +8,7 @@ class QPushButton;
 
 namespace spacepenguin {
 
+class ChromeExtensions;
 class UserScripts;
 
 class ExtensionsDialog : public QDialog
@@ -15,7 +16,13 @@ class ExtensionsDialog : public QDialog
     Q_OBJECT
 
 public:
-    ExtensionsDialog(UserScripts *scripts, QWidget *parent = nullptr);
+    ExtensionsDialog(UserScripts *scripts, ChromeExtensions *chrome, QWidget *parent = nullptr);
+
+signals:
+    /** Open the Chrome Web Store in a tab. */
+    void webStoreRequested();
+    /** Open the SpacePenguin Store in a tab. */
+    void scriptStoreRequested();
 
 private:
     void reload();
@@ -24,7 +31,14 @@ private:
     void updateButtons();
     QString selectedId() const;
 
+    void reloadChrome();
+    QString selectedChromeId() const;
+
     UserScripts *m_scripts = nullptr;
+    ChromeExtensions *m_chrome = nullptr;
+    QListWidget *m_chromeList = nullptr;
+    QPushButton *m_chromeToggle = nullptr;
+    QPushButton *m_chromeRemove = nullptr;
     QListWidget *m_list = nullptr;
     QLabel *m_summary = nullptr;
     QPushButton *m_removeButton = nullptr;

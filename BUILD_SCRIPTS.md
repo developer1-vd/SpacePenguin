@@ -11,8 +11,10 @@
 | `flake.nix` / `default.nix` | NixOS, any Linux or macOS with Nix | the browser in the Nix store (`./result`) |
 | `build-dmg.sh` | macOS | `dist/SpacePenguin-<version>-macos.dmg` and `.zip` of the `.app` |
 | `build-windows.ps1` | Windows | `dist/SpacePenguin-<version>-windows-x64-setup.exe` and `.zip` |
+| `build-android.sh` | Linux, macOS | `dist/SpacePenguin-<version>-android-arm64.apk` (the phone app in `mobile/`) |
+| `build-ios.sh` | macOS with Xcode | an iOS Simulator build, or a signed `.ipa` with `--team` |
 | `build-all.sh` | any | whichever of the above this machine can make |
-| `packaging/chromeos/install.sh` | ChromeOS Linux, Debian, Ubuntu | the AppImage installed per user, with a launcher entry |
+| `install.sh` | any Linux, ChromeOS Linux | the AppImage installed per user, with an app-menu entry (`packaging/chromeos/install.sh` runs it) |
 | `tools/build-jobs.sh` | Linux, macOS | the number of compiler jobs this machine has memory for |
 
 Every packaging script reads the version from `CMakeLists.txt` unless given one,
@@ -47,6 +49,25 @@ checksum next to the package. All of them take `--help` (`-Help` on Windows).
 5. Checks CMake is 3.21+ and the Qt is 6.8+, and prints the build commands.
 
 The script needs bash: on Alpine run `apk add bash`, on Void `xbps-install bash`.
+
+## build-android.sh and build-ios.sh
+
+```bash
+./build-android.sh [--release]          # QT_ANDROID_KEYSTORE_* for --release
+./build-ios.sh [--team <id> [--export-method development|ad-hoc|app-store]]
+```
+
+They build the phone app in `mobile/` (Qt Quick and QtWebView; see the README's
+*Phones* section for what it can and cannot do). Each fetches its Qt with
+aqtinstall into `.qt/` — the phone kit with QtWebView, and the desktop kit its
+build tools run from. `build-android.sh` also fetches the Android command-line
+tools (checked against their SHA-256), then the SDK platform, build tools and
+NDK 26.1 that Qt 6.8 is built with, into `.cache/android-sdk` unless
+`ANDROID_SDK_ROOT` points at an SDK; it needs a JDK 17 or newer. Without
+`--release` the APK is signed with a debug key, which installs fine but is not
+accepted by Google Play. `build-ios.sh` generates an Xcode project; without
+`--team` it builds an unsigned Simulator app, with it an archive exported as an
+`.ipa` signed through your Xcode account.
 
 ## Build parallelism
 
@@ -89,20 +110,23 @@ machine's, which is why CI builds it on Ubuntu 22.04. The ARM64 AppImage is buil
 on Ubuntu 24.04, because Qt's ARM64 Linux binaries need glibc 2.38; it runs on
 Ubuntu 24.04, Debian 13, Fedora 39 and newer.
 
-## packaging/chromeos/install.sh
+## install.sh
 
 ```bash
-bash install.sh [--yes] [SpacePenguin-<version>-<arch>.AppImage]
+curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/install.sh | bash
+bash install.sh [--yes] [--no-deps] [SpacePenguin-<version>-<arch>.AppImage]
 bash install.sh --uninstall
 ```
 
-For Chromebooks (and any Debian or Ubuntu user without root for the rest):
-installs the libraries the AppImage takes from the system with apt, downloads the
-newest release's AppImage for this CPU (checking its `.sha256`) unless given one,
+The Linux installer, for any distribution and for Chromebooks
+(`packaging/chromeos/install.sh` runs it): installs the libraries the AppImage
+takes from the system with apt, dnf, zypper or pacman, downloads the newest
+release's AppImage for this CPU — or, before there is a release, the *nightly*
+pre-release that CI publishes from `main` — (checking its `.sha256`) unless given one,
 unpacks it into `~/.local/opt/spacepenguin`, links `~/.local/bin/spacepenguin`,
 installs the launcher entry and icon — which ChromeOS copies into its own
-launcher — and checks it starts. CI runs it in a stock Debian 12 container, the
-base of ChromeOS's Linux environment.
+launcher — and checks it starts. CI runs it in stock Debian containers, the
+base of ChromeOS's Linux environment, and in Fedora, openSUSE Tumbleweed and Arch.
 
 ## build-linux-packages.sh
 

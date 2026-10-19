@@ -13,6 +13,7 @@
 
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QPixmap>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDesktopServices>
@@ -297,6 +298,37 @@ QWidget *SettingsDialog::createAppearanceTab()
     layout->addWidget(mutedLabel(tr("The theme colours the browser itself. Websites that "
                                     "support dark mode follow your system setting.")));
 
+    layout->addWidget(sectionTitle(tr("Colour")));
+    auto *colourRow = new QHBoxLayout;
+    auto *colour = new QComboBox;
+    for (const Theme::Palette &palette : Theme::palettes()) {
+        QPixmap swatch(14, 14);
+        swatch.fill(palette.lightAccent);
+        colour->addItem(QIcon(swatch), palette.name, palette.id);
+        if (palette.id == Theme::storedPalette())
+            colour->setCurrentIndex(colour->count() - 1);
+    }
+    connect(colour, &QComboBox::currentIndexChanged, this, [colour] {
+        Theme::storePalette(colour->currentData().toString());
+        Theme::apply(Theme::storedMode());
+        Preferences::instance()->notifyChanged();
+    });
+    colourRow->addWidget(colour);
+    colourRow->addStretch(1);
+    layout->addLayout(colourRow);
+    layout->addWidget(mutedLabel(tr("More in the SpacePenguin Store, under the puzzle piece in "
+                                    "the toolbar.")));
+
+    layout->addWidget(sectionTitle(tr("Tabs")));
+    auto *sideTabs = new QCheckBox(tr("Show tabs on the side"));
+    sideTabs->setChecked(preferences->sideTabs());
+    connect(sideTabs, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setSideTabs(checked); });
+    layout->addWidget(sideTabs);
+    layout->addWidget(mutedLabel(tr("A panel down the left of the window, with room for long "
+                                    "titles and many tabs. Collapse it to just the icons with "
+                                    "its arrow button.")));
+
     layout->addWidget(sectionTitle(tr("Toolbar")));
     auto *homeButton = new QCheckBox(tr("Show the Home button"));
     homeButton->setChecked(preferences->showHomeButton());
@@ -335,8 +367,9 @@ QWidget *SettingsDialog::createAppearanceTab()
 
     // Keep the controls honest when the same setting changes elsewhere.
     connect(Preferences::instance(), &Preferences::changed, page,
-            [homeButton, bookmarksBar, menuBar] {
+            [sideTabs, homeButton, bookmarksBar, menuBar] {
                 Preferences *current = Preferences::instance();
+                sideTabs->setChecked(current->sideTabs());
                 homeButton->setChecked(current->showHomeButton());
                 bookmarksBar->setChecked(current->showBookmarksBar());
                 menuBar->setChecked(current->showMenuBar());
@@ -351,6 +384,24 @@ QWidget *SettingsDialog::createPrivacyTab()
     QVBoxLayout *layout = nullptr;
     QWidget *page = pageShell(tr("Privacy & Security"),
                               tr("Content blocking, data use and your browsing data."), &layout);
+
+    layout->addWidget(sectionTitle(tr("Logins and permissions")));
+    auto *offerLogins = new QCheckBox(tr("Offer to save logins"));
+    offerLogins->setChecked(Preferences::instance()->offerToSaveLogins());
+    connect(offerLogins, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setOfferToSaveLogins(checked); });
+    layout->addWidget(offerLogins);
+    auto *loginButtons = new QHBoxLayout;
+    auto *savedLogins = new QPushButton(Icons::icon(Icons::Key), tr("Saved logins…"));
+    connect(savedLogins, &QPushButton::clicked, this, &SettingsDialog::savedLoginsRequested);
+    auto *permissions = new QPushButton(Icons::icon(Icons::Shield), tr("Site permissions…"));
+    connect(permissions, &QPushButton::clicked, this, &SettingsDialog::sitePermissionsRequested);
+    loginButtons->addWidget(savedLogins);
+    loginButtons->addWidget(permissions);
+    loginButtons->addStretch(1);
+    layout->addLayout(loginButtons);
+    layout->addWidget(mutedLabel(tr("Sites ask before using your camera, microphone, location "
+                                    "or notifications; your answers are kept per site.")));
 
     layout->addWidget(sectionTitle(tr("Ad blocking")));
     auto *blocking = new QCheckBox(tr("Block ads and trackers"));

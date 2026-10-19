@@ -1,13 +1,18 @@
 #pragma once
 
+#include <QHash>
 #include <QList>
+#include <QSet>
 #include <QMainWindow>
 #include <QPointer>
-#include <QTabBar>
 #include <QUrl>
 
+#include <functional>
+
 #include "aboutpages.h"
+#include "icons.h"
 #include "profiles.h"
+#include "tabbar.h"
 #include "theme.h"
 #include "urlresolver.h"
 
@@ -16,6 +21,7 @@ class QActionGroup;
 class QCompleter;
 class QLabel;
 class QLineEdit;
+class QNetworkAccessManager;
 class QMenu;
 class QProgressBar;
 class QStackedWidget;
@@ -30,20 +36,9 @@ class WindowFrame;
 
 class DownloadsDialog;
 class HistoryDialog;
+class SideTabs;
+class TabGroups;
 class WebView;
-
-/** Tab bar whose tabs shrink to share the available width, like a modern browser. */
-class TabBar : public QTabBar
-{
-    Q_OBJECT
-
-public:
-    explicit TabBar(QWidget *parent = nullptr);
-
-protected:
-    QSize tabSizeHint(int index) const override;
-    QSize minimumTabSizeHint(int index) const override;
-};
 
 class BrowserWindow : public QMainWindow
 {
@@ -69,6 +64,16 @@ private:
     struct ClosedTab {
         int index = 0;
         QUrl url;
+    };
+
+    /** A question for the person about one tab: a site asking for a permission, or
+     *  whether to save a login. Shown in the bar above the page while its tab is shown. */
+    struct Prompt {
+        QString key; // the same question is not asked twice at once
+        Icons::Glyph icon = Icons::Info;
+        QString text;
+        QList<std::pair<QString, std::function<void()>>> buttons; // the first is the main one
+        std::function<void()> dismissed;
     };
 
     // Construction.
@@ -123,7 +128,39 @@ private:
     void selectTabByOffset(int offset);
     void selectTabByIndex(int index);
     void showTabContextMenu(const QPoint &pos);
+    void showTabMenu(int index, const QPoint &globalPosition);
     void updateTabLabel(WebView *view);
+
+    // Questions above the page: site permissions and saving logins.
+    QWidget *createPromptBar();
+    void addPrompt(WebView *view, Prompt prompt);
+    void dropPrompts(WebView *view, const QString &keyPrefix);
+    void showPrompt();
+    void answerPrompt(int button);
+    void offerToSaveLogin(WebView *view, const QString &username, const QString &password);
+    void updateLoginsAction();
+    void showLoginsMenu();
+    void showSavedLogins();
+    void showSitePermissions();
+
+    // Chrome extensions.
+    void populateExtensionsMenu();
+    void showExtensionPopup(const QUrl &url);
+    void offerWebStoreExtension(WebView *view);
+    void offerUserScript(WebView *view, const QUrl &url, bool quiet);
+    /** Downloads the @require libraries of a script; @p done gets an error, or nothing. */
+    void fetchRequires(const QString &source, std::function<void(const QString &failure)> done);
+
+    // Tabs on the side, and tab groups.
+    void setTabsOnSide(bool side);
+    void syncSideTabs();
+    void refreshGroups();
+    void addTabToNewGroup(int index);
+    void toggleGroupCollapsed(int group);
+    void showGroupMenu(int group, const QPoint &globalPosition);
+    void newTabInGroup(int group);
+    void closeGroup(int group);
+    void onTabDragFinished(QObject *tab);
 
     // Navigation.
     void navigate(const QString &text);
@@ -171,6 +208,9 @@ private:
     QWidget *m_tabStrip = nullptr;
     WindowFrame *m_frame = nullptr;
     TabBar *m_tabBar = nullptr;
+    TabGroups *m_groups = nullptr;
+    SideTabs *m_sideTabs = nullptr;
+    bool m_tabsOnSide = false;
     QStackedWidget *m_stack = nullptr;
     QWidget *m_navBar = nullptr;
     QToolBar *m_bookmarksBar = nullptr;
@@ -180,6 +220,7 @@ private:
     QLineEdit *m_omnibox = nullptr;
     QAction *m_securityAction = nullptr;
     QAction *m_bookmarkStarAction = nullptr;
+    QAction *m_loginsAction = nullptr;
     QCompleter *m_completer = nullptr;
     QStandardItemModel *m_completionModel = nullptr;
     bool m_completionsDirty = true;
@@ -192,6 +233,10 @@ private:
     QToolButton *m_blockingButton = nullptr;
     QMenu *m_blockingMenu = nullptr;
     QToolButton *m_downloadsButton = nullptr;
+    QToolButton *m_extensionsButton = nullptr;
+    QMenu *m_extensionsMenu = nullptr;
+    QNetworkAccessManager *m_network = nullptr;
+    QSet<QString> m_offeredScripts; // store pages offer their script once
     QToolButton *m_menuButton = nullptr;
     QLabel *m_zoomMenuLabel = nullptr;
 
@@ -201,6 +246,12 @@ private:
     QPointer<QWebEngineView> m_findView;
 
     QList<ClosedTab> m_closedTabs;
+
+    QHash<const QObject *, QList<Prompt>> m_prompts;
+    QWidget *m_promptBar = nullptr;
+    QLabel *m_promptIcon = nullptr;
+    QLabel *m_promptText = nullptr;
+    QWidget *m_promptButtons = nullptr;
 
     QPointer<DownloadsDialog> m_downloadsDialog;
     QPointer<HistoryDialog> m_historyDialog;
@@ -229,6 +280,7 @@ private:
     QAction *m_bookmarkPageAction = nullptr;
     QAction *m_bookmarksBarAction = nullptr;
     QAction *m_menuBarAction = nullptr;
+    QAction *m_sideTabsAction = nullptr;
     QAction *m_bookmarksAction = nullptr;
     QAction *m_historyAction = nullptr;
     QAction *m_downloadsAction = nullptr;

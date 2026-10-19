@@ -100,14 +100,34 @@ qt_add_executable(spacepenguin
     src/aboutpages.h
     src/browserwindow.cpp
     src/browserwindow.h
+    src/chromeextensions.cpp
+    src/chromeextensions.h
+    src/logins.cpp
+    src/logins.h
+    src/notifications.cpp
+    src/notifications.h
+    src/sidetabs.cpp
+    src/sidetabs.h
+    src/tabbar.cpp
+    src/tabbar.h
+    src/sitepermissions.cpp
+    src/sitepermissions.h
+    src/store.cpp
+    src/store.h
+    src/tabgroups.cpp
+    src/tabgroups.h
     src/browserpage.cpp
     src/browserpage.h
     src/webview.cpp
     src/webview.h
     src/startuptrace.cpp
     src/startuptrace.h
+    src/sponsorblock.cpp
+    src/sponsorblock.h
     src/youtube.cpp
     src/youtube.h
+    src/youtubescripts.cpp
+    src/youtubescripts.h
     src/windowframe.cpp
     src/windowframe.h
     src/icons.cpp
@@ -181,7 +201,7 @@ if(WIN32)
     # and embed the icon and version information Explorer shows.
     set_target_properties(spacepenguin PROPERTIES WIN32_EXECUTABLE TRUE)
     # DwmSetWindowAttribute, for Windows 11's rounded corners on our own frame.
-    target_link_libraries(spacepenguin PRIVATE dwmapi)
+    target_link_libraries(spacepenguin PRIVATE dwmapi crypt32)
     set(SPACEPENGUIN_ICO "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/spacepenguin.ico")
     file(TO_CMAKE_PATH "${SPACEPENGUIN_ICO}" SPACEPENGUIN_ICO)
     configure_file(packaging/windows/spacepenguin.rc.in
@@ -311,6 +331,10 @@ if(SPACEPENGUIN_BUILD_TESTS)
             tests/tst_startpage.cpp
             src/startpageschemehandler.cpp
             src/startpageschemehandler.h
+            src/store.cpp
+            src/store.h
+            src/userextensions.cpp
+            src/userextensions.h
             src/shortcuts.cpp
             src/shortcuts.h
             src/preferences.cpp
@@ -320,7 +344,7 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/urlresolver.cpp
             src/urlresolver.h
         )
-        target_link_libraries(tst_startpage PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
+        target_link_libraries(tst_startpage PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore Qt6::Network)
         target_include_directories(tst_startpage PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_definitions(tst_startpage PRIVATE
             SPACEPENGUIN_START_PAGE="${CMAKE_CURRENT_SOURCE_DIR}/html/start.html")
@@ -353,20 +377,14 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_include_directories(tst_devicetuning PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME devicetuning COMMAND tst_devicetuning)
 
-        qt_add_executable(tst_youtube
-            tests/tst_youtube.cpp
-            src/youtube.cpp
-            src/youtube.h
-            src/preferences.cpp
-            src/preferences.h
-            src/userextensions.cpp
-            src/userextensions.h
-            src/urlresolver.cpp
-            src/urlresolver.h
+        qt_add_executable(tst_sponsorblock
+            tests/tst_sponsorblock.cpp
+            src/sponsorblock.cpp
+            src/sponsorblock.h
         )
-        target_link_libraries(tst_youtube PRIVATE Qt6::Test Qt6::Network Qt6::WebEngineWidgets)
-        target_include_directories(tst_youtube PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-        add_test(NAME youtube COMMAND tst_youtube)
+        target_link_libraries(tst_sponsorblock PRIVATE Qt6::Test Qt6::Network)
+        target_include_directories(tst_sponsorblock PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME sponsorblock COMMAND tst_sponsorblock)
     endif()
 endif()
 

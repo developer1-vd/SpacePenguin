@@ -81,6 +81,9 @@ QList<QKeySequence> Shortcuts::keys(Command command)
         return {key(Qt::CTRL | Qt::Key_D)};
     case BookmarksBar:
         return {key(Qt::CTRL | Qt::SHIFT | Qt::Key_B)};
+    case SideTabs:
+        // Edge's binding.
+        return {key(Qt::CTRL | Qt::SHIFT | Qt::Key_Comma)};
     case Bookmarks:
         if constexpr (kMac)
             return {key(Qt::CTRL | Qt::ALT | Qt::Key_B)};
