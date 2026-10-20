@@ -24,6 +24,7 @@
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -422,6 +423,11 @@ QWidget *SettingsDialog::createPrivacyTab()
                                     "fragment of a hash of the video's ID is sent, never the ID "
                                     "itself, so SponsorBlock cannot tell which video you watch.")));
 
+    auto *strip = new QCheckBox(tr("Remove tracking from links (utm_source, fbclid and the like)"));
+    strip->setChecked(Preferences::instance()->stripTracking());
+    connect(strip, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setStripTracking(on); });
+    layout->addWidget(strip);
+
     m_blockingSummary = mutedLabel(QString());
     m_blockingSummary->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(m_blockingSummary);
@@ -505,7 +511,25 @@ QWidget *SettingsDialog::createPrivacyTab()
         reloadPaused();
     });
     layout->addWidget(paused);
+    auto *pause = new QPushButton(tr("Pause on a site…"));
+    pause->setEnabled(m_adBlocker != nullptr);
+    connect(pause, &QPushButton::clicked, this, [this, reloadPaused] {
+        const QString text = QInputDialog::getText(this, tr("Pause blocking"),
+                                                   tr("Site where nothing should be blocked (for example example.com):"));
+        QString host = QUrl::fromUserInput(text.trimmed()).host().toLower();
+        if (host.startsWith(QLatin1String("www.")))
+            host = host.mid(4);
+        if (host.isEmpty())
+            return;
+        QStringList hosts = m_adBlocker->pausedHosts();
+        if (!hosts.contains(host)) {
+            hosts.append(host);
+            m_adBlocker->setPausedHosts(hosts);
+        }
+        reloadPaused();
+    });
     auto *resumeRow = new QHBoxLayout;
+    resumeRow->addWidget(pause);
     resumeRow->addWidget(resume);
     resumeRow->addStretch(1);
     layout->addLayout(resumeRow);

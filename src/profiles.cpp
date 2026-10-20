@@ -188,6 +188,7 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     const auto applyPreferences = [preferences, blocker, downloads] {
         if (blocker->isEnabled() != preferences->blockingEnabled())
             blocker->setEnabled(preferences->blockingEnabled());
+        blocker->setStripTracking(preferences->stripTracking());
         downloads->setDownloadPath(preferences->downloadDirectory());
     };
     QObject::connect(preferences, &Preferences::changed, blocker, applyPreferences);

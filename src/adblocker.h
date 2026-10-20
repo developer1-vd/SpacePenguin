@@ -43,6 +43,9 @@ struct NetworkRule {
     bool caseSensitive = false;
     /** For a rule that is only `||host^`: the host, matched without a regex. */
     QString hostOnly;
+    /** `$removeparam`: the parameter to take off matching addresses ("" for all, /…/ a regex). */
+    QString removeParam;
+    bool isRemoveParam = false;
 
     bool matches(const QUrl &url, const QString &documentHost, RequestType requestType) const;
     bool matchesDomain(const QString &documentHost) const;
@@ -84,6 +87,7 @@ public:
         QList<CosmeticRule> cosmeticExceptions;
         Index ruleIndex;
         Index exceptionIndex;
+        QList<NetworkRule> removeParams;
     };
     /** Parses rules; safe on any thread, so a large list need not hold up the window. */
     static std::shared_ptr<const Filters> parseFilters(const QString &text);
@@ -111,6 +115,13 @@ public:
 
     bool wouldBlock(const QUrl &url, RequestType type = RequestType::Any,
                     const QString &documentHost = QString()) const;
+
+    /** Takes tracking parameters off addresses: the list's `$removeparam` rules, and common ones. */
+    void setStripTracking(bool strip) { m_stripTracking = strip; }
+    bool stripsTracking() const { return m_stripTracking; }
+    /** @p url without the parameters the rules remove; @p url itself if there are none. */
+    QUrl cleanUrl(const QUrl &url, RequestType type = RequestType::Any,
+                  const QString &documentHost = QString()) const;
     QStringList cosmeticSelectors(const QString &documentHost) const;
 
     /**
@@ -142,6 +153,7 @@ private:
     QString m_lastBlockedHost;
     int m_blockedCount = 0;
     bool m_enabled = true;
+    bool m_stripTracking = true;
 };
 
 }

@@ -38,6 +38,8 @@ private slots:
     void unsupportedSyntaxIsSkipped();
     void hostRuleMatchesSubdomainsOnly();
     void indexFindsEveryKindOfRule();
+    void trackingParametersAreRemoved();
+    void removeparamRules();
     void generatedPatternsMatchExpectedTargets();
     void separatorBeforeOptions();
     void endOfAddressQuestionMark();
@@ -538,6 +540,26 @@ void TestAdBlocker::sameHostContentIsNotBlocked()
                     QStringLiteral("www.youtube.com")));
     QVERIFY(!blocks(blocker, "https://i.ytimg.com/vi/abc/hqdefault.jpg", RequestType::Image,
                     QStringLiteral("www.youtube.com")));
+}
+
+void TestAdBlocker::trackingParametersAreRemoved()
+{
+    AdBlocker blocker;
+    QCOMPARE(blocker.cleanUrl(QUrl("https://shop.example/item?id=7&utm_source=news&fbclid=abc")),
+             QUrl("https://shop.example/item?id=7"));
+    QCOMPARE(blocker.cleanUrl(QUrl("https://shop.example/?utm_medium=x")), QUrl("https://shop.example/"));
+    // Nothing to remove: the very same address back.
+    QCOMPARE(blocker.cleanUrl(QUrl("https://shop.example/?q=utm_source")), QUrl("https://shop.example/?q=utm_source"));
+}
+
+void TestAdBlocker::removeparamRules()
+{
+    auto blocker = blockerWith("$removeparam=ref_src\n||news.example^$removeparam=/^Track/\n||all.example^$removeparam");
+    QCOMPARE(blocker->ruleCount(), 0); // they remove, they do not block
+    QCOMPARE(blocker->cleanUrl(QUrl("https://a.example/?ref_src=tw&x=1")), QUrl("https://a.example/?x=1"));
+    QCOMPARE(blocker->cleanUrl(QUrl("https://news.example/p?Track=1&track=2")), QUrl("https://news.example/p?track=2"));
+    QCOMPARE(blocker->cleanUrl(QUrl("https://all.example/p?a=1&b=2")), QUrl("https://all.example/p"));
+    QCOMPARE(blocker->cleanUrl(QUrl("https://other.example/p?Track=1")), QUrl("https://other.example/p?Track=1"));
 }
 
 QTEST_MAIN(TestAdBlocker)

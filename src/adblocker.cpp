@@ -7,6 +7,7 @@
 #include <QSet>
 #include <QTextStream>
 #include <QUrl>
+#include <QUrlQuery>
 #include <QWebEngineUrlRequestInfo>
 
 namespace spacepenguin {
@@ -272,6 +273,7 @@ bool knownOption(const QString &option)
         QStringLiteral("elemhide"),      QStringLiteral("ehide"),
         QStringLiteral("websocket"),     QStringLiteral("other"),
         QStringLiteral("important"),     QStringLiteral("match-case"),
+        QStringLiteral("removeparam"),
     };
     return names.contains(option);
 }
@@ -462,7 +464,7 @@ bool AdBlocker::parseRule(const QString &line, NetworkRule *rule)
         break;
     }
 
-    if (optionStart > 0) {
+    if (optionStart >= 0) {
         const QString optionText = filter.mid(optionStart + 1).toLower();
         const QStringList options = optionText.split(QLatin1Char(','));
 
@@ -493,6 +495,19 @@ bool AdBlocker::parseRule(const QString &line, NetworkRule *rule)
 
             if (isCosmeticOnlyOption(name)) {
                 cosmeticOnly = true;
+                continue;
+            }
+
+            if (name == QLatin1String("removeparam")) {
+                rule->isRemoveParam = true;
+                // The value as written: a regex is case-sensitive.
+                if (equals >= 0) {
+                    const QString written = filter.mid(optionStart + 1);
+                    const int start = written.indexOf(QLatin1Char('='),
+                                                      written.indexOf(QLatin1String("removeparam"), 0, Qt::CaseInsensitive)) + 1;
+                    const int end = written.indexOf(QLatin1Char(','), start);
+                    rule->removeParam = written.mid(start, end < 0 ? -1 : end - start);
+                }
                 continue;
             }
 
@@ -556,6 +571,9 @@ bool AdBlocker::parseRule(const QString &line, NetworkRule *rule)
         }
     }
 
+    // `$removeparam=…` on its own applies to every address.
+    if (filter.isEmpty() && rule->isRemoveParam)
+        filter = QStringLiteral("*");
     if (filter.isEmpty())
         return false;
 
@@ -667,10 +685,15 @@ std::shared_ptr<const AdBlocker::Filters> AdBlocker::parseFilters(const QString 
         if (!parseRule(line, &rule))
             continue;
 
-        if (line.startsWith(QLatin1String("@@")))
+        if (rule.isRemoveParam) {
+            // Exceptions to them are not supported; the rule itself is kept.
+            if (!line.startsWith(QLatin1String("@@")))
+                filters->removeParams.append(rule);
+        } else if (line.startsWith(QLatin1String("@@"))) {
             filters->exceptions.append(rule);
-        else
+        } else {
             filters->rules.append(rule);
+        }
     }
     filters->ruleIndex = buildIndex(filters->rules);
     filters->exceptionIndex = buildIndex(filters->exceptions);
@@ -687,7 +710,7 @@ bool AdBlocker::loadFiltersFromText(const QString &text)
 {
     std::shared_ptr<const Filters> filters = parseFilters(text);
     if (filters->rules.isEmpty() && filters->exceptions.isEmpty() && filters->cosmeticRules.isEmpty()
-        && filters->cosmeticExceptions.isEmpty()) {
+        && filters->cosmeticExceptions.isEmpty() && filters->removeParams.isEmpty()) {
         m_lastListError = tr("The filter list contains no usable rules.");
         return false;
     }
@@ -714,8 +737,14 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info)
     const RequestType type = static_cast<RequestType>(static_cast<int>(info.resourceType()));
     const QString documentHost = info.initiator().host();
 
-    if (!wouldBlock(url, type, documentHost))
+    if (!wouldBlock(url, type, documentHost)) {
+        if (m_stripTracking && url.hasQuery()) {
+            const QUrl clean = cleanUrl(url, type, documentHost);
+            if (clean != url)
+                info.redirect(clean);
+        }
         return;
+    }
 
     info.block(true);
     ++m_blockedCount;
@@ -741,6 +770,61 @@ bool AdBlocker::wouldBlock(const QUrl &url, RequestType type, const QString &doc
     if (anyMatches(rules->exceptions, rules->exceptionIndex, url, tokens, domain, type))
         return false;
     return anyMatches(rules->rules, rules->ruleIndex, url, tokens, domain, type);
+}
+
+QUrl AdBlocker::cleanUrl(const QUrl &url, RequestType type, const QString &documentHost) const
+{
+    if (!url.hasQuery())
+        return url;
+    // Parameters that only say where a click came from, removed on every site.
+    static const QStringList tracking = {
+        QStringLiteral("utm_source"), QStringLiteral("utm_medium"), QStringLiteral("utm_campaign"),
+        QStringLiteral("utm_term"),   QStringLiteral("utm_content"), QStringLiteral("utm_id"),
+        QStringLiteral("fbclid"),     QStringLiteral("gclid"),       QStringLiteral("dclid"),
+        QStringLiteral("gbraid"),     QStringLiteral("wbraid"),      QStringLiteral("msclkid"),
+        QStringLiteral("yclid"),      QStringLiteral("twclid"),      QStringLiteral("igshid"),
+        QStringLiteral("mc_eid"),     QStringLiteral("_hsenc"),      QStringLiteral("_hsmi"),
+        QStringLiteral("mkt_tok"),    QStringLiteral("oly_enc_id"),  QStringLiteral("oly_anon_id"),
+    };
+    QList<const NetworkRule *> rules;
+    const std::shared_ptr<const Filters> current = filters();
+    const QString domain = documentHost.toLower();
+    for (const NetworkRule &rule : current->removeParams) {
+        if (rule.matches(url, domain, type))
+            rules.append(&rule);
+    }
+
+    QUrlQuery query(url);
+    const QList<QPair<QString, QString>> items = query.queryItems(QUrl::FullyEncoded);
+    QList<QPair<QString, QString>> kept;
+    for (const auto &item : items) {
+        const QString name = QUrl::fromPercentEncoding(item.first.toUtf8());
+        bool remove = tracking.contains(name.toLower());
+        for (const NetworkRule *rule : std::as_const(rules)) {
+            if (remove)
+                break;
+            const QString &param = rule->removeParam;
+            if (param.isEmpty()) {
+                remove = true;
+            } else if (param.size() > 2 && param.startsWith(QLatin1Char('/')) && param.endsWith(QLatin1Char('/'))) {
+                remove = QRegularExpression(param.mid(1, param.size() - 2))
+                             .match(name + QLatin1Char('=') + item.second).hasMatch();
+            } else {
+                remove = name.compare(param, Qt::CaseInsensitive) == 0;
+            }
+        }
+        if (!remove)
+            kept.append(item);
+    }
+    if (kept.size() == items.size())
+        return url;
+    QUrl clean = url;
+    QUrlQuery cleanQuery;
+    cleanQuery.setQueryItems(kept);
+    clean.setQuery(kept.isEmpty() ? QString() : cleanQuery.query(QUrl::FullyEncoded), QUrl::StrictMode);
+    if (kept.isEmpty())
+        clean.setQuery(QString());
+    return clean;
 }
 
 AdBlocker::Index AdBlocker::buildIndex(const QList<NetworkRule> &rules)
