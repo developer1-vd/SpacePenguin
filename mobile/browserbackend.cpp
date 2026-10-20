@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QSettings>
 
 namespace spacepenguin {
@@ -180,6 +181,17 @@ void BrowserBackend::removeBookmark(const QUrl &url)
 QVariantList BrowserBackend::history() const
 {
     return readList(kHistory);
+}
+
+void BrowserBackend::saveSession(const QVariantMap &session)
+{
+    QSettings().setValue(QStringLiteral("session"),
+                         QJsonDocument(QJsonObject::fromVariantMap(session)).toJson(QJsonDocument::Compact));
+}
+
+QVariantMap BrowserBackend::savedSession() const
+{
+    return QJsonDocument::fromJson(QSettings().value(QStringLiteral("session")).toByteArray()).object().toVariantMap();
 }
 
 void BrowserBackend::recordVisit(const QString &title, const QUrl &url)

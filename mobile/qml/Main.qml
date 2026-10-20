@@ -83,8 +83,8 @@ ApplicationWindow {
     // Bumped when a tab's group changes, which a ListModel does not announce to bindings.
     property int tabRevision: 0
 
-    function newTab(address) {
-        tabModel.append({ first: address || "", group: 0 });
+    function newTab(address, isPrivate) {
+        tabModel.append({ first: address || "", group: 0, isPrivate: !!isPrivate });
         current = tabModel.count - 1;
         sheet = "";
         editing = false;
@@ -173,13 +173,50 @@ ApplicationWindow {
             tab.load(BrowserBackend.resolve(text));
     }
 
-    Component.onCompleted: newTab("")
+    // The tabs and groups, kept when the app goes to the background (where the
+    // phone may close it) and when it closes, and reopened at start.
+    function saveSession() {
+        const tabs = [];
+        let currentIndex = 0;
+        for (let i = 0; i < tabModel.count; ++i) {
+            const entry = tabModel.get(i);
+            const page = tabRepeater.itemAt(i);
+            if (entry.isPrivate)
+                continue;
+            if (i === current)
+                currentIndex = tabs.length;
+            tabs.push({ url: page && !page.onStartPage ? page.url.toString() : "", group: entry.group });
+        }
+        BrowserBackend.saveSession({ tabs: tabs, groups: groups, current: currentIndex });
+    }
+    Connections {
+        target: Qt.application
+        function onStateChanged() {
+            if (Qt.application.state !== Qt.ApplicationActive)
+                window.saveSession();
+        }
+    }
+    Component.onCompleted: {
+        const saved = BrowserBackend.savedSession();
+        const tabs = saved.tabs || [];
+        if (!tabs.length) {
+            newTab("");
+            return;
+        }
+        groups = (saved.groups || []).filter(g => tabs.some(t => t.group === g.id));
+        nextGroupId = groups.reduce((top, g) => Math.max(top, g.id + 1), 1);
+        for (const saved_tab of tabs)
+            tabModel.append({ first: saved_tab.url || "", group: saved_tab.group || 0, isPrivate: false });
+        current = Math.min(saved.current || 0, tabModel.count - 1);
+        tabRevision++;
+    }
 
     // Android's Back button closes what is open, then goes back, then leaves.
     onClosing: close => {
         if (sheet !== "") { sheet = ""; close.accepted = false; }
         else if (editing) { editing = false; close.accepted = false; }
         else if (tab && !tab.onStartPage) { tab.goBack(); close.accepted = false; }
+        else saveSession();
     }
 
     // ---- Pages -----------------------------------------------------------
@@ -196,6 +233,7 @@ ApplicationWindow {
             delegate: BrowserTab {
                 required property int index
                 required property string first
+                required isPrivate
                 anchors.fill: parent
                 visible: index === window.current
                 pageVisible: window.sheet === "" && !window.editing
@@ -252,6 +290,7 @@ ApplicationWindow {
                 id: menuColumn
                 width: parent.width
                 MenuRow { width: parent.width; glyph: "plus"; label: qsTr("New tab"); onClicked: window.newTab("") }
+                MenuRow { width: parent.width; glyph: "shield"; label: qsTr("New private tab"); onClicked: window.newTab("", true) }
                 MenuRow { width: parent.width; glyph: "bookmarks"; label: qsTr("Bookmarks"); onClicked: window.sheet = "bookmarks" }
                 MenuRow { width: parent.width; glyph: "history"; label: qsTr("History"); onClicked: window.sheet = "history" }
                 MenuRow {
@@ -352,7 +391,8 @@ ApplicationWindow {
                                         onPressAndHold: tabMenu.openFor(cell.tabIndex)
                                         background: Rectangle {
                                             radius: Theme.radius
-                                            color: card.pressed ? Theme.pressed : Theme.surface
+                                            color: card.pressed ? Theme.pressed
+                                                   : cell.page && cell.page.isPrivate ? Theme.privateSurface : Theme.surface
                                             border.color: cell.tabIndex === window.current ? Theme.accent : Theme.border
                                             border.width: cell.tabIndex === window.current ? 2 : 1
                                             // A group's tabs carry its colour along their top.
@@ -385,7 +425,8 @@ ApplicationWindow {
                                                 anchors.right: parent.right
                                                 anchors.bottom: parent.bottom
                                                 anchors.margins: 14
-                                                text: cell.page && !cell.page.onStartPage ? BrowserBackend.displayUrl(cell.page.url) : ""
+                                                text: (cell.page && cell.page.isPrivate ? qsTr("Private · ") : "")
+                                                      + (cell.page && !cell.page.onStartPage ? BrowserBackend.displayUrl(cell.page.url) : "")
                                                 color: Theme.muted
                                                 font.pixelSize: 12
                                                 elide: Text.ElideMiddle

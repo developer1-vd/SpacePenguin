@@ -16,6 +16,8 @@ QtObject {
     readonly property color accentText: dark ? "#0f1116" : "#ffffff"
     readonly property color pressed: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
     readonly property color danger: dark ? "#ff7b7b" : "#c7362f"
+    // Private tabs' cards: the desktop's private-window purple, toned down.
+    readonly property color privateSurface: dark ? "#2a2140" : "#ede7fb"
 
     // Tab group colours, the desktop's (src/tabgroups.cpp): strong on light, soft on dark.
     readonly property var groupColorNames: [qsTr("Grey"), qsTr("Blue"), qsTr("Red"), qsTr("Yellow"),

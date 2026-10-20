@@ -61,6 +61,10 @@ public:
     Q_INVOKABLE void recordVisit(const QString &title, const QUrl &url);
     Q_INVOKABLE void clearHistory();
 
+    /** The open tabs (not private ones), kept so the app reopens them. */
+    Q_INVOKABLE void saveSession(const QVariantMap &session);
+    Q_INVOKABLE QVariantMap savedSession() const;
+
     /**
      * JavaScript to run in a page once it has loaded: for YouTube the ad hiding,
      * ad skipping and sponsor skipping; elsewhere the element-hiding rules of the

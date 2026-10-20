@@ -36,6 +36,7 @@
 #include <QCloseEvent>
 #include <QCompleter>
 #include <QCursor>
+#include <QDataStream>
 #include <QDateTime>
 #include <QDialog>
 #include <QPointer>
@@ -1500,8 +1501,20 @@ void BrowserWindow::restoreSession()
 
     const int current = qBound(0, settings.value(QStringLiteral("session/currentTab")).toInt(),
                                int(urls.size()) - 1);
-    for (const QString &url : urls)
-        newTab(QUrl(url));
+    // Each tab's back and forward history, with what Chromium keeps for each page
+    // (where it was scrolled to, what was typed into forms); the address alone if not.
+    const QStringList histories = settings.value(QStringLiteral("session/histories")).toStringList();
+    for (int index = 0; index < urls.size(); ++index) {
+        WebView *view = addTab(false);
+        const QByteArray history = QByteArray::fromBase64(histories.value(index).toLatin1());
+        if (!history.isEmpty()) {
+            QDataStream stream(history);
+            stream >> *view->history();
+            if (stream.status() == QDataStream::Ok && view->history()->count() > 0)
+                continue;
+        }
+        loadUrl(view, QUrl(urls.at(index)));
+    }
 
     const QJsonObject saved =
         QJsonDocument::fromJson(settings.value(QStringLiteral("session/groups")).toString().toUtf8())
@@ -1538,6 +1551,7 @@ void BrowserWindow::saveSession() const
 
     QStringList urls;
     urls.reserve(m_tabBar->count());
+    QStringList histories;
     // Each saved tab's group, as a place in the list of groups; -1 for none.
     const QList<TabGroup> groups = m_groups->groups();
     QJsonArray tabGroups;
@@ -1545,6 +1559,13 @@ void BrowserWindow::saveSession() const
         const WebView *view = viewAt(index);
         if (view && view->url().isValid() && !view->url().isEmpty()) {
             urls.append(view->url().toString());
+            // Internal pages are drawn by the browser, so only their address is kept.
+            QByteArray history;
+            if (isWebScheme(view->url()) || view->url().isLocalFile()) {
+                QDataStream stream(&history, QIODevice::WriteOnly);
+                stream << *view->history();
+            }
+            histories.append(QString::fromLatin1(history.toBase64()));
             const int group = m_groups->groupOf(view);
             int place = -1;
             for (int i = 0; i < groups.size(); ++i) {
@@ -1562,6 +1583,7 @@ void BrowserWindow::saveSession() const
     }
 
     settings.setValue(QStringLiteral("session/urls"), urls);
+    settings.setValue(QStringLiteral("session/histories"), histories);
     settings.setValue(QStringLiteral("session/groups"),
                       QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("groups"), groupList},
                                                                   {QStringLiteral("tabs"), tabGroups}})
