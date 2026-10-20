@@ -5,6 +5,7 @@
 #include "notifications.h"
 
 #include "adblocker.h"
+#include "filterlists.h"
 #include "bookmarkmanager.h"
 #include "cookiemanager.h"
 #include "cosmeticfilters.h"
@@ -166,8 +167,14 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     if (!explicitList && !QFile::exists(listPath))
         writeStarterFilterList(listPath);
 
-    if (!listPath.isEmpty())
-        services.adBlocker->loadFilters(listPath);
+    // One set of lists for every window: the person's own, and their subscriptions
+    // (left out when a list is given on the command line, for testing).
+    static const bool listsSet = [&] {
+        FilterLists::instance()->setUserList(listPath, !explicitList);
+        return true;
+    }();
+    Q_UNUSED(listsSet)
+    FilterLists::instance()->attach(services.adBlocker);
 
     QWebEngineProfile *profile = services.profile;
     AdBlocker *blocker = services.adBlocker;

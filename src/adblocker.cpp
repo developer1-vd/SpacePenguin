@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QHostAddress>
 #include <QRegularExpression>
+#include <QSet>
 #include <QTextStream>
 #include <QUrl>
 #include <QWebEngineUrlRequestInfo>
@@ -15,6 +16,88 @@ bool isCommentOrHeader(const QString &line)
 {
     return line.startsWith(QLatin1Char('!')) || line.startsWith(QLatin1Char('#'))
         || line.startsWith(QLatin1Char('['));
+}
+
+/**
+ * uBlock Origin and Adblock Plus extensions this blocker does not run: procedural
+ * and scriptlet filters, HTML filtering, CSS injection. Skipped whole, rather than
+ * read as patterns that never match (or, as selectors, break the page's stylesheet).
+ */
+bool isUnsupportedSyntax(const QString &line)
+{
+    static const char *const markers[] = {"#?#", "#@?#", "#$#", "#@$#", "#%#", "#@%#", "$$", "##+js(",
+                                          "#@#+js(", "##^", ":-abp-", ":has-text(", ":matches-css",
+                                          ":xpath(", ":upward(", ":remove(", ":style(", ":min-text-length(",
+                                          ":watch-attr(", ":matches-path(", ":others(", ":matches-attr(",
+                                          ":matches-prop(", ":remove-attr(", ":remove-class("};
+    for (const char *marker : markers) {
+        if (line.contains(QLatin1String(marker)))
+            return true;
+    }
+    return false;
+}
+
+inline bool isTokenChar(QChar c)
+{
+    const ushort u = c.unicode();
+    return (u >= 'a' && u <= 'z') || (u >= '0' && u <= '9');
+}
+
+/** The words of an address, lowercase, split at everything but letters and digits. */
+QStringList urlTokens(const QString &url)
+{
+    QStringList tokens;
+    const QString lower = url.toLower();
+    int start = -1;
+    for (int i = 0; i <= lower.size(); ++i) {
+        if (i < lower.size() && isTokenChar(lower.at(i))) {
+            if (start < 0)
+                start = i;
+        } else if (start >= 0) {
+            if (i - start >= 2)
+                tokens.append(lower.mid(start, i - start));
+            start = -1;
+        }
+    }
+    tokens.removeDuplicates();
+    return tokens;
+}
+
+/**
+ * The words every address the pattern matches must contain whole: ones bounded on
+ * both sides by a separator, an anchor or `^`, not by a wildcard or the pattern's
+ * open ends. None for a regular expression.
+ */
+QStringList patternTokens(const QString &pattern)
+{
+    QStringList tokens;
+    if (pattern.size() > 2 && pattern.startsWith(QLatin1Char('/')) && pattern.endsWith(QLatin1Char('/')))
+        return tokens;
+    const QString lower = pattern.toLower();
+    int start = -1;
+    for (int i = 0; i <= lower.size(); ++i) {
+        if (i < lower.size() && isTokenChar(lower.at(i))) {
+            if (start < 0)
+                start = i;
+            continue;
+        }
+        if (start < 0)
+            continue;
+        const bool leftBounded = start > 0 && lower.at(start - 1) != QLatin1Char('*');
+        const bool rightBounded = i < lower.size() && lower.at(i) != QLatin1Char('*');
+        if (leftBounded && rightBounded && i - start >= 2)
+            tokens.append(lower.mid(start, i - start));
+        start = -1;
+    }
+    return tokens;
+}
+
+/** "example.com" for `||example.com^`: a rule that is only a host, checked without a regex. */
+QString anchoredHost(const QString &pattern)
+{
+    static const QRegularExpression hostOnly(QStringLiteral("^\\|\\|([a-z0-9.-]+)\\^?$"));
+    const QRegularExpressionMatch match = hostOnly.match(pattern.toLower());
+    return match.hasMatch() ? match.captured(1) : QString();
 }
 
 QString hostSuffix(const QString &host)
@@ -85,6 +168,10 @@ QString endOfAddressPattern()
  */
 QString patternToRegExpSourceInternal(const QString &filter)
 {
+    // `/…/` is a regular expression already.
+    if (filter.size() > 2 && filter.startsWith(QLatin1Char('/')) && filter.endsWith(QLatin1Char('/')))
+        return filter.mid(1, filter.size() - 2);
+
     QString pattern = unescapePattern(filter);
     QString source;
     bool anchorStart = false;
@@ -296,6 +383,11 @@ bool NetworkRule::matches(const QUrl &url, const QString &documentHost,
             return false;
     }
 
+    if (!hostOnly.isEmpty()) {
+        const QString lowerHost = host.toLower();
+        return lowerHost == hostOnly || hostMatchesSuffix(lowerHost, hostSuffix(hostOnly));
+    }
+
     static thread_local QHash<QString, QRegularExpression> cache;
 
     const QString key = caseSensitive ? QStringLiteral("1") + pattern : pattern;
@@ -394,8 +486,9 @@ bool AdBlocker::parseRule(const QString &line, NetworkRule *rule)
             const QString value = equals < 0 ? QString() : option.mid(equals + 1);
 
             if (!knownOption(name)) {
-                ok = false;
-                break;
+                // An option this blocker does not support ($redirect, $removeparam, …):
+                // the rule cannot be honoured as written, so it is left out.
+                return false;
             }
 
             if (isCosmeticOnlyOption(name)) {
@@ -466,10 +559,14 @@ bool AdBlocker::parseRule(const QString &line, NetworkRule *rule)
     if (filter.isEmpty())
         return false;
 
-    if (!compilePattern(filter, false).isValid())
+    // Only a regular-expression rule can fail to compile; the rest are escaped.
+    if (filter.size() > 2 && filter.startsWith(QLatin1Char('/')) && filter.endsWith(QLatin1Char('/'))
+        && !compilePattern(filter, false).isValid()) {
         return false;
+    }
 
     rule->pattern = filter;
+    rule->hostOnly = anchoredHost(filter);
     return true;
 }
 
@@ -539,28 +636,26 @@ bool AdBlocker::loadFilters(const QString &path, QString *error)
     return true;
 }
 
-bool AdBlocker::loadFiltersFromText(const QString &text)
+std::shared_ptr<const AdBlocker::Filters> AdBlocker::parseFilters(const QString &text)
 {
-    QList<NetworkRule> rules;
-    QList<NetworkRule> exceptions;
-    QList<CosmeticRule> cosmeticRules;
-    QList<CosmeticRule> cosmeticExceptions;
-
+    auto filters = std::make_shared<Filters>();
     const QStringList lines = text.split(QLatin1Char('\n'));
     for (const QString &rawLine : lines) {
         const QString line = rawLine.trimmed();
         if (line.isEmpty())
             continue;
 
+        if (isUnsupportedSyntax(line))
+            continue;
+
         // Cosmetic rules are checked first: they start with `#`, but are rules.
         if (line.contains(QLatin1String("##")) || line.contains(QLatin1String("#@#"))) {
             CosmeticRule cosmetic;
             if (parseCosmeticRule(line, &cosmetic)) {
-                const bool negated = line.contains(QLatin1String("#@#"));
-                if (negated)
-                    cosmeticExceptions.append(cosmetic);
+                if (line.contains(QLatin1String("#@#")))
+                    filters->cosmeticExceptions.append(cosmetic);
                 else
-                    cosmeticRules.append(cosmetic);
+                    filters->cosmeticRules.append(cosmetic);
             }
             continue;
         }
@@ -573,28 +668,36 @@ bool AdBlocker::loadFiltersFromText(const QString &text)
             continue;
 
         if (line.startsWith(QLatin1String("@@")))
-            exceptions.append(rule);
+            filters->exceptions.append(rule);
         else
-            rules.append(rule);
+            filters->rules.append(rule);
     }
+    filters->ruleIndex = buildIndex(filters->rules);
+    filters->exceptionIndex = buildIndex(filters->exceptions);
+    return filters;
+}
 
-    if (rules.isEmpty() && exceptions.isEmpty() && cosmeticRules.isEmpty()
-        && cosmeticExceptions.isEmpty()) {
+void AdBlocker::setFilters(std::shared_ptr<const Filters> filters)
+{
+    std::atomic_store(&m_filters, std::move(filters));
+    emit filtersChanged();
+}
+
+bool AdBlocker::loadFiltersFromText(const QString &text)
+{
+    std::shared_ptr<const Filters> filters = parseFilters(text);
+    if (filters->rules.isEmpty() && filters->exceptions.isEmpty() && filters->cosmeticRules.isEmpty()
+        && filters->cosmeticExceptions.isEmpty()) {
         m_lastListError = tr("The filter list contains no usable rules.");
         return false;
     }
-
-    m_rules = rules;
-    m_exceptions = exceptions;
-    m_cosmeticRules = cosmeticRules;
-    m_cosmeticExceptions = cosmeticExceptions;
-    emit filtersChanged();
+    setFilters(std::move(filters));
     return true;
 }
 
 void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info)
 {
-    if (!m_enabled || m_rules.isEmpty())
+    if (!m_enabled)
         return;
 
     const QUrl url = info.requestUrl();
@@ -622,7 +725,8 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info)
 
 bool AdBlocker::wouldBlock(const QUrl &url, RequestType type, const QString &documentHost) const
 {
-    if (m_rules.isEmpty())
+    const std::shared_ptr<const Filters> rules = filters();
+    if (rules->rules.isEmpty())
         return false;
 
     const QString host = url.host();
@@ -633,17 +737,56 @@ bool AdBlocker::wouldBlock(const QUrl &url, RequestType type, const QString &doc
         return false;
 
     const QString domain = documentHost.toLower();
+    const QStringList tokens = urlTokens(url.toString());
+    if (anyMatches(rules->exceptions, rules->exceptionIndex, url, tokens, domain, type))
+        return false;
+    return anyMatches(rules->rules, rules->ruleIndex, url, tokens, domain, type);
+}
 
-    for (const NetworkRule &rule : m_exceptions) {
-        if (rule.matches(url, domain, type))
-            return false;
+AdBlocker::Index AdBlocker::buildIndex(const QList<NetworkRule> &rules)
+{
+    // Each rule goes under its rarest word, so no one word gathers thousands of rules.
+    QList<QStringList> tokens;
+    tokens.reserve(rules.size());
+    QHash<QString, int> frequency;
+    for (const NetworkRule &rule : rules) {
+        tokens.append(patternTokens(rule.pattern));
+        for (const QString &token : std::as_const(tokens.last()))
+            ++frequency[token];
     }
+    Index index;
+    for (int i = 0; i < rules.size(); ++i) {
+        const QStringList &candidates = tokens.at(i);
+        if (candidates.isEmpty()) {
+            index.unindexed.append(i);
+            continue;
+        }
+        const QString *best = &candidates.first();
+        for (const QString &token : candidates) {
+            if (frequency.value(token) < frequency.value(*best))
+                best = &token;
+        }
+        index.byToken[*best].append(i);
+    }
+    return index;
+}
 
-    for (const NetworkRule &rule : m_rules) {
-        if (rule.matches(url, domain, type))
+bool AdBlocker::anyMatches(const QList<NetworkRule> &rules, const Index &index, const QUrl &url,
+                           const QStringList &tokens, const QString &documentHost, RequestType type)
+{
+    for (const QString &token : tokens) {
+        const auto found = index.byToken.constFind(token);
+        if (found == index.byToken.constEnd())
+            continue;
+        for (const int i : found.value()) {
+            if (rules.at(i).matches(url, documentHost, type))
+                return true;
+        }
+    }
+    for (const int i : index.unindexed) {
+        if (rules.at(i).matches(url, documentHost, type))
             return true;
     }
-
     return false;
 }
 
@@ -664,8 +807,9 @@ QStringList AdBlocker::cosmeticSelectors(const QString &documentHost) const
         }
     };
 
-    collect(m_cosmeticExceptions, &blocked);
-    collect(m_cosmeticRules, &selectors);
+    const std::shared_ptr<const Filters> rules = filters();
+    collect(rules->cosmeticExceptions, &blocked);
+    collect(rules->cosmeticRules, &selectors);
 
     for (const QString &selector : blocked)
         selectors.removeAll(selector);
@@ -679,31 +823,34 @@ QList<CosmeticGroup> AdBlocker::cosmeticGroups() const
     if (!m_enabled)
         return groups;
 
-    const auto append = [&groups](const QList<CosmeticRule> &rules, bool isException) {
+    // Grouped through a hash: a full list has tens of thousands of these rules.
+    QHash<QString, int> groupOf;
+    QList<QSet<QString>> seen;
+    const auto append = [&groups, &groupOf, &seen](const QList<CosmeticRule> &rules, bool isException) {
         for (const CosmeticRule &rule : rules) {
-            auto it = std::find_if(groups.begin(), groups.end(), [&](const CosmeticGroup &group) {
-                return group.domains == rule.includedDomains
-                    && group.excludedDomains == rule.excludedDomains
-                    && group.isException == isException;
-            });
-
-            if (it == groups.end()) {
+            const QString key = rule.includedDomains.join(QLatin1Char(',')) + QLatin1Char('|')
+                + rule.excludedDomains.join(QLatin1Char(',')) + (isException ? QLatin1String("|e")
+                                                                             : QLatin1String("|h"));
+            auto found = groupOf.constFind(key);
+            if (found == groupOf.constEnd()) {
                 CosmeticGroup group;
                 group.domains = rule.includedDomains;
                 group.excludedDomains = rule.excludedDomains;
                 group.isException = isException;
-                group.selectors.append(rule.selector);
+                found = groupOf.insert(key, int(groups.size()));
                 groups.append(group);
-                continue;
+                seen.append(QSet<QString>());
             }
-
-            if (!it->selectors.contains(rule.selector))
-                it->selectors.append(rule.selector);
+            if (!seen[*found].contains(rule.selector)) {
+                seen[*found].insert(rule.selector);
+                groups[*found].selectors.append(rule.selector);
+            }
         }
     };
 
-    append(m_cosmeticRules, false);
-    append(m_cosmeticExceptions, true);
+    const std::shared_ptr<const Filters> rules = filters();
+    append(rules->cosmeticRules, false);
+    append(rules->cosmeticExceptions, true);
 
     return groups;
 }

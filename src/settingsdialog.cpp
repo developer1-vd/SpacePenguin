@@ -1,6 +1,7 @@
 #include "settingsdialog.h"
 
 #include "adblocker.h"
+#include "filterlists.h"
 #include "bookmarkmanager.h"
 #include "cookiemanager.h"
 #include "datasavermanager.h"
@@ -428,13 +429,8 @@ QWidget *SettingsDialog::createPrivacyTab()
     auto *filterButtons = new QHBoxLayout;
     auto *reload = new QPushButton(Icons::icon(Icons::Reload), tr("Reload filter list"));
     reload->setEnabled(m_adBlocker != nullptr);
-    connect(reload, &QPushButton::clicked, this, [this] {
-        QString error;
-        if (!m_adBlocker->loadFilters(m_adBlocker->listPath(), &error))
-            QMessageBox::warning(this, tr("Filter list"), error);
-        updateBlockingSummary();
-    });
-    auto *openFolder = new QPushButton(Icons::icon(Icons::Folder), tr("Show filter list"));
+    connect(reload, &QPushButton::clicked, this, [] { FilterLists::instance()->reload(); });
+    auto *openFolder = new QPushButton(Icons::icon(Icons::Folder), tr("Show your filter list"));
     openFolder->setEnabled(m_adBlocker != nullptr);
     connect(openFolder, &QPushButton::clicked, this, [this] {
         QDesktopServices::openUrl(
@@ -444,6 +440,43 @@ QWidget *SettingsDialog::createPrivacyTab()
     filterButtons->addWidget(openFolder);
     filterButtons->addStretch(1);
     layout->addLayout(filterButtons);
+
+    // The well-known lists, a tick away; they are downloaded and kept up to date.
+    layout->addWidget(sectionTitle(tr("Filter lists")));
+    FilterLists *lists = FilterLists::instance();
+    auto *listStatus = mutedLabel(QString());
+    const auto describe = [lists](const FilterLists::List &list) {
+        if (!lists->isSubscribed(list.id))
+            return list.description;
+        const QDateTime updated = lists->updated(list.id);
+        if (!updated.isValid())
+            return tr("%1 Downloading…").arg(list.description);
+        const qint64 days = updated.daysTo(QDateTime::currentDateTime());
+        return tr("%1 Updated %2.").arg(list.description,
+                                        days == 0 ? tr("today") : tr("%n day(s) ago", nullptr, int(days)));
+    };
+    for (const FilterLists::List &list : FilterLists::catalog()) {
+        auto *box = new QCheckBox(list.name);
+        box->setChecked(lists->isSubscribed(list.id));
+        auto *about = mutedLabel(describe(list));
+        about->setContentsMargins(24, 0, 0, 4);
+        connect(box, &QCheckBox::toggled, this, [lists, id = list.id](bool on) { lists->setSubscribed(id, on); });
+        connect(lists, &FilterLists::changed, about, [about, describe, list] { about->setText(describe(list)); });
+        layout->addWidget(box);
+        layout->addWidget(about);
+    }
+    auto *updateNow = new QPushButton(Icons::icon(Icons::Reload), tr("Update lists now"));
+    connect(updateNow, &QPushButton::clicked, this, [lists] { lists->update(true); });
+    connect(lists, &FilterLists::changed, this, [this, updateNow, lists, listStatus] {
+        updateNow->setEnabled(!lists->isUpdating());
+        listStatus->setText(lists->isUpdating() ? tr("Downloading…") : QString());
+        updateBlockingSummary();
+    });
+    connect(lists, &FilterLists::updateFailed, listStatus, &QLabel::setText);
+    auto *updateRow = new QHBoxLayout;
+    updateRow->addWidget(updateNow);
+    updateRow->addWidget(listStatus, 1);
+    layout->addLayout(updateRow);
 
     layout->addWidget(sectionTitle(tr("Sites where blocking is paused")));
     auto *paused = new QListWidget;
@@ -548,7 +581,7 @@ void SettingsDialog::updateBlockingSummary()
         return;
     }
 
-    QString text = tr("%1 network rules and %2 cosmetic rules from %3.")
+    QString text = tr("%1 network rules and %2 cosmetic rules, from your list (%3) and the lists below.")
                        .arg(m_adBlocker->ruleCount())
                        .arg(m_adBlocker->cosmeticRuleCount())
                        .arg(QDir::toNativeSeparators(m_adBlocker->listPath()));

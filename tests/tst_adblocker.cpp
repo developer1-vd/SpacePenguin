@@ -34,7 +34,10 @@ private slots:
     void typeOptionSelectsResourceType();
     void generichideExceptionDoesNotBlockNetwork();
     void matchCaseOptionIsHonoured();
-    void unknownOptionFallsBackToLiteralPattern();
+    void unsupportedOptionSkipsTheRule();
+    void unsupportedSyntaxIsSkipped();
+    void hostRuleMatchesSubdomainsOnly();
+    void indexFindsEveryKindOfRule();
     void generatedPatternsMatchExpectedTargets();
     void separatorBeforeOptions();
     void endOfAddressQuestionMark();
@@ -269,13 +272,48 @@ void TestAdBlocker::matchCaseOptionIsHonoured()
     QVERIFY(!blocks(*blocker, "https://site.example/promo"));
 }
 
-void TestAdBlocker::unknownOptionFallsBackToLiteralPattern()
+void TestAdBlocker::unsupportedOptionSkipsTheRule()
 {
-    auto blocker = blockerWith("||ads.example.com^$made-up-option");
+    auto blocker = blockerWith("||ads.example.com^$made-up-option\n||tracker.example^$removeparam=utm_source");
 
-    // An unrecognised option name leaves the whole line as a literal pattern, exactly
-    // as Adblock Plus does, so the rule no longer matches the bare domain.
+    // A rule with an option this blocker cannot honour is left out, not half-applied.
+    QCOMPARE(blocker->ruleCount(), 0);
     QVERIFY(!blocks(*blocker, "https://ads.example.com/x.js"));
+}
+
+void TestAdBlocker::unsupportedSyntaxIsSkipped()
+{
+    auto blocker = blockerWith("example.com#?#div:-abp-has(.ad)\nexample.com##+js(set, a, 1)\n"
+                               "example.com#$#body { color: red }\nexample.com##.ad\n||ads.example^");
+    QCOMPARE(blocker->ruleCount(), 1);
+    QCOMPARE(blocker->cosmeticRuleCount(), 1);
+}
+
+void TestAdBlocker::hostRuleMatchesSubdomainsOnly()
+{
+    auto blocker = blockerWith("||ads.example.com^");
+    QVERIFY(blocks(*blocker, "https://ads.example.com/a.js"));
+    QVERIFY(blocks(*blocker, "https://cdn.ads.example.com/a.js"));
+    QVERIFY(!blocks(*blocker, "https://badads.example.com/a.js"));
+    QVERIFY(!blocks(*blocker, "https://example.com/ads.example.com"));
+}
+
+void TestAdBlocker::indexFindsEveryKindOfRule()
+{
+    // Rules filed under a word, rules with none (regular expressions, bare wildcards)
+    // and many rules sharing words must all still be found.
+    QString list;
+    for (int i = 0; i < 500; ++i)
+        list += QStringLiteral("||host%1.tracker.example^\n").arg(i);
+    list += QStringLiteral("/banner/*/img^\n/\\/pixel\\d+\\.gif/\n*/adserve/*\n-sponsor-box.\n");
+    AdBlocker blocker;
+    QVERIFY(blocker.loadFiltersFromText(list));
+    QVERIFY(blocker.wouldBlock(QUrl("https://host499.tracker.example/x"), RequestType::Image, "site.example"));
+    QVERIFY(blocker.wouldBlock(QUrl("https://cdn.site/banner/1/img?x"), RequestType::Image, "site.example"));
+    QVERIFY(blocker.wouldBlock(QUrl("https://cdn.site/pixel42.gif"), RequestType::Image, "site.example"));
+    QVERIFY(blocker.wouldBlock(QUrl("https://cdn.site/v1/adserve/x.js"), RequestType::Script, "site.example"));
+    QVERIFY(blocker.wouldBlock(QUrl("https://cdn.site/img/top-sponsor-box.png"), RequestType::Image, "site.example"));
+    QVERIFY(!blocker.wouldBlock(QUrl("https://cdn.site/article.html"), RequestType::Document, "site.example"));
 }
 
 void TestAdBlocker::generatedPatternsMatchExpectedTargets()
