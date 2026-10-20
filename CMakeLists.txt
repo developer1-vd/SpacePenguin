@@ -170,6 +170,8 @@ qt_add_executable(spacepenguin
     src/singleinstance.h
     src/extensionsdialog.cpp
     src/extensionsdialog.h
+    src/systemscheme.cpp
+    src/systemscheme.h
     src/theme.cpp
     src/theme.h
     src/userextensions.cpp
@@ -186,6 +188,14 @@ qt_add_executable(spacepenguin
 )
 
 target_link_libraries(spacepenguin PRIVATE Qt6::Network Qt6::Widgets Qt6::WebEngineWidgets)
+# The desktop portal tells Linux desktops' light or dark style (src/systemscheme.cpp).
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+    find_package(Qt6 6.8 QUIET COMPONENTS DBus)
+    if(TARGET Qt6::DBus)
+        target_link_libraries(spacepenguin PRIVATE Qt6::DBus)
+        target_compile_definitions(spacepenguin PRIVATE SPACEPENGUIN_HAVE_DBUS)
+    endif()
+endif()
 target_compile_definitions(spacepenguin PRIVATE
     SPACEPENGUIN_VERSION="${PROJECT_VERSION}"
     SPACEPENGUIN_BUILD_TYPE="$<CONFIG>")

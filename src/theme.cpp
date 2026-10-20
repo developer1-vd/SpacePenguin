@@ -14,6 +14,15 @@ namespace spacepenguin {
 namespace {
 
 bool s_followingSystem = false;
+Qt::ColorScheme s_systemScheme = Qt::ColorScheme::Unknown;
+
+Qt::ColorScheme systemScheme()
+{
+    if (s_systemScheme != Qt::ColorScheme::Unknown)
+        return s_systemScheme;
+    QStyleHints *hints = QGuiApplication::styleHints();
+    return hints ? hints->colorScheme() : Qt::ColorScheme::Unknown;
+}
 
 QString rgba(const QColor &color)
 {
@@ -157,7 +166,12 @@ void Theme::apply(Mode mode)
             hints->setColorScheme(Qt::ColorScheme::Dark);
             break;
         case Mode::System:
-            hints->unsetColorScheme();
+            // Pages follow the hint too; where Qt cannot tell what the desktop
+            // uses, it is told.
+            if (s_systemScheme != Qt::ColorScheme::Unknown)
+                hints->setColorScheme(s_systemScheme);
+            else
+                hints->unsetColorScheme();
             break;
         }
     }
@@ -173,18 +187,32 @@ void Theme::apply(Mode mode)
         dark = true;
         break;
     case Mode::System:
-        dark = hints && hints->colorScheme() == Qt::ColorScheme::Dark;
+        dark = systemScheme() == Qt::ColorScheme::Dark;
         break;
     }
     applyColors(dark);
 }
 
+bool Theme::hasKnownScheme()
+{
+    return storedMode() != Mode::System || s_systemScheme != Qt::ColorScheme::Unknown;
+}
+
+void Theme::setSystemScheme(Qt::ColorScheme scheme)
+{
+    if (scheme == s_systemScheme)
+        return;
+    s_systemScheme = scheme;
+    if (storedMode() == Mode::System)
+        apply(Mode::System);
+}
+
 Theme::Mode Theme::effectiveMode()
 {
-    QStyleHints *hints = QGuiApplication::styleHints();
-    if (!hints || hints->colorScheme() == Qt::ColorScheme::Unknown)
+    const Qt::ColorScheme scheme = systemScheme();
+    if (scheme == Qt::ColorScheme::Unknown)
         return Mode::System;
-    return hints->colorScheme() == Qt::ColorScheme::Dark ? Mode::Dark : Mode::Light;
+    return scheme == Qt::ColorScheme::Dark ? Mode::Dark : Mode::Light;
 }
 
 bool Theme::isDark()
@@ -197,8 +225,7 @@ bool Theme::isDark()
     case Mode::System:
         break;
     }
-    QStyleHints *hints = QGuiApplication::styleHints();
-    return hints && hints->colorScheme() == Qt::ColorScheme::Dark;
+    return systemScheme() == Qt::ColorScheme::Dark;
 }
 
 QList<Theme::Palette> Theme::palettes()

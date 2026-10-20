@@ -2729,7 +2729,7 @@ void BrowserWindow::loadAboutPage(WebView *view, const QString &id)
     const AboutPageContext context = aboutContext();
     QString html = AboutPages::isKnown(normalized) ? AboutPages::render(normalized, context)
                                                    : AboutPages::renderUnknown(id);
-    if (Theme::storedMode() != Theme::Mode::System) {
+    if (Theme::hasKnownScheme()) {
         html.replace(QStringLiteral("<html lang=\"en\">"),
                      Theme::isDark() ? QStringLiteral("<html lang=\"en\" class=\"dark\">")
                                      : QStringLiteral("<html lang=\"en\" class=\"light\">"));
