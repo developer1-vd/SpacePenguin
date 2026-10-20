@@ -42,6 +42,7 @@
 #include <QFile>
 #include <QDir>
 #include <QDialogButtonBox>
+#include <QFileDialog>
 #include <QFocusEvent>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -317,6 +318,15 @@ void BrowserWindow::createActions()
         addAction(action);
         return action;
     };
+
+    m_openFileAction = makeAction(tr("Open File…"), {QKeySequence(QKeySequence::Open)});
+    connect(m_openFileAction, &QAction::triggered, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(
+            this, tr("Open File"), QDir::homePath(),
+            tr("Pages, PDFs and images (*.html *.htm *.xhtml *.pdf *.svg *.png *.jpg *.jpeg *.gif *.webp *.txt);;All files (*)"));
+        if (!path.isEmpty())
+            newTab(QUrl::fromLocalFile(path));
+    });
 
     m_newTabAction = makeAction(tr("New Tab"), Shortcuts::keys(Shortcuts::NewTab),
                                 Icons::icon(Icons::Plus));
@@ -851,6 +861,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_newTabAction);
     menu->addAction(m_newWindowAction);
     menu->addAction(m_newPrivateWindowAction);
+    menu->addAction(m_openFileAction);
     menu->addSeparator();
 
     QMenu *bookmarks = menu->addMenu(Icons::icon(Icons::Bookmarks), tr("Bookmarks"));
@@ -963,6 +974,7 @@ void BrowserWindow::createMenus()
     fileMenu->addAction(m_newWindowAction);
     fileMenu->addAction(m_newPrivateWindowAction);
     fileMenu->addAction(m_reopenTabAction);
+    fileMenu->addAction(m_openFileAction);
     fileMenu->addSeparator();
     fileMenu->addAction(m_closeTabAction);
     fileMenu->addAction(m_closeWindowAction);

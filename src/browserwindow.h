@@ -268,6 +268,7 @@ private:
 
     // Actions.
     QAction *m_newTabAction = nullptr;
+    QAction *m_openFileAction = nullptr;
     QAction *m_newWindowAction = nullptr;
     QAction *m_newPrivateWindowAction = nullptr;
     QAction *m_closeTabAction = nullptr;

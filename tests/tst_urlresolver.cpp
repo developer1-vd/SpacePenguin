@@ -1,4 +1,5 @@
 #include <QtTest>
+#include <QTemporaryDir>
 
 #include "urlresolver.h"
 
@@ -9,6 +10,7 @@ class TestUrlResolver : public QObject
     Q_OBJECT
 
 private slots:
+    void resolvesLocalFiles();
     void looksLikeUrl_data();
     void looksLikeUrl();
     void resolve_data();
@@ -120,6 +122,21 @@ void TestUrlResolver::percentEncodesQueries()
     const QUrl url = resolver.resolve(QStringLiteral("a&b=c"));
     QCOMPARE(url.host(), QStringLiteral("duckduckgo.com"));
     QCOMPARE(url.query(QUrl::FullyEncoded), QStringLiteral("q=a%26b%3Dc"));
+}
+
+void TestUrlResolver::resolvesLocalFiles()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("notes.pdf"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.close();
+
+    UrlResolver resolver;
+    QCOMPARE(resolver.resolve(path), QUrl::fromLocalFile(path));
+    // A path that does not exist is not taken for a file.
+    QVERIFY(!resolver.resolve(dir.filePath(QStringLiteral("missing.pdf"))).isLocalFile());
 }
 
 QTEST_MAIN(TestUrlResolver)

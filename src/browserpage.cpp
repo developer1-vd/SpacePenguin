@@ -23,6 +23,9 @@ BrowserPage::BrowserPage(QWebEngineProfile *profile, QObject *parent)
     settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, false);
     // Video players may fill the screen; the window takes them there (see BrowserWindow).
     settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
+    // PDFs open in Chromium's own viewer, which Qt counts as a plugin.
+    settings()->setAttribute(QWebEngineSettings::PluginsEnabled, true);
+    settings()->setAttribute(QWebEngineSettings::PdfViewerEnabled, true);
 
     // Remember the internal link last under the pointer. The hover is cleared just
     // before a click navigates, so keep it for a moment afterwards.
@@ -65,7 +68,9 @@ bool BrowserPage::isAllowedScheme(const QString &scheme)
         || scheme.compare(QLatin1String("sp"), Qt::CaseInsensitive) == 0
         || scheme.compare(QLatin1String("qrc"), Qt::CaseInsensitive) == 0
         || scheme.compare(QLatin1String("about"), Qt::CaseInsensitive) == 0
-        || scheme.compare(QLatin1String("data"), Qt::CaseInsensitive) == 0;
+        || scheme.compare(QLatin1String("data"), Qt::CaseInsensitive) == 0
+        // Local files: Chromium itself keeps websites from opening them.
+        || scheme.compare(QLatin1String("file"), Qt::CaseInsensitive) == 0;
 }
 
 bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame)
