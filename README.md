@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/ins
 It downloads the newest AppImage (before the first release, the newest build of
 `main`, published as the *nightly* pre-release), checks its SHA-256, installs any
 missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
-`~/.local/opt/spacepenguin`. `bash install.sh --uninstall` removes it.
+`~/.local/opt/spacepenguin`. To remove it, see [Uninstalling](#uninstalling).
 
 ## What it does
 
@@ -447,7 +447,7 @@ cannot run on ChromeOS without it.
 
 The script installs the few system libraries the AppImage cannot carry, unpacks
 it into `~/.local/opt/spacepenguin` (no FUSE needed) and adds the launcher entry;
-`bash install.sh --uninstall` removes it. It picks the x86-64 or ARM64 build to
+`bash uninstall.sh` removes it. It picks the x86-64 or ARM64 build to
 match the Chromebook (Celeron/Pentium/Core/Ryzen or MediaTek/Snapdragon). The
 ARM64 build needs the Debian 13 container, because Qt's ARM64 libraries need a
 newer C library than Debian 12 has; if `install.sh` reports a `GLIBC` error,
@@ -534,6 +534,23 @@ Publishing to Google Play needs your own signing key (`./build-android.sh
 an Apple Developer account. To try the
 interface without a phone, `cmake -S mobile -B build-mobile` builds it for the
 desktop.
+
+## Uninstalling
+
+| Installed with | Remove it |
+| -------------- | --------- |
+| `install.sh` (Linux, Chromebooks) | `curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/uninstall.sh \| bash` |
+| Windows installer | *Settings › Apps › SpacePenguin › Uninstall*, or *Uninstall SpacePenguin* in the Start menu |
+| macOS DMG | drag SpacePenguin from Applications to the Bin |
+| `.deb` / `.rpm` / Arch | `sudo apt remove spacepenguin`, `sudo dnf remove spacepenguin`, `sudo pacman -R spacepenguin` |
+| Flatpak | `flatpak uninstall org.spacepenguin.SpacePenguin` |
+| Android, iPhone | as any app: touch and hold its icon, then remove it |
+
+Your bookmarks, history, saved logins and settings are kept, so installing again
+brings them back. On Linux, `uninstall.sh` asks whether to delete them too
+(`--purge` deletes them without asking); the Windows uninstaller offers the same.
+Elsewhere they are in `~/Library/Application Support/SpacePenguin` (macOS) or
+`~/.local/share/SpacePenguin` and `~/.config/SpacePenguin` (Linux packages).
 
 ## Building
 
