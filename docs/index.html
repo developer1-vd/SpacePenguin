@@ -134,6 +134,8 @@
             <code>.deb</code>, <code>.rpm</code>, Arch package and Nix flake. Or install it with one
             command, which also updates it:</p>
           <pre class="code"><code>curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/install.sh | bash</code></pre>
+          <p class="fineprint">To remove it, the same with <code>uninstall.sh</code>. It asks whether
+            to delete your bookmarks and history too.</p>
         </div>
         <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the AppImage</a>
       </article>
@@ -153,19 +155,33 @@
     </div>
     <p class="note">On phones SpacePenguin uses the system's web engine, because Apple and Qt
       offer no other. It hides ads and skips YouTube ads once they start rather than
-      stopping them from downloading, and has no private tabs.
+      stopping them from downloading, and its private tabs stay out of history but share
+      cookies with other tabs.
       <a href="https://github.com/developer1-vd/SpacePenguin#phones-android-and-ios">What's different on phones</a></p>
     <details class="more">
       <summary>Which Linux package should I use?</summary>
       <ul>
         <li><strong>AppImage</strong> — any distribution from Ubuntu 22.04, Debian 12 and
           Fedora 36 on (ARM64: Ubuntu 24.04, Debian 13 and newer). For faster starts,
-          install it once: <code>bash packaging/chromeos/install.sh SpacePenguin-*.AppImage</code>.</li>
+          install it once: <code>bash install.sh SpacePenguin-*.AppImage</code>.</li>
         <li><strong>.deb / .rpm</strong> — Debian 13, Ubuntu 25.04+, Fedora 41+, openSUSE
           Tumbleweed. They also set up the sandbox permission on Ubuntu.</li>
         <li><strong>Arch</strong> — <code>packaging/arch/PKGBUILD</code>.</li>
         <li><strong>Nix</strong> — <code>nix run github:developer1-vd/SpacePenguin</code>.</li>
         <li><strong>Flatpak</strong> — built from <code>packaging/flatpak/</code>.</li>
+      </ul>
+    </details>
+    <details class="more">
+      <summary>How do I uninstall it?</summary>
+      <ul>
+        <li><strong>Linux and Chromebooks</strong> (installed with <code>install.sh</code>) —
+          <code>curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/uninstall.sh | bash</code>.
+          It asks whether to delete your bookmarks, history and logins too.</li>
+        <li><strong>Windows</strong> — Settings › Apps › SpacePenguin › Uninstall. Tick
+          “Remove browsing data” to delete your data too.</li>
+        <li><strong>macOS</strong> — drag SpacePenguin from Applications to the Bin.</li>
+        <li><strong>.deb, .rpm, Arch, Flatpak</strong> — with your package manager, as any app.</li>
+        <li><strong>Android and iPhone</strong> — touch and hold the icon, then remove it.</li>
       </ul>
     </details>
 </section>
@@ -190,8 +206,8 @@
     <pre class="code" aria-label="Chromebook install commands"><code><span class="c"># download the installer, then run it</span>
 curl -fsSLO https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/packaging/chromeos/install.sh
 bash install.sh</code></pre>
-    <p class="fineprint">The installer needs a published release. It checks each
-      download's SHA-256 and won't install a file that doesn't match.</p>
+    <p class="fineprint">The installer checks each download's SHA-256 and won't install a
+      file that doesn't match. Remove it again with <code>bash install.sh --uninstall</code>.</p>
   </div>
   </div>
 </section>
