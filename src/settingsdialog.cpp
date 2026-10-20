@@ -582,6 +582,12 @@ QWidget *SettingsDialog::createPrivacyTab()
                     tr("Delete all cookies? You will be signed out of most websites.")))
             m_cookieManager->deleteAllCookies();
     });
+    auto *manageCookies = new QPushButton(tr("Cookies by site…"));
+    manageCookies->setEnabled(m_cookieManager != nullptr);
+    connect(manageCookies, &QPushButton::clicked, this, [this] {
+        CookiesDialog dialog(m_cookieManager, this);
+        dialog.exec();
+    });
     auto *clearCache = new QPushButton(tr("Clear cache"));
     clearCache->setEnabled(false);
     connect(clearCache, &QPushButton::clicked, this, [this, clearCache] {
@@ -594,15 +600,16 @@ QWidget *SettingsDialog::createPrivacyTab()
     m_clearCacheButton = clearCache;
     dataButtons->addWidget(clearHistory);
     dataButtons->addWidget(clearCookies);
+    dataButtons->addWidget(manageCookies);
     dataButtons->addWidget(clearCache);
     dataButtons->addStretch(1);
     layout->addLayout(dataButtons);
 
     layout->addWidget(sectionTitle(tr("Built-in protections")));
     layout->addWidget(mutedLabel(
-        tr("Always on: no file:// or javascript: navigation, no mixed content, no pop-up "
-           "windows, and no telemetry. Private windows never write history, cookies or "
-           "cache to disk.")));
+        tr("Always on: websites cannot open local files or javascript: links, no mixed "
+           "content, no pop-up windows you did not click for, and no telemetry. Private "
+           "windows never write history, cookies or cache to disk.")));
 
     updateBlockingSummary();
     layout->addStretch(1);

@@ -727,6 +727,16 @@ QWidget *BrowserWindow::createNavigationBar()
             menu.addSeparator();
             connect(menu.addAction(tr("Site permissions…")), &QAction::triggered, this,
                     &BrowserWindow::showSitePermissions);
+            // This site's cookies, to sign out of it in one go.
+            if (CookieManager *cookies = m_services.cookieManager; cookies && !m_isPrivate) {
+                const QString site = CookieManager::siteOf(view->url().host());
+                int count = 0;
+                for (const Cookie &cookie : cookies->allCookies())
+                    count += CookieManager::siteOf(cookie) == site ? 1 : 0;
+                QAction *clear = menu.addAction(tr("Remove %n cookie(s) of %1", nullptr, count).arg(site));
+                clear->setEnabled(count > 0);
+                connect(clear, &QAction::triggered, this, [cookies, site] { cookies->deleteCookiesForSite(site); });
+            }
         }
         menu.exec(m_omnibox->mapToGlobal(QPoint(0, m_omnibox->height())));
     });
