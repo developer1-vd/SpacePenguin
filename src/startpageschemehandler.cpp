@@ -96,7 +96,7 @@ void StartPageSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
     QByteArray page = renderPage(m_template, Preferences::instance()->searchTemplate(), tiles,
                                  m_isPrivate);
     // Follow the browser's theme rather than only the system's.
-    if (Theme::storedMode() != Theme::Mode::System) {
+    if (Theme::hasKnownScheme()) {
         page.replace(QByteArrayLiteral("<html lang=\"en\">"),
                      Theme::isDark() ? QByteArrayLiteral("<html lang=\"en\" class=\"dark\">")
                                      : QByteArrayLiteral("<html lang=\"en\" class=\"light\">"));

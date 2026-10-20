@@ -60,6 +60,20 @@ public:
     static void apply(Mode mode);
     static Mode effectiveMode();
 
+    /**
+     * The desktop's light or dark choice, for desktops whose choice Qt does not
+     * read (GNOME's dark style, which Qt 6.8 reports as light). Unknown leaves it
+     * to Qt. In "Follow system" the chrome and pages follow it at once.
+     */
+    static void setSystemScheme(Qt::ColorScheme scheme);
+
+    /**
+     * Whether light or dark is settled, chosen or read from the desktop. Built-in
+     * pages are then told with a class on <html>, as their prefers-color-scheme
+     * follows only what Qt sees.
+     */
+    static bool hasKnownScheme();
+
     /** True when the chrome is currently drawn dark, whatever the stored mode. */
     static bool isDark();
     static Colors colors(bool dark);

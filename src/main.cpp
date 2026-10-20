@@ -15,6 +15,7 @@
 #include "sandbox.h"
 #include "singleinstance.h"
 #include "startuptrace.h"
+#include "systemscheme.h"
 #include "theme.h"
 
 #include <functional>
@@ -105,6 +106,7 @@ int main(int argc, char *argv[])
         return 0;
 
     spacepenguin::StartupTrace::mark("single-instance check done");
+    spacepenguin::watchSystemScheme();
     spacepenguin::ProfileServices services = spacepenguin::createProfileServices(
         &app, isPrivate, parser.value(filterListOption));
     spacepenguin::StartupTrace::mark("browser profile, history and filters loaded");

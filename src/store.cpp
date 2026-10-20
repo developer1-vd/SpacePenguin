@@ -180,7 +180,7 @@ void Store::handle(QWebEngineUrlRequestJob *job)
     }
     QByteArray page = file.readAll();
     // Follow the browser's light or dark, and its accent.
-    if (Theme::storedMode() != Theme::Mode::System) {
+    if (Theme::hasKnownScheme()) {
         page.replace(QByteArrayLiteral("<html lang=\"en\">"),
                      Theme::isDark() ? QByteArrayLiteral("<html lang=\"en\" class=\"dark\">")
                                      : QByteArrayLiteral("<html lang=\"en\" class=\"light\">"));
