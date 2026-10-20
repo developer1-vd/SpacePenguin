@@ -115,7 +115,7 @@ Ubuntu 24.04, Debian 13, Fedora 39 and newer.
 ```bash
 curl -fsSL https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/install.sh | bash
 bash install.sh [--yes] [--no-deps] [SpacePenguin-<version>-<arch>.AppImage]
-bash install.sh --uninstall
+bash install.sh --uninstall [--purge]      # or: uninstall.sh, the same, also as a curl one-liner
 ```
 
 The Linux installer, for any distribution and for Chromebooks

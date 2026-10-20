@@ -8,7 +8,8 @@
 #
 #   bash install.sh                          download the newest version and install it
 #   bash install.sh SpacePenguin-*.AppImage  install an AppImage you already have
-#   bash install.sh --uninstall              remove it again (keeps your bookmarks)
+#   bash install.sh --uninstall              remove it again (asks about your data)
+#   bash install.sh --uninstall --purge      remove it and your bookmarks, history and logins
 #   bash install.sh --no-deps                do not install missing system libraries
 #
 # It downloads the AppImage of the newest release (or, before the first release,
@@ -32,6 +33,7 @@ ICON_DIR="${DATA_HOME}/icons/hicolor/256x256/apps"
 
 ASSUME_YES=0
 UNINSTALL=0
+PURGE=0
 DEPS=1
 APPIMAGE=""
 
@@ -41,7 +43,9 @@ Usage: install.sh [options] [SpacePenguin-*.AppImage]
 
   (no file)        download the newest SpacePenguin and install it
   <file>           install this AppImage
-  --uninstall      remove SpacePenguin (your bookmarks and history are kept)
+  --uninstall      remove SpacePenguin; asks whether to delete your data too
+  --purge          with --uninstall: also delete bookmarks, history, logins,
+                   settings and cache, without asking
   --no-deps        do not install missing system libraries
   -y, --yes        do not ask anything
   -h, --help       show this help
@@ -52,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -y|--yes) ASSUME_YES=1; shift ;;
         --uninstall) UNINSTALL=1; shift ;;
+        --purge) PURGE=1; shift ;;
         --no-deps) DEPS=0; shift ;;
         -h|--help) usage; exit 0 ;;
         -*) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -63,9 +68,49 @@ step() { printf '\n==> %s\n' "$*"; }
 die() { echo "error: $*" >&2; exit 1; }
 
 if [[ ${UNINSTALL} -eq 1 ]]; then
-    rm -rf "${INSTALL_DIR}"
-    rm -f "${BIN_DIR}/spacepenguin" "${LAUNCHER}" "${ICON_DIR}/${APP_ID}.png"
-    echo "SpacePenguin is removed. Your bookmarks and history are still in ${DATA_HOME}/SpacePenguin/SpacePenguin."
+    if pgrep -x SpacePenguin >/dev/null 2>&1 || pgrep -f "${INSTALL_DIR}/" >/dev/null 2>&1; then
+        echo "SpacePenguin is running; close it first, then run this again." >&2
+        exit 1
+    fi
+    if [[ -e "${INSTALL_DIR}" || -e "${BIN_DIR}/spacepenguin" || -e "${LAUNCHER}" ]]; then
+        rm -rf "${INSTALL_DIR}"
+        rm -f "${BIN_DIR}/spacepenguin" "${LAUNCHER}" "${ICON_DIR}/${APP_ID}.png"
+        if command -v update-desktop-database >/dev/null; then
+            update-desktop-database "$(dirname "${LAUNCHER}")" >/dev/null 2>&1 || true
+        fi
+        echo "SpacePenguin is removed."
+    else
+        echo "SpacePenguin is not installed in ${INSTALL_DIR}."
+        echo "(A .deb, .rpm, Flatpak or Arch package is removed with its package manager.)"
+    fi
+
+    # What it kept: bookmarks, history, saved logins, cookies, settings and cache.
+    data=("${DATA_HOME}/SpacePenguin" "${XDG_CONFIG_HOME:-${HOME}/.config}/SpacePenguin"
+          "${XDG_CACHE_HOME:-${HOME}/.cache}/SpacePenguin")
+    existing=()
+    for folder in "${data[@]}"; do
+        [[ -e "${folder}" ]] && existing+=("${folder}")
+    done
+    if [[ ${#existing[@]} -eq 0 ]]; then
+        exit 0
+    fi
+    if [[ ${PURGE} -eq 0 && ${ASSUME_YES} -eq 0 ]] && { : </dev/tty; } 2>/dev/null; then
+        # The terminal, not stdin: this also runs as curl … | bash.
+        printf 'Also delete your bookmarks, history, saved logins and settings? [y/N] ' >/dev/tty
+        read -r answer </dev/tty || answer=""
+        [[ "${answer}" =~ ^[Yy] ]] && PURGE=1
+    fi
+    if [[ ${PURGE} -eq 1 ]]; then
+        rm -rf "${existing[@]}"
+        echo "Your SpacePenguin data is deleted too."
+    else
+        echo "Your bookmarks, history and logins are kept in ${existing[0]}; installing again brings them back."
+        echo "To delete them as well: bash install.sh --uninstall --purge"
+    fi
+    if [[ -e /etc/apparmor.d/spacepenguin-local ]]; then
+        echo "The AppArmor profile for the sandbox stays; remove it with:"
+        echo "    sudo packaging/linux/install-apparmor-profile.sh --remove"
+    fi
     exit 0
 fi
 
@@ -252,4 +297,4 @@ if [[ -e /dev/.cros_milestone ]]; then
     echo "    draws without the GPU where ChromeOS gives Linux apps none; about:version"
     echo "    shows what it chose."
 fi
-echo "    Update by running this again; remove it with: bash install.sh --uninstall"
+echo "    Update by running this again; remove it with: bash uninstall.sh (or install.sh --uninstall)"
