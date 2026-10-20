@@ -341,19 +341,38 @@ jobs:
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [desktop, distro, nix, flatpak, mobile]
+    # Nix builds nothing to ship, so it does not hold a release back.
+    needs: [desktop, distro, flatpak, mobile]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      # SpacePenguin.flatpak-<arch> as well as the SpacePenguin-<platform> sets.
       - uses: actions/download-artifact@v4
         with:
           path: packages
-          pattern: SpacePenguin-*
+          pattern: SpacePenguin*
           merge-multiple: true
+
+      # An annotated tag's first line names the release ("Almost To Stable");
+      # a plain tag is named after itself.
+      - name: Name
+        id: name
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -l packages
+          name="${GITHUB_REF_NAME}"
+          tag=$(gh api "repos/${GH_REPO}/git/ref/tags/${GITHUB_REF_NAME}" --jq 'select(.object.type == "tag") | .object.sha')
+          if [ -n "${tag}" ]; then
+            name=$(gh api "repos/${GH_REPO}/git/tags/${tag}" --jq '.message' | head -n 1)
+          fi
+          echo "name=${name}" >> "${GITHUB_OUTPUT}"
 
       - uses: softprops/action-gh-release@v2
         with:
+          name: ${{ steps.name.outputs.name }}
           files: packages/*
           generate_release_notes: true
 
