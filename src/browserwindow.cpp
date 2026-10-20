@@ -340,7 +340,12 @@ void BrowserWindow::createActions()
     m_readerAction = makeAction(tr("Reader View"), {QKeySequence(Qt::Key_F9)}, Icons::icon(Icons::Reader));
     connect(m_readerAction, &QAction::triggered, this, &BrowserWindow::toggleReaderView);
 
+#ifdef Q_OS_MACOS
+    // ⌘M is the system's Minimize; the Control key is free.
+    m_muteTabAction = makeAction(tr("Mute Tab"), {QKeySequence(Qt::META | Qt::Key_M)});
+#else
     m_muteTabAction = makeAction(tr("Mute Tab"), {QKeySequence(Qt::CTRL | Qt::Key_M)});
+#endif
     connect(m_muteTabAction, &QAction::triggered, this, [this] { toggleMuted(m_tabBar->currentIndex()); });
 
     m_openFileAction = makeAction(tr("Open File…"), {QKeySequence(QKeySequence::Open)});
