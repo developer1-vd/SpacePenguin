@@ -31,6 +31,7 @@ BIN_DIR="${HOME}/.local/bin"
 LAUNCHER="${DATA_HOME}/applications/${APP_ID}.desktop"
 ICON_THEME="${DATA_HOME}/icons/hicolor"
 ICON_SIZES=(16 32 48 64 128 256 512)
+SYSTEM_ICON_THEME="/usr/local/share/icons/hicolor"  # Chromebooks only
 
 ASSUME_YES=0
 UNINSTALL=0
@@ -94,6 +95,13 @@ if [[ ${UNINSTALL} -eq 1 ]]; then
         rm -f "${BIN_DIR}/spacepenguin" "${LAUNCHER}"
         for size in "${ICON_SIZES[@]}"; do
             rm -f "${ICON_THEME}/${size}x${size}/apps/${APP_ID}.png"
+            if [[ -e "${SYSTEM_ICON_THEME}/${size}x${size}/apps/${APP_ID}.png" ]]; then
+                if [[ "$(id -u)" -eq 0 ]]; then
+                    rm -f "${SYSTEM_ICON_THEME}/${size}x${size}/apps/${APP_ID}.png"
+                else
+                    sudo rm -f "${SYSTEM_ICON_THEME}/${size}x${size}/apps/${APP_ID}.png" || true
+                fi
+            fi
         done
         refresh_menu
         echo "SpacePenguin is removed."
@@ -294,10 +302,20 @@ for size in "${ICON_SIZES[@]}"; do
         cp "${icon}" "${ICON_THEME}/${size}x${size}/apps/${APP_ID}.png"
     fi
 done
-# The menu entry names the icon by its full path: some menus (and ChromeOS's
-# launcher) never look in ~/.local/share/icons, or not until the next login.
+# The menu entry names the icon by its full path: some menus never look in
+# ~/.local/share/icons, or not until the next login.
 menu_icon="${ICON_THEME}/256x256/apps/${APP_ID}.png"
 [[ -f "${menu_icon}" ]] || menu_icon="${APP_ID}"
+# ChromeOS's launcher takes icons by name from the system's icon folders only
+# (anything else shows a gear), so on a Chromebook they go there too.
+if [[ -e /dev/.cros_milestone ]]; then
+    for size in "${ICON_SIZES[@]}"; do
+        icon="${INSTALL_DIR}/usr/share/icons/hicolor/${size}x${size}/apps/${APP_ID}.png"
+        [[ -f "${icon}" ]] || continue
+        ${sudo} install -D -m 644 "${icon}" "${SYSTEM_ICON_THEME}/${size}x${size}/apps/${APP_ID}.png" &&
+            menu_icon="${APP_ID}"
+    done
+fi
 
 # The app menu entry, pointing at this copy. ChromeOS adds it to its own launcher.
 sed -e "s|^Exec=SpacePenguin|Exec=${BIN_DIR}/spacepenguin|" \
