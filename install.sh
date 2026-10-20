@@ -29,7 +29,8 @@ DATA_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}"
 INSTALL_DIR="${HOME}/.local/opt/spacepenguin"
 BIN_DIR="${HOME}/.local/bin"
 LAUNCHER="${DATA_HOME}/applications/${APP_ID}.desktop"
-ICON_DIR="${DATA_HOME}/icons/hicolor/256x256/apps"
+ICON_THEME="${DATA_HOME}/icons/hicolor"
+ICON_SIZES=(16 32 48 64 128 256 512)
 
 ASSUME_YES=0
 UNINSTALL=0
@@ -67,6 +68,22 @@ done
 step() { printf '\n==> %s\n' "$*"; }
 die() { echo "error: $*" >&2; exit 1; }
 
+# Tells the desktop the menu and its icons changed, so it shows them now.
+refresh_menu() {
+    if command -v update-desktop-database >/dev/null; then
+        update-desktop-database "$(dirname "${LAUNCHER}")" >/dev/null 2>&1 || true
+    fi
+    if command -v gtk-update-icon-cache >/dev/null && [[ -f "${ICON_THEME}/index.theme" ]]; then
+        gtk-update-icon-cache -q -t "${ICON_THEME}" >/dev/null 2>&1 || true
+    fi
+    touch "${ICON_THEME}" 2>/dev/null || true
+    if command -v kbuildsycoca6 >/dev/null; then
+        kbuildsycoca6 >/dev/null 2>&1 || true
+    elif command -v kbuildsycoca5 >/dev/null; then
+        kbuildsycoca5 >/dev/null 2>&1 || true
+    fi
+}
+
 if [[ ${UNINSTALL} -eq 1 ]]; then
     if pgrep -x SpacePenguin >/dev/null 2>&1 || pgrep -f "${INSTALL_DIR}/" >/dev/null 2>&1; then
         echo "SpacePenguin is running; close it first, then run this again." >&2
@@ -74,10 +91,11 @@ if [[ ${UNINSTALL} -eq 1 ]]; then
     fi
     if [[ -e "${INSTALL_DIR}" || -e "${BIN_DIR}/spacepenguin" || -e "${LAUNCHER}" ]]; then
         rm -rf "${INSTALL_DIR}"
-        rm -f "${BIN_DIR}/spacepenguin" "${LAUNCHER}" "${ICON_DIR}/${APP_ID}.png"
-        if command -v update-desktop-database >/dev/null; then
-            update-desktop-database "$(dirname "${LAUNCHER}")" >/dev/null 2>&1 || true
-        fi
+        rm -f "${BIN_DIR}/spacepenguin" "${LAUNCHER}"
+        for size in "${ICON_SIZES[@]}"; do
+            rm -f "${ICON_THEME}/${size}x${size}/apps/${APP_ID}.png"
+        done
+        refresh_menu
         echo "SpacePenguin is removed."
     else
         echo "SpacePenguin is not installed in ${INSTALL_DIR}."
@@ -259,7 +277,7 @@ if [[ -e "${INSTALL_DIR}" && ${ASSUME_YES} -eq 0 ]]; then
     echo "Replacing the SpacePenguin already installed there (your data is kept)."
 fi
 rm -rf "${INSTALL_DIR}"
-mkdir -p "$(dirname "${INSTALL_DIR}")" "${BIN_DIR}" "$(dirname "${LAUNCHER}")" "${ICON_DIR}"
+mkdir -p "$(dirname "${INSTALL_DIR}")" "${BIN_DIR}" "$(dirname "${LAUNCHER}")"
 mv "${WORK}/squashfs-root" "${INSTALL_DIR}"
 
 cat > "${BIN_DIR}/spacepenguin" <<EOF
@@ -268,16 +286,25 @@ exec "${INSTALL_DIR}/AppRun" "\$@"
 EOF
 chmod +x "${BIN_DIR}/spacepenguin"
 
-icon="$(find "${INSTALL_DIR}/usr/share/icons" -path "*256x256*" -name "${APP_ID}.png" 2>/dev/null | head -n1)"
-[[ -n "${icon}" ]] && cp "${icon}" "${ICON_DIR}/${APP_ID}.png"
+# The penguin in every size the app ships, where icon themes look for it.
+for size in "${ICON_SIZES[@]}"; do
+    icon="${INSTALL_DIR}/usr/share/icons/hicolor/${size}x${size}/apps/${APP_ID}.png"
+    if [[ -f "${icon}" ]]; then
+        mkdir -p "${ICON_THEME}/${size}x${size}/apps"
+        cp "${icon}" "${ICON_THEME}/${size}x${size}/apps/${APP_ID}.png"
+    fi
+done
+# The menu entry names the icon by its full path: some menus (and ChromeOS's
+# launcher) never look in ~/.local/share/icons, or not until the next login.
+menu_icon="${ICON_THEME}/256x256/apps/${APP_ID}.png"
+[[ -f "${menu_icon}" ]] || menu_icon="${APP_ID}"
 
 # The app menu entry, pointing at this copy. ChromeOS adds it to its own launcher.
 sed -e "s|^Exec=SpacePenguin|Exec=${BIN_DIR}/spacepenguin|" \
     -e "s|^TryExec=.*|TryExec=${BIN_DIR}/spacepenguin|" \
+    -e "s|^Icon=.*|Icon=${menu_icon}|" \
     "${INSTALL_DIR}/usr/share/applications/${APP_ID}.desktop" > "${LAUNCHER}"
-if command -v update-desktop-database >/dev/null; then
-    update-desktop-database "$(dirname "${LAUNCHER}")" >/dev/null 2>&1 || true
-fi
+refresh_menu
 
 output="$(QT_QPA_PLATFORM=offscreen "${BIN_DIR}/spacepenguin" --version 2>&1 || true)"
 version="$(printf '%s\n' "${output}" | grep '^SpacePenguin' | tail -n1 || true)"
