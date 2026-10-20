@@ -1,5 +1,7 @@
 #include "browserwindow.h"
 
+#include "updatechecker.h"
+
 #include "aboutpages.h"
 #include "adblocker.h"
 #include "bookmarkmanager.h"
@@ -285,6 +287,20 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
 
     rebuildBookmarksBar();
     restoreSession();
+
+    // A new release, for those who asked to hear of one.
+    if (!m_isPrivate) {
+        connect(UpdateChecker::instance(), &UpdateChecker::updateAvailable, this,
+                [this](const QString &version, const QUrl &page) {
+                    Prompt prompt;
+                    prompt.key = QStringLiteral("update");
+                    prompt.icon = Icons::Info;
+                    prompt.text = tr("<b>SpacePenguin %1</b> is out.").arg(version.toHtmlEscaped());
+                    prompt.buttons = {{tr("See what's new"), [this, page] { newTab(page); }}};
+                    addPrompt(currentView(), prompt);
+                });
+        QTimer::singleShot(5000, UpdateChecker::instance(), &UpdateChecker::checkIfDue);
+    }
 }
 
 BrowserWindow::~BrowserWindow()

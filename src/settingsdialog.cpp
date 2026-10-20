@@ -2,6 +2,7 @@
 
 #include "adblocker.h"
 #include "filterlists.h"
+#include "updatechecker.h"
 #include "bookmarkmanager.h"
 #include "cookiemanager.h"
 #include "datasavermanager.h"
@@ -196,6 +197,18 @@ QWidget *SettingsDialog::createGeneralTab()
             [](bool checked) { Preferences::instance()->setRestoreSession(checked); });
     layout->addWidget(restore);
     layout->addWidget(openHome);
+
+    layout->addWidget(sectionTitle(tr("Updates")));
+    auto *updates = new QCheckBox(tr("Tell me when a new version is out"));
+    updates->setChecked(preferences->checkForUpdates());
+    connect(updates, &QCheckBox::toggled, this, [](bool on) {
+        Preferences::instance()->setCheckForUpdates(on);
+        if (on)
+            UpdateChecker::instance()->checkIfDue();
+    });
+    layout->addWidget(updates);
+    layout->addWidget(mutedLabel(tr("Once a day, SpacePenguin asks GitHub for its newest release. It never "
+                                    "installs anything itself; on Linux, run install.sh again to update.")));
 
     layout->addWidget(sectionTitle(tr("Home page")));
     auto *homeRow = new QHBoxLayout;

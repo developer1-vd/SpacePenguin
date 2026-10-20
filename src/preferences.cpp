@@ -22,6 +22,7 @@ const QString kDownloads = QStringLiteral("downloads/directory");
 const QString kBlocking = QStringLiteral("adblock/enabled");
 const QString kSponsors = QStringLiteral("adblock/skipSponsors");
 const QString kStripTracking = QStringLiteral("adblock/stripTracking");
+const QString kCheckUpdates = QStringLiteral("updates/check");
 const QString kSaveLogins = QStringLiteral("privacy/offerToSaveLogins");
 
 } // namespace
@@ -188,6 +189,16 @@ bool Preferences::skipSponsors() const
 void Preferences::setSkipSponsors(bool skip)
 {
     write(kSponsors, skip);
+}
+
+bool Preferences::checkForUpdates() const
+{
+    return QSettings().value(kCheckUpdates, false).toBool();
+}
+
+void Preferences::setCheckForUpdates(bool check)
+{
+    write(kCheckUpdates, check);
 }
 
 bool Preferences::stripTracking() const

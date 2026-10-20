@@ -142,6 +142,7 @@ qt_add_executable(spacepenguin
     src/bookmarksdialog.h
     src/adblocker.cpp
     src/filterlists.cpp
+    src/updatechecker.cpp
     src/adblocker.h
     src/cosmeticfilters.cpp
     src/cosmeticfilters.h
