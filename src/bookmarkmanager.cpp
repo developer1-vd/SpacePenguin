@@ -9,13 +9,16 @@
 #include <QJsonObject>
 #include <QSettings>
 #include <QUuid>
+#include <QHash>
+#include <QSet>
+
+#include <functional>
 
 namespace spacepenguin {
 
 BookmarkManager::BookmarkManager(QObject *parent)
     : QObject(parent)
 {
-    m_rootFolderId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     loadFromSettings();
 }
 
@@ -61,15 +64,110 @@ bool BookmarkManager::addBookmark(const Bookmark &bookmark)
 
 bool BookmarkManager::removeBookmark(const QString &id)
 {
-    for (int i = 0; i < m_bookmarks.size(); ++i) {
-        if (m_bookmarks[i].id == id) {
-            m_bookmarks.removeAt(i);
-            saveToSettings();
-            emit bookmarkRemoved(id);
-            return true;
+    // A folder goes with everything in it.
+    QSet<QString> doomed{id};
+    for (bool grew = true; grew;) {
+        grew = false;
+        for (const Bookmark &bookmark : std::as_const(m_bookmarks)) {
+            if (doomed.contains(bookmark.folderId) && !doomed.contains(bookmark.id)) {
+                doomed.insert(bookmark.id);
+                grew = true;
+            }
         }
     }
-    return false;
+    const qsizetype before = m_bookmarks.size();
+    m_bookmarks.removeIf([&doomed](const Bookmark &bookmark) { return doomed.contains(bookmark.id); });
+    if (m_bookmarks.size() == before)
+        return false;
+    saveToSettings();
+    emit bookmarkRemoved(id);
+    return true;
+}
+
+QList<Bookmark> BookmarkManager::children(const QString &folderId) const
+{
+    // Kept newest first; shown oldest first, as in every other browser.
+    QList<Bookmark> result;
+    for (const Bookmark &bookmark : m_bookmarks) {
+        if (bookmark.folderId == folderId)
+            result.prepend(bookmark);
+    }
+    return result;
+}
+
+QList<QPair<QString, QString>> BookmarkManager::folderPaths() const
+{
+    QList<QPair<QString, QString>> paths;
+    const std::function<void(const QString &, const QString &)> walk =
+        [&](const QString &parent, const QString &prefix) {
+            for (const Bookmark &bookmark : children(parent)) {
+                if (!isFolder(bookmark))
+                    continue;
+                const QString path = prefix.isEmpty() ? bookmark.title : prefix + QStringLiteral(" › ") + bookmark.title;
+                paths.append({bookmark.id, path});
+                walk(bookmark.id, path);
+            }
+        };
+    walk(QString(), QString());
+    return paths;
+}
+
+int BookmarkManager::importBookmarks(const QList<Importer::ImportedBookmark> &bookmarks,
+                                     const QString &folderTitle)
+{
+    QSet<QString> existing;
+    for (const Bookmark &bookmark : std::as_const(m_bookmarks))
+        existing.insert(bookmark.url.toString());
+
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    QList<Bookmark> added; // in the order they are shown
+    QHash<QString, QString> folderIds; // folder path → id
+    const auto folderFor = [&](const QStringList &path) {
+        QString parent = folderIds.value(QString());
+        for (int depth = 1; depth <= path.size(); ++depth) {
+            const QString key = path.mid(0, depth).join(QChar(0x1f));
+            if (!folderIds.contains(key)) {
+                Bookmark folder;
+                folder.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+                folder.title = path.at(depth - 1);
+                folder.folderId = parent;
+                folder.createdAt = now;
+                added.append(folder);
+                folderIds.insert(key, folder.id);
+            }
+            parent = folderIds.value(key);
+        }
+        return parent;
+    };
+    Bookmark top;
+    top.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    top.title = folderTitle;
+    top.createdAt = now;
+    added.append(top);
+    folderIds.insert(QString(), top.id);
+
+    int count = 0;
+    for (const Importer::ImportedBookmark &imported : bookmarks) {
+        if (existing.contains(imported.url.toString()))
+            continue;
+        existing.insert(imported.url.toString());
+        Bookmark bookmark;
+        bookmark.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        bookmark.title = imported.title.isEmpty() ? imported.url.host() : imported.title;
+        bookmark.url = imported.url;
+        bookmark.folderId = folderFor(imported.folders);
+        bookmark.createdAt = now;
+        added.append(bookmark);
+        ++count;
+    }
+    if (count == 0)
+        return 0;
+    // Stored newest first: what is shown first goes last.
+    for (const Bookmark &bookmark : std::as_const(added))
+        m_bookmarks.prepend(bookmark);
+    saveToSettings();
+    emit bookmarkAdded(top);
+    return count;
 }
 
 bool BookmarkManager::updateBookmark(const Bookmark &bookmark)
@@ -103,17 +201,8 @@ void BookmarkManager::loadFromSettings()
 {
     QSettings settings;
     const QByteArray data = settings.value("bookmarks/data").toByteArray();
-    if (data.isEmpty()) {
-        // Create default bookmarks
-        Bookmark folder;
-        folder.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        folder.title = QStringLiteral("Bookmarks Bar");
-        folder.folderId = QString();
-        folder.createdAt = QDateTime::currentSecsSinceEpoch();
-        m_bookmarks.append(folder);
-        m_rootFolderId = folder.id;
+    if (data.isEmpty())
         return;
-    }
 
     const QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isArray()) {
@@ -135,9 +224,12 @@ void BookmarkManager::loadFromSettings()
         m_bookmarks.append(bookmark);
     }
 
-    if (m_rootFolderId.isEmpty() && !m_bookmarks.isEmpty()) {
-        m_rootFolderId = m_bookmarks.first().id;
-    }
+    // Older versions made an empty "Bookmarks Bar" folder nothing used; it would now
+    // show up as a folder on the bar.
+    m_bookmarks.removeIf([this](const Bookmark &bookmark) {
+        return isFolder(bookmark) && bookmark.title == QLatin1String("Bookmarks Bar")
+            && bookmark.folderId.isEmpty() && folderBookmarks(bookmark.id).isEmpty();
+    });
 }
 
 void BookmarkManager::saveToSettings()

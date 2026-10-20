@@ -170,6 +170,7 @@ private:
     AboutPageContext aboutContext() const;
     void goHome();
     void toggleFullScreen();
+    void fillBookmarkMenu(QMenu *menu, const QString &folderId);
     void setPageFullScreen(bool on);
     void exitPageFullScreen();
 

@@ -50,6 +50,8 @@ public:
 
     /** Saves a login, replacing the password of one with the same site and name. */
     void save(const QString &origin, const QString &username, const QString &password);
+    /** Adds logins brought from another browser; returns how many were new or changed. */
+    int importLogins(const QList<Login> &logins);
     void remove(const QString &origin, const QString &username);
     void markUsed(const QString &origin, const QString &username);
 

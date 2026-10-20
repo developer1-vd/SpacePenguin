@@ -1,6 +1,9 @@
 #pragma once
 
+#include "importer.h"
+
 #include <QList>
+#include <QPair>
 #include <QObject>
 #include <QString>
 #include <QUrl>
@@ -35,6 +38,20 @@ public:
 
     QString createFolder(const QString &title, const QString &parentFolderId = QString());
 
+    /** A folder is a bookmark without an address. */
+    static bool isFolder(const Bookmark &bookmark) { return bookmark.url.isEmpty(); }
+    /** What a folder holds (the top level for an empty id), oldest first, as shown. */
+    QList<Bookmark> children(const QString &folderId) const;
+    /** Every folder, with its path ("Work › Projects"), for choosing one. */
+    QList<QPair<QString, QString>> folderPaths() const;
+
+    /**
+     * Adds bookmarks brought over from another browser in one go, inside a new folder
+     * named @p folderTitle, keeping their folders and order. Addresses already
+     * bookmarked are skipped. Returns how many were added.
+     */
+    int importBookmarks(const QList<Importer::ImportedBookmark> &bookmarks, const QString &folderTitle);
+
     void loadFromSettings();
     void saveToSettings();
 
@@ -45,7 +62,6 @@ signals:
 
 private:
     QList<Bookmark> m_bookmarks;
-    QString m_rootFolderId;
 };
 
 }

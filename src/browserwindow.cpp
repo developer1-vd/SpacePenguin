@@ -870,26 +870,10 @@ QMenu *BrowserWindow::createAppMenu()
         bookmarks->addAction(m_bookmarkPageAction);
         bookmarks->addAction(m_bookmarksBarAction);
         bookmarks->addAction(m_bookmarksAction);
-        if (!m_services.bookmarkManager)
+        if (!m_services.bookmarkManager || m_services.bookmarkManager->children(QString()).isEmpty())
             return;
-        bool separated = false;
-        for (const Bookmark &bookmark : m_services.bookmarkManager->bookmarks()) {
-            if (!bookmark.url.isValid() || bookmark.url.isEmpty())
-                continue;
-            if (!separated) {
-                bookmarks->addSeparator();
-                separated = true;
-            }
-            const QUrl url = bookmark.url;
-            QAction *action = bookmarks->addAction(
-                Icons::icon(Icons::Globe),
-                bookmark.title.isEmpty() ? url.toDisplayString() : bookmark.title);
-            action->setToolTip(url.toDisplayString());
-            connect(action, &QAction::triggered, this, [this, url] {
-                if (WebView *view = currentView())
-                    loadUrl(view, url);
-            });
-        }
+        bookmarks->addSeparator();
+        fillBookmarkMenu(bookmarks, QString());
     });
 
     menu->addAction(m_historyAction);
@@ -1325,13 +1309,9 @@ void BrowserWindow::rebuildBookmarksBar()
 
     m_bookmarksBar->clear();
 
-    QList<Bookmark> bookmarks;
-    if (m_services.bookmarkManager) {
-        for (const Bookmark &bookmark : m_services.bookmarkManager->bookmarks()) {
-            if (bookmark.url.isValid() && !bookmark.url.isEmpty())
-                bookmarks.prepend(bookmark); // oldest first, like every other bookmarks bar
-        }
-    }
+    // The top level: bookmarks, and folders that open as menus.
+    const QList<Bookmark> bookmarks =
+        m_services.bookmarkManager ? m_services.bookmarkManager->children(QString()) : QList<Bookmark>();
 
     if (bookmarks.isEmpty()) {
         auto *hint = new QLabel(tr("Bookmark pages with %1 and they will show up here.")
@@ -1347,6 +1327,32 @@ void BrowserWindow::rebuildBookmarksBar()
         QString title = bookmark.title.isEmpty() ? url.host() : bookmark.title;
         if (title.size() > 28)
             title = title.left(26) + QStringLiteral("…");
+
+        if (BookmarkManager::isFolder(bookmark)) {
+            auto *folder = new QToolButton;
+            folder->setText(title);
+            folder->setIcon(Icons::icon(Icons::Folder));
+            folder->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            folder->setAutoRaise(true);
+            folder->setFocusPolicy(Qt::NoFocus);
+            folder->setPopupMode(QToolButton::InstantPopup);
+            auto *menu = new QMenu(folder);
+            connect(menu, &QMenu::aboutToShow, this, [this, menu, id] {
+                menu->clear();
+                fillBookmarkMenu(menu, id);
+            });
+            folder->setMenu(menu);
+            folder->setContextMenuPolicy(Qt::CustomContextMenu);
+            connect(folder, &QToolButton::customContextMenuRequested, this, [this, folder, id](const QPoint &pos) {
+                QMenu context(this);
+                connect(context.addAction(tr("Edit…")), &QAction::triggered, this, [this, id] {
+                    BookmarkEditDialog::editBookmark(m_services.bookmarkManager, id, this);
+                });
+                context.exec(folder->mapToGlobal(pos));
+            });
+            m_bookmarksBar->addWidget(folder);
+            continue;
+        }
 
         auto *button = new QToolButton;
         button->setText(title);
@@ -1383,6 +1389,46 @@ void BrowserWindow::rebuildBookmarksBar()
                 });
         m_bookmarksBar->addWidget(button);
     }
+}
+
+void BrowserWindow::fillBookmarkMenu(QMenu *menu, const QString &folderId)
+{
+    const QList<Bookmark> items = m_services.bookmarkManager->children(folderId);
+    if (items.isEmpty()) {
+        menu->addAction(tr("(Empty)"))->setEnabled(false);
+        return;
+    }
+    for (const Bookmark &bookmark : items) {
+        if (BookmarkManager::isFolder(bookmark)) {
+            QMenu *sub = menu->addMenu(Icons::icon(Icons::Folder), bookmark.title);
+            const QString id = bookmark.id;
+            connect(sub, &QMenu::aboutToShow, this, [this, sub, id] {
+                sub->clear();
+                fillBookmarkMenu(sub, id);
+            });
+            continue;
+        }
+        const QUrl url = bookmark.url;
+        QAction *action = menu->addAction(Icons::icon(Icons::Globe),
+                                          bookmark.title.isEmpty() ? url.toDisplayString() : bookmark.title);
+        action->setToolTip(url.toDisplayString());
+        connect(action, &QAction::triggered, this, [this, url] {
+            if (QGuiApplication::keyboardModifiers() & Qt::ControlModifier)
+                newTab(url, true);
+            else if (WebView *view = currentView())
+                loadUrl(view, url);
+        });
+    }
+    if (folderId.isEmpty())
+        return;
+    // A folder can open all its bookmarks at once.
+    menu->addSeparator();
+    connect(menu->addAction(tr("Open All in Tabs")), &QAction::triggered, this, [this, items] {
+        for (const Bookmark &bookmark : items) {
+            if (!BookmarkManager::isFolder(bookmark))
+                newTab(bookmark.url, true);
+        }
+    });
 }
 
 void BrowserWindow::toggleBookmarkForCurrentPage()
