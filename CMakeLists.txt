@@ -336,6 +336,10 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/theme.h
         )
         target_link_libraries(tst_importer PRIVATE Qt6::Test Qt6::Widgets)
+        if(WIN32)
+            # Saved logins are encrypted with the Windows account (logins.cpp).
+            target_link_libraries(tst_importer PRIVATE crypt32)
+        endif()
         target_include_directories(tst_importer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME importer COMMAND tst_importer)
 
