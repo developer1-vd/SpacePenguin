@@ -702,7 +702,11 @@ std::shared_ptr<const AdBlocker::Filters> AdBlocker::parseFilters(const QString 
 
 void AdBlocker::setFilters(std::shared_ptr<const Filters> filters)
 {
-    std::atomic_store(&m_filters, std::move(filters));
+    {
+        const std::lock_guard<std::mutex> lock(m_filtersMutex);
+        m_filters.swap(filters);
+    }
+    // The old rules are released here, outside the lock, once no request holds them.
     emit filtersChanged();
 }
 
