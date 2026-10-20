@@ -292,8 +292,26 @@ bool TabBar::event(QEvent *event)
     return handled;
 }
 
+QRect TabBar::iconRect(int index) const
+{
+    // Where QTabBar draws the icon: after the group chip, at the tab's left padding.
+    const QRect tab = tabRect(index);
+    const int left = tab.left() + chipWidth(index) + 8;
+    return QRect(left - 4, tab.center().y() - iconSize().height() / 2 - 4, iconSize().width() + 8,
+                 iconSize().height() + 8);
+}
+
 void TabBar::mousePressEvent(QMouseEvent *event)
 {
+    if (event->button() == Qt::LeftButton) {
+        const int index = tabAt(event->position().toPoint());
+        if (index >= 0 && !isChipOnly(index) && m_iconClickable && m_iconClickable(index)
+            && iconRect(index).contains(event->position().toPoint())) {
+            // The click is for the speaker, not a tab switch.
+            emit iconClicked(index);
+            return;
+        }
+    }
     // The tab being dragged; tabMoved names the tabs it passes, not it.
     if (event->button() == Qt::LeftButton)
         m_pressed = tabObject(this, tabAt(event->position().toPoint()));

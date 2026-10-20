@@ -1,5 +1,6 @@
 #include "browserwindow.h"
 
+#include "readerview.h"
 #include "updatechecker.h"
 
 #include "aboutpages.h"
@@ -336,6 +337,12 @@ void BrowserWindow::createActions()
         return action;
     };
 
+    m_readerAction = makeAction(tr("Reader View"), {QKeySequence(Qt::Key_F9)}, Icons::icon(Icons::Reader));
+    connect(m_readerAction, &QAction::triggered, this, &BrowserWindow::toggleReaderView);
+
+    m_muteTabAction = makeAction(tr("Mute Tab"), {QKeySequence(Qt::CTRL | Qt::Key_M)});
+    connect(m_muteTabAction, &QAction::triggered, this, [this] { toggleMuted(m_tabBar->currentIndex()); });
+
     m_openFileAction = makeAction(tr("Open File…"), {QKeySequence(QKeySequence::Open)});
     connect(m_openFileAction, &QAction::triggered, this, [this] {
         const QString path = QFileDialog::getOpenFileName(
@@ -637,6 +644,11 @@ QWidget *BrowserWindow::createTabStrip()
     connect(m_tabBar, &TabBar::dragFinished, this, &BrowserWindow::onTabDragFinished);
     connect(m_tabBar, &TabBar::groupChipClicked, this, &BrowserWindow::toggleGroupCollapsed);
     connect(m_tabBar, &TabBar::groupMenuRequested, this, &BrowserWindow::showGroupMenu);
+    m_tabBar->setIconClickable([this](int index) {
+        const WebView *view = viewAt(index);
+        return view && (view->page()->isAudioMuted() || view->page()->recentlyAudible());
+    });
+    connect(m_tabBar, &TabBar::iconClicked, this, &BrowserWindow::toggleMuted);
     connect(m_tabBar, &QTabBar::customContextMenuRequested, this,
             &BrowserWindow::showTabContextMenu);
     connect(m_tabBar, &QTabBar::tabBarDoubleClicked, this, [this](int index) {
@@ -893,6 +905,7 @@ QMenu *BrowserWindow::createAppMenu()
         fillBookmarkMenu(bookmarks, QString());
     });
 
+    menu->addAction(m_readerAction);
     menu->addAction(m_historyAction);
     menu->addAction(m_downloadsAction);
     menu->addSeparator();
@@ -999,6 +1012,8 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_zoomOutAction);
     viewMenu->addAction(m_zoomResetAction);
     viewMenu->addAction(m_fullScreenAction);
+    viewMenu->addAction(m_readerAction);
+    viewMenu->addAction(m_muteTabAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_bookmarksBarAction);
     viewMenu->addAction(m_sideTabsAction);
@@ -1822,6 +1837,26 @@ void BrowserWindow::showTabContextMenu(const QPoint &pos)
     showTabMenu(m_tabBar->tabAt(pos), m_tabBar->mapToGlobal(pos));
 }
 
+void BrowserWindow::toggleReaderView()
+{
+    WebView *view = currentView();
+    if (!view || !(isWebScheme(view->url()) || view->url().isLocalFile()))
+        return;
+    QPointer<WebView> target(view);
+    // In SpacePenguin's own script world, so the page's scripts cannot interfere.
+    view->page()->runJavaScript(readerViewScript(), QWebEngineScript::ApplicationWorld,
+                                [this, target](const QVariant &result) {
+                                    if (target && target == currentView() && result.toString() == QLatin1String("none"))
+                                        showToast(tr("Reader view found no article on this page."), 3000);
+                                });
+}
+
+void BrowserWindow::toggleMuted(int index)
+{
+    if (WebView *view = viewAt(index))
+        view->page()->setAudioMuted(!view->page()->isAudioMuted());
+}
+
 void BrowserWindow::showTabMenu(int index, const QPoint &globalPosition)
 {
     QMenu menu(this);
@@ -1832,6 +1867,12 @@ void BrowserWindow::showTabMenu(int index, const QPoint &globalPosition)
                 this, [this, index] { if (WebView *view = viewAt(index)) view->reload(); });
         connect(menu.addAction(tr("Duplicate")), &QAction::triggered, this,
                 [this, index] { duplicateTab(index); });
+        if (WebView *view = viewAt(index)) {
+            const bool muted = view->page()->isAudioMuted();
+            connect(menu.addAction(Icons::icon(muted ? Icons::Speaker : Icons::Muted),
+                                   muted ? tr("Unmute Tab") : tr("Mute Tab")),
+                    &QAction::triggered, this, [this, index] { toggleMuted(index); });
+        }
 
         menu.addSeparator();
         QObject *tab = tabObject(m_tabBar, index);
@@ -1912,6 +1953,11 @@ void BrowserWindow::updateTabLabel(WebView *view)
         icon = Icons::icon(Icons::Penguin);
     else if (icon.isNull())
         icon = Icons::icon(Icons::Globe);
+    // Sound shows instead of the site's icon; clicking it mutes or unmutes the tab.
+    if (view->page()->isAudioMuted())
+        icon = Icons::icon(Icons::Muted);
+    else if (view->page()->recentlyAudible())
+        icon = Icons::icon(Icons::Speaker);
     m_tabBar->setLabel(index, {title, icon, toolTip});
     syncSideTabs();
 }
@@ -3001,6 +3047,8 @@ void BrowserWindow::connectView(WebView *view)
             updateWindowTitle();
     });
     connect(view, &QWebEngineView::iconChanged, this, [this, view] { updateTabLabel(view); });
+    connect(view->page(), &QWebEnginePage::recentlyAudibleChanged, this, [this, view] { updateTabLabel(view); });
+    connect(view->page(), &QWebEnginePage::audioMutedChanged, this, [this, view] { updateTabLabel(view); });
     connect(view, &QWebEngineView::urlChanged, this,
             [this, view](const QUrl &url) { onUrlChanged(view, url); });
     connect(view, &QWebEngineView::loadStarted, this, [this, view] { onLoadStarted(view); });

@@ -171,6 +171,8 @@ private:
     void goHome();
     void toggleFullScreen();
     void fillBookmarkMenu(QMenu *menu, const QString &folderId);
+    void toggleMuted(int index);
+    void toggleReaderView();
     void setPageFullScreen(bool on);
     void exitPageFullScreen();
 
@@ -270,6 +272,8 @@ private:
     // Actions.
     QAction *m_newTabAction = nullptr;
     QAction *m_openFileAction = nullptr;
+    QAction *m_muteTabAction = nullptr;
+    QAction *m_readerAction = nullptr;
     QAction *m_newWindowAction = nullptr;
     QAction *m_newPrivateWindowAction = nullptr;
     QAction *m_closeTabAction = nullptr;

@@ -143,6 +143,7 @@ qt_add_executable(spacepenguin
     src/adblocker.cpp
     src/filterlists.cpp
     src/updatechecker.cpp
+    src/readerview.cpp
     src/adblocker.h
     src/cosmeticfilters.cpp
     src/cosmeticfilters.h

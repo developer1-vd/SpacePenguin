@@ -46,6 +46,9 @@ public:
         Folder,
         Open,
         Trash,
+        Speaker,     // a tab playing sound
+        Muted,       // a muted tab
+        Reader,      // reader view: lines of text on a page
         WindowMinimize, // window controls, for the merged title bar
         WindowMaximize,
         WindowRestore,
