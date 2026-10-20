@@ -1,10 +1,13 @@
 #include "logins.h"
 
 #include "icons.h"
+#include "importer.h"
 
 #include <QApplication>
 #include <QClipboard>
 #include <QDialogButtonBox>
+#include <QFileDialog>
+#include <QMessageBox>
 #include <QDir>
 #include <QFile>
 #include <QHBoxLayout>
@@ -134,6 +137,32 @@ void LoginStore::save(const QString &origin, const QString &username, const QStr
     m_never.remove(origin);
     store();
     emit changed();
+}
+
+int LoginStore::importLogins(const QList<Login> &logins)
+{
+    int count = 0;
+    for (const Login &incoming : logins) {
+        bool found = false;
+        for (Login &login : m_logins) {
+            if (login.origin == incoming.origin && login.username == incoming.username) {
+                found = true;
+                if (login.password != incoming.password) {
+                    login.password = incoming.password;
+                    ++count;
+                }
+            }
+        }
+        if (!found) {
+            m_logins.append(incoming);
+            ++count;
+        }
+    }
+    if (count > 0) {
+        store();
+        emit changed();
+    }
+    return count;
 }
 
 void LoginStore::remove(const QString &origin, const QString &username)
@@ -370,6 +399,26 @@ LoginsDialog::LoginsDialog(LoginStore *store, QWidget *parent)
     buttons->addWidget(copyUser);
     buttons->addWidget(copyPassword);
     buttons->addStretch(1);
+    auto *import = new QPushButton(tr("Import…"));
+    import->setToolTip(tr("From a passwords CSV file exported by Chrome, Edge, Firefox or a password manager"));
+    connect(import, &QPushButton::clicked, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(this, tr("Import logins"), QDir::homePath(),
+                                                          tr("Passwords file (*.csv);;All files (*)"));
+        if (path.isEmpty())
+            return;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly))
+            return;
+        const QList<Login> found = Importer::parseLoginsCsv(QString::fromUtf8(file.readAll()));
+        const int added = m_store->importLogins(found);
+        QMessageBox::information(
+            this, tr("Import logins"),
+            found.isEmpty() ? tr("No logins were found. The file should be a passwords CSV, with url, "
+                                 "username and password columns.")
+                            : tr("Imported %n login(s). Delete the CSV file now: it holds your passwords "
+                                 "unprotected.", nullptr, added));
+    });
+    buttons->addWidget(import);
     buttons->addWidget(remove);
 
     auto *note = new QLabel(LoginStore::storageDescription());

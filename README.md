@@ -38,8 +38,10 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
 ## What it does
 
 - **Tabs** — tab strip on top; new, close, middle-click to close, drag to reorder,
-  duplicate, close others, reopen closed, session restored on restart. Links that ask
-  for a new tab or window (`target=_blank`, "Open link in new tab") open as tabs
+  duplicate, close others, reopen closed. The session comes back on restart with
+  each tab's back/forward history and scroll position. Links that ask for a new tab
+  or window (`target=_blank`, "Open link in new tab") open as tabs. A tab playing
+  sound shows a speaker; click it (or `Ctrl`+`M`) to mute it
 - **Tabs on the side** — the button at the start of the tab row (or *View › Tabs on
   the Side*) moves the tabs into a panel down the left of the window, as in Edge and
   Firefox; the window buttons move onto the toolbar. The panel's arrow narrows it
@@ -85,8 +87,23 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
   download folder
 - **Theme** — follow system, light or dark (`View → Theme`), remembered between
   runs
-- **Content blocking** — an Adblock Plus style filter list, applied through a
-  request interceptor
+- **Content blocking** — EasyList and EasyPrivacy, one tick away in *Settings ›
+  Privacy › Filter lists* (on by default, kept up to date), plus your own list;
+  tracking parameters such as `utm_source` and `fbclid` are taken off links
+- **Videos full screen** — a player's full-screen button fills the screen; `Esc`
+  leaves
+- **PDFs and local files** — PDFs open in the browser's own viewer; *File › Open
+  File…* (`Ctrl`+`O`) or a path typed in the address bar opens files on your computer
+- **Bookmark folders and import** — folders on the bookmarks bar and in the menu;
+  the bookmarks manager imports from Chrome, Edge, Brave, Chromium and Vivaldi
+  directly, or any browser's exported bookmarks file (Firefox, Safari); saved
+  logins import from a passwords CSV
+- **Reader view** — `F9` shows a page's article alone, in clean type
+- **Cookies by site** — *Settings › Privacy › Cookies by site* lists and removes
+  cookies one site or one cookie at a time; the address bar's site menu removes the
+  current site's
+- **Update notices** — off by default; when on (*Settings › General*), a bar says
+  when a new version is out
 - **SpacePenguin Store** — `sp://store`, from the puzzle piece in the toolbar: one
   search over the user-script extensions of Greasy Fork and OpenUserJS, most installed
   first and in your language first, and colour themes for SpacePenguin (Penguin,
@@ -204,8 +221,14 @@ too.
 | `$match-case` | case sensitive |
 | `##selector`, `a.com##selector`, `#@#selector` | cosmetic hide / exception |
 
-Not supported: `$redirect` and `$removeparam` rewrites, scriptlet rules
-(`##+js(...)`), generic-hiding exceptions, and per-site exception editing.
+`$removeparam` is supported (a parameter name, `/regex/`, or all parameters):
+matching requests are redirected without those parameters, and common tracking
+parameters are removed on every site (*Settings › Privacy*). Blocking is paused
+for a site from the shield menu or *Settings › Privacy › Pause on a site…*.
+
+Not supported, and skipped rather than half-applied: `$redirect`, scriptlet rules
+(`##+js(...)`), procedural cosmetic filters (`#?#`, `:has-text()`…) and
+generic-hiding exceptions.
 
 `$generichide` and `$elemhide` rules are ignored for network decisions. That
 matters in practice: EasyList ships `@@||www.youtube.com^$generichide`, and
@@ -213,26 +236,18 @@ treating it as a network exception silently disables that site's own rules.
 
 ### Filter lists
 
-A fresh install writes a small starter list to
-`<app data>/adblock/filters.txt` so blocking is visible immediately. It is
-deliberately minimal — the ad hosts and YouTube ad endpoints, written for this
-project.
+*Settings › Privacy › Filter lists* subscribes to EasyList and EasyPrivacy (on by
+default), Peter Lowe's list, uBlock filters and Fanboy's Annoyances. They are
+downloaded into `<app data>/adblock/lists/`, checked a few times a day and fetched
+again when over four days old. Your own rules go in `<app data>/adblock/filters.txt`
+(a small starter list on a fresh install) and apply on top.
+`spacepenguin --filter-list <file>` uses one list alone, for testing.
 
-For real coverage, point SpacePenguin at a maintained list:
-
-```sh
-spacepenguin --filter-list ~/lists/easylist.txt
-```
-
-EasyList is GPLv3, the same license as SpacePenguin, so you can redistribute a
-build that vendors it under GPLv3 terms. It is not committed here because the list
-changes several times a week and a fresh clone should stay small.
-
-Measured against EasyList, SpacePenguin parses 53,859 network rules and 24,009
-cosmetic rules, and 13,650 cosmetic selectors apply to `youtube.com`.
-
-A full list means a large injected stylesheet on every page. That costs some
-memory and a little load time; if you notice it, use a smaller list.
+Rules are indexed by the rarest word each pattern must contain, so a request is
+checked against a few dozen rules rather than all of them; `||host^` rules compare
+hosts without a regex. With EasyList, EasyPrivacy and uBlock filters together
+(about 114,000 network rules and 25,000 cosmetic rules), lists load in about 0.4 s
+off the window's thread and a request is checked in about 0.06 ms.
 
 ### Pop-ups
 
@@ -284,19 +299,21 @@ Any `about:` page not in the list above gets an internal "no such page" answer i
 
 These are deliberate choices, not defaults we inherited:
 
-- Top-level navigation is restricted to `http`, `https`, `sp`, `qrc`, `about` and
-  `data`. `file://` and `javascript:` top-level loads are refused.
+- Top-level navigation is restricted to `http`, `https`, `file`, `sp`, `qrc`,
+  `about` and `data`; `javascript:` top-level loads are refused, and Chromium keeps
+  websites from opening `file://` pages.
 - The built-in start page is served by our own `sp://` scheme handler
   (`src/startpageschemehandler.cpp`) rather than `qrc:` — Chromium's network
   stack cannot read Qt resources, so a `qrc:` start page silently fails to load.
 - `LocalContentCanAccessRemoteUrls` and `LocalContentCanAccessFileUrls` are off,
   so a page from the local disk or an in-app page can't reach the network.
 - `AllowRunningInsecureContent` is off — no mixed content, ever.
-- `JavascriptCanOpenWindows` is off until we implement popup windows properly.
-  Links the user opens in a new tab or window become tabs; script pop-ups and
-  dialogs are still refused.
-- No telemetry, no background services, no auto-updater, no remote
-  configuration. The browser does not phone home.
+- `JavascriptCanOpenWindows` is off: pop-ups a page opens by itself are refused.
+  Links the user opens in a new tab or window become tabs, and a small window opened
+  on a click (a sign-in box) opens as one, titled with its site.
+- No telemetry, no auto-updater, no remote configuration. The only background
+  requests are the filter lists you subscribe to and, if you turn it on, a daily
+  look at the newest release.
 - Web pages run in Chromium's renderer sandbox. Where the system makes that
   impossible (see Troubleshooting), the browser starts without it rather than
   crashing, and says so in every window and in `about:version`.
@@ -331,6 +348,9 @@ the desktop — macOS gets the binding Safari and Chrome use there instead.
 | Find in page          | `Ctrl+F`                        | `⌘F`                          |
 | Zoom in / out / reset | `Ctrl++` / `Ctrl+-` / `Ctrl+0`  | `⌘+` / `⌘-` / `⌘0`            |
 | Full screen           | `F11`                           | `⌃⌘F`                         |
+| Reader view           | `F9`                            | `F9`                          |
+| Mute tab              | `Ctrl+M`                        | `⌃M`                          |
+| Open file             | `Ctrl+O`                        | `⌘O`                          |
 | Bookmark this page    | `Ctrl+D`                        | `⌘D`                          |
 | Show bookmarks bar    | `Ctrl+Shift+B`                  | `⇧⌘B`                         |
 | Tabs on the side      | `Ctrl+Shift+,`                  | `⇧⌘,`                         |
@@ -471,8 +491,10 @@ It has tabs with tab groups (touch and hold a tab on the tabs screen to group it
 tap a group's header to collapse it, ⋮ to rename, recolour, add a tab, ungroup
 or close it), a start page with your bookmarks, bookmarks and history, a bottom
 toolbar within thumb reach, light and dark, and the choice of search engine.
-Android's Back button closes what is open, then goes back. Tabs and groups last
-until the app closes; the phone app does not restore a session.
+Android's Back button closes what is open, then goes back. Tabs and groups are
+reopened when the app starts again (their addresses; the phone's web view cannot
+hand over its history). *☰ › New private tab* opens a tab kept out of history and
+not reopened.
 
 What the phone engines do not allow, and so it does not do:
 
@@ -481,7 +503,8 @@ What the phone engines do not allow, and so it does not do:
   and YouTube ads that start are muted and skipped — but they are still downloaded.
 - **YouTube ad removal before playback.** That needs a script that runs before the
   page's own, which the phone web views do not offer; the desktop app does it.
-- **Private tabs.** All tabs share the web view's storage; *Settings › Clear
+- **Separate cookies for private tabs.** All tabs share the web view's storage, so
+  a private tab is kept out of history but not out of cookies; *Settings › Clear
   history and cookies* is the way to forget.
 
 Sponsor segments are skipped as on the desktop.
@@ -712,22 +735,18 @@ printed by default, since they come from the sites themselves; set
 
 ## Known limitations
 
-- Bookmarks are a flat list; the backend's folders are not shown
-- No page-requested fullscreen (video players cannot go full screen); `F11`
-  makes the whole window full screen
-- No `file://` support, no PDF viewer
 - Chrome extensions are off (Qt 6.10's support crashes); extensions are user
   scripts, whose `GM_getValue` settings are kept per site rather than shared
   across sites, and whose `GM_xmlhttpRequest` cannot reach sites that refuse
   other sites' requests
-- Blocking covers network rules and cosmetic element hiding, but not
-  `$redirect`/`$removeparam` rewrites or `##+js(...)` scriptlets, so a few
-  sites still show "ad" placeholders or count blocked requests
-- A very large filter list means a large stylesheet injected into every page
+- Blocking covers network rules, `$removeparam` and cosmetic element hiding, but
+  not `$redirect` or `##+js(...)` scriptlets, so a few sites still show "ad"
+  placeholders or notice the blocker
+- The cookie manager removes cookies only; a site's other stored data (local
+  storage) is removed with everything else, as Qt has no per-site API for it
 - The theme applies to application chrome and internal pages only; website
   colours follow each site's own CSS
 - Internal `about:` pages do not create a back/forward history entry
-- Session restore saves URLs only — not scroll position or history depth
 - `Ctrl+F` uses the renderer's find pass, one tab at a time
 - Packages are not code signed. Unsigned Windows installers trigger SmartScreen,
   and an ad-hoc signed macOS app needs right-click › Open the first time;
@@ -753,6 +772,11 @@ src/aboutpages.*      internal about: pages, including the easter eggs
 src/profiles.*        profile factory, plus blocking and user-script install
 src/theme.*           System / Light / Dark setting, palette and stylesheet
 src/adblocker.*       QWebEngineUrlRequestInterceptor, filter and cosmetic parsing
+src/filterlists.*     filter list subscriptions: download, update, parse off-thread
+src/importer.*        bookmark and login import from other browsers
+src/readerview.*      reader view script
+src/updatechecker.*   opt-in check for a newer release
+src/cookiemanager.*   cookie list and the cookies-by-site window
 src/cosmeticfilters.* builds the injected element-hiding stylesheet
 src/userextensions.*  user script discovery and QWebEngineScript installation
 src/extensionsdialog.*  extension manager UI

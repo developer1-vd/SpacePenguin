@@ -1,5 +1,8 @@
 #include "browserwindow.h"
 
+#include "readerview.h"
+#include "updatechecker.h"
+
 #include "aboutpages.h"
 #include "adblocker.h"
 #include "bookmarkmanager.h"
@@ -36,12 +39,14 @@
 #include <QCloseEvent>
 #include <QCompleter>
 #include <QCursor>
+#include <QDataStream>
 #include <QDateTime>
 #include <QDialog>
 #include <QPointer>
 #include <QFile>
 #include <QDir>
 #include <QDialogButtonBox>
+#include <QFileDialog>
 #include <QFocusEvent>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -75,6 +80,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QWebEngineFindTextResult>
+#include <QWebEngineFullScreenRequest>
 #include <QWebEngineHistory>
 #include <QWebEnginePage>
 #include <QWebEngineView>
@@ -282,6 +288,20 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
 
     rebuildBookmarksBar();
     restoreSession();
+
+    // A new release, for those who asked to hear of one.
+    if (!m_isPrivate) {
+        connect(UpdateChecker::instance(), &UpdateChecker::updateAvailable, this,
+                [this](const QString &version, const QUrl &page) {
+                    Prompt prompt;
+                    prompt.key = QStringLiteral("update");
+                    prompt.icon = Icons::Info;
+                    prompt.text = tr("<b>SpacePenguin %1</b> is out.").arg(version.toHtmlEscaped());
+                    prompt.buttons = {{tr("See what's new"), [this, page] { newTab(page); }}};
+                    addPrompt(currentView(), prompt);
+                });
+        QTimer::singleShot(5000, UpdateChecker::instance(), &UpdateChecker::checkIfDue);
+    }
 }
 
 BrowserWindow::~BrowserWindow()
@@ -316,6 +336,26 @@ void BrowserWindow::createActions()
         addAction(action);
         return action;
     };
+
+    m_readerAction = makeAction(tr("Reader View"), {QKeySequence(Qt::Key_F9)}, Icons::icon(Icons::Reader));
+    connect(m_readerAction, &QAction::triggered, this, &BrowserWindow::toggleReaderView);
+
+#ifdef Q_OS_MACOS
+    // ⌘M is the system's Minimize; the Control key is free.
+    m_muteTabAction = makeAction(tr("Mute Tab"), {QKeySequence(Qt::META | Qt::Key_M)});
+#else
+    m_muteTabAction = makeAction(tr("Mute Tab"), {QKeySequence(Qt::CTRL | Qt::Key_M)});
+#endif
+    connect(m_muteTabAction, &QAction::triggered, this, [this] { toggleMuted(m_tabBar->currentIndex()); });
+
+    m_openFileAction = makeAction(tr("Open File…"), {QKeySequence(QKeySequence::Open)});
+    connect(m_openFileAction, &QAction::triggered, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(
+            this, tr("Open File"), QDir::homePath(),
+            tr("Pages, PDFs and images (*.html *.htm *.xhtml *.pdf *.svg *.png *.jpg *.jpeg *.gif *.webp *.txt);;All files (*)"));
+        if (!path.isEmpty())
+            newTab(QUrl::fromLocalFile(path));
+    });
 
     m_newTabAction = makeAction(tr("New Tab"), Shortcuts::keys(Shortcuts::NewTab),
                                 Icons::icon(Icons::Plus));
@@ -401,6 +441,10 @@ void BrowserWindow::createActions()
 
     m_zoomResetAction = makeAction(tr("Reset Zoom"), Shortcuts::keys(Shortcuts::ZoomReset));
     connect(m_zoomResetAction, &QAction::triggered, this, [this] { setZoom(1.0); });
+
+    m_exitFullScreenShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    m_exitFullScreenShortcut->setEnabled(false);
+    connect(m_exitFullScreenShortcut, &QShortcut::activated, this, &BrowserWindow::exitPageFullScreen);
 
     m_fullScreenAction = makeAction(tr("Full Screen"), Shortcuts::keys(Shortcuts::FullScreen));
     m_fullScreenAction->setCheckable(true);
@@ -605,6 +649,11 @@ QWidget *BrowserWindow::createTabStrip()
     connect(m_tabBar, &TabBar::dragFinished, this, &BrowserWindow::onTabDragFinished);
     connect(m_tabBar, &TabBar::groupChipClicked, this, &BrowserWindow::toggleGroupCollapsed);
     connect(m_tabBar, &TabBar::groupMenuRequested, this, &BrowserWindow::showGroupMenu);
+    m_tabBar->setIconClickable([this](int index) {
+        const WebView *view = viewAt(index);
+        return view && (view->page()->isAudioMuted() || view->page()->recentlyAudible());
+    });
+    connect(m_tabBar, &TabBar::iconClicked, this, &BrowserWindow::toggleMuted);
     connect(m_tabBar, &QTabBar::customContextMenuRequested, this,
             &BrowserWindow::showTabContextMenu);
     connect(m_tabBar, &QTabBar::tabBarDoubleClicked, this, [this](int index) {
@@ -683,6 +732,16 @@ QWidget *BrowserWindow::createNavigationBar()
             menu.addSeparator();
             connect(menu.addAction(tr("Site permissions…")), &QAction::triggered, this,
                     &BrowserWindow::showSitePermissions);
+            // This site's cookies, to sign out of it in one go.
+            if (CookieManager *cookies = m_services.cookieManager; cookies && !m_isPrivate) {
+                const QString site = CookieManager::siteOf(view->url().host());
+                int count = 0;
+                for (const Cookie &cookie : cookies->allCookies())
+                    count += CookieManager::siteOf(cookie) == site ? 1 : 0;
+                QAction *clear = menu.addAction(tr("Remove %n cookie(s) of %1", nullptr, count).arg(site));
+                clear->setEnabled(count > 0);
+                connect(clear, &QAction::triggered, this, [cookies, site] { cookies->deleteCookiesForSite(site); });
+            }
         }
         menu.exec(m_omnibox->mapToGlobal(QPoint(0, m_omnibox->height())));
     });
@@ -846,6 +905,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_newTabAction);
     menu->addAction(m_newWindowAction);
     menu->addAction(m_newPrivateWindowAction);
+    menu->addAction(m_openFileAction);
     menu->addSeparator();
 
     QMenu *bookmarks = menu->addMenu(Icons::icon(Icons::Bookmarks), tr("Bookmarks"));
@@ -854,28 +914,13 @@ QMenu *BrowserWindow::createAppMenu()
         bookmarks->addAction(m_bookmarkPageAction);
         bookmarks->addAction(m_bookmarksBarAction);
         bookmarks->addAction(m_bookmarksAction);
-        if (!m_services.bookmarkManager)
+        if (!m_services.bookmarkManager || m_services.bookmarkManager->children(QString()).isEmpty())
             return;
-        bool separated = false;
-        for (const Bookmark &bookmark : m_services.bookmarkManager->bookmarks()) {
-            if (!bookmark.url.isValid() || bookmark.url.isEmpty())
-                continue;
-            if (!separated) {
-                bookmarks->addSeparator();
-                separated = true;
-            }
-            const QUrl url = bookmark.url;
-            QAction *action = bookmarks->addAction(
-                Icons::icon(Icons::Globe),
-                bookmark.title.isEmpty() ? url.toDisplayString() : bookmark.title);
-            action->setToolTip(url.toDisplayString());
-            connect(action, &QAction::triggered, this, [this, url] {
-                if (WebView *view = currentView())
-                    loadUrl(view, url);
-            });
-        }
+        bookmarks->addSeparator();
+        fillBookmarkMenu(bookmarks, QString());
     });
 
+    menu->addAction(m_readerAction);
     menu->addAction(m_historyAction);
     menu->addAction(m_downloadsAction);
     menu->addSeparator();
@@ -958,6 +1003,7 @@ void BrowserWindow::createMenus()
     fileMenu->addAction(m_newWindowAction);
     fileMenu->addAction(m_newPrivateWindowAction);
     fileMenu->addAction(m_reopenTabAction);
+    fileMenu->addAction(m_openFileAction);
     fileMenu->addSeparator();
     fileMenu->addAction(m_closeTabAction);
     fileMenu->addAction(m_closeWindowAction);
@@ -981,6 +1027,8 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_zoomOutAction);
     viewMenu->addAction(m_zoomResetAction);
     viewMenu->addAction(m_fullScreenAction);
+    viewMenu->addAction(m_readerAction);
+    viewMenu->addAction(m_muteTabAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_bookmarksBarAction);
     viewMenu->addAction(m_sideTabsAction);
@@ -1308,13 +1356,9 @@ void BrowserWindow::rebuildBookmarksBar()
 
     m_bookmarksBar->clear();
 
-    QList<Bookmark> bookmarks;
-    if (m_services.bookmarkManager) {
-        for (const Bookmark &bookmark : m_services.bookmarkManager->bookmarks()) {
-            if (bookmark.url.isValid() && !bookmark.url.isEmpty())
-                bookmarks.prepend(bookmark); // oldest first, like every other bookmarks bar
-        }
-    }
+    // The top level: bookmarks, and folders that open as menus.
+    const QList<Bookmark> bookmarks =
+        m_services.bookmarkManager ? m_services.bookmarkManager->children(QString()) : QList<Bookmark>();
 
     if (bookmarks.isEmpty()) {
         auto *hint = new QLabel(tr("Bookmark pages with %1 and they will show up here.")
@@ -1330,6 +1374,32 @@ void BrowserWindow::rebuildBookmarksBar()
         QString title = bookmark.title.isEmpty() ? url.host() : bookmark.title;
         if (title.size() > 28)
             title = title.left(26) + QStringLiteral("…");
+
+        if (BookmarkManager::isFolder(bookmark)) {
+            auto *folder = new QToolButton;
+            folder->setText(title);
+            folder->setIcon(Icons::icon(Icons::Folder));
+            folder->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            folder->setAutoRaise(true);
+            folder->setFocusPolicy(Qt::NoFocus);
+            folder->setPopupMode(QToolButton::InstantPopup);
+            auto *menu = new QMenu(folder);
+            connect(menu, &QMenu::aboutToShow, this, [this, menu, id] {
+                menu->clear();
+                fillBookmarkMenu(menu, id);
+            });
+            folder->setMenu(menu);
+            folder->setContextMenuPolicy(Qt::CustomContextMenu);
+            connect(folder, &QToolButton::customContextMenuRequested, this, [this, folder, id](const QPoint &pos) {
+                QMenu context(this);
+                connect(context.addAction(tr("Edit…")), &QAction::triggered, this, [this, id] {
+                    BookmarkEditDialog::editBookmark(m_services.bookmarkManager, id, this);
+                });
+                context.exec(folder->mapToGlobal(pos));
+            });
+            m_bookmarksBar->addWidget(folder);
+            continue;
+        }
 
         auto *button = new QToolButton;
         button->setText(title);
@@ -1366,6 +1436,46 @@ void BrowserWindow::rebuildBookmarksBar()
                 });
         m_bookmarksBar->addWidget(button);
     }
+}
+
+void BrowserWindow::fillBookmarkMenu(QMenu *menu, const QString &folderId)
+{
+    const QList<Bookmark> items = m_services.bookmarkManager->children(folderId);
+    if (items.isEmpty()) {
+        menu->addAction(tr("(Empty)"))->setEnabled(false);
+        return;
+    }
+    for (const Bookmark &bookmark : items) {
+        if (BookmarkManager::isFolder(bookmark)) {
+            QMenu *sub = menu->addMenu(Icons::icon(Icons::Folder), bookmark.title);
+            const QString id = bookmark.id;
+            connect(sub, &QMenu::aboutToShow, this, [this, sub, id] {
+                sub->clear();
+                fillBookmarkMenu(sub, id);
+            });
+            continue;
+        }
+        const QUrl url = bookmark.url;
+        QAction *action = menu->addAction(Icons::icon(Icons::Globe),
+                                          bookmark.title.isEmpty() ? url.toDisplayString() : bookmark.title);
+        action->setToolTip(url.toDisplayString());
+        connect(action, &QAction::triggered, this, [this, url] {
+            if (QGuiApplication::keyboardModifiers() & Qt::ControlModifier)
+                newTab(url, true);
+            else if (WebView *view = currentView())
+                loadUrl(view, url);
+        });
+    }
+    if (folderId.isEmpty())
+        return;
+    // A folder can open all its bookmarks at once.
+    menu->addSeparator();
+    connect(menu->addAction(tr("Open All in Tabs")), &QAction::triggered, this, [this, items] {
+        for (const Bookmark &bookmark : items) {
+            if (!BookmarkManager::isFolder(bookmark))
+                newTab(bookmark.url, true);
+        }
+    });
 }
 
 void BrowserWindow::toggleBookmarkForCurrentPage()
@@ -1437,8 +1547,20 @@ void BrowserWindow::restoreSession()
 
     const int current = qBound(0, settings.value(QStringLiteral("session/currentTab")).toInt(),
                                int(urls.size()) - 1);
-    for (const QString &url : urls)
-        newTab(QUrl(url));
+    // Each tab's back and forward history, with what Chromium keeps for each page
+    // (where it was scrolled to, what was typed into forms); the address alone if not.
+    const QStringList histories = settings.value(QStringLiteral("session/histories")).toStringList();
+    for (int index = 0; index < urls.size(); ++index) {
+        WebView *view = addTab(false);
+        const QByteArray history = QByteArray::fromBase64(histories.value(index).toLatin1());
+        if (!history.isEmpty()) {
+            QDataStream stream(history);
+            stream >> *view->history();
+            if (stream.status() == QDataStream::Ok && view->history()->count() > 0)
+                continue;
+        }
+        loadUrl(view, QUrl(urls.at(index)));
+    }
 
     const QJsonObject saved =
         QJsonDocument::fromJson(settings.value(QStringLiteral("session/groups")).toString().toUtf8())
@@ -1475,6 +1597,7 @@ void BrowserWindow::saveSession() const
 
     QStringList urls;
     urls.reserve(m_tabBar->count());
+    QStringList histories;
     // Each saved tab's group, as a place in the list of groups; -1 for none.
     const QList<TabGroup> groups = m_groups->groups();
     QJsonArray tabGroups;
@@ -1482,6 +1605,13 @@ void BrowserWindow::saveSession() const
         const WebView *view = viewAt(index);
         if (view && view->url().isValid() && !view->url().isEmpty()) {
             urls.append(view->url().toString());
+            // Internal pages are drawn by the browser, so only their address is kept.
+            QByteArray history;
+            if (isWebScheme(view->url()) || view->url().isLocalFile()) {
+                QDataStream stream(&history, QIODevice::WriteOnly);
+                stream << *view->history();
+            }
+            histories.append(QString::fromLatin1(history.toBase64()));
             const int group = m_groups->groupOf(view);
             int place = -1;
             for (int i = 0; i < groups.size(); ++i) {
@@ -1499,6 +1629,7 @@ void BrowserWindow::saveSession() const
     }
 
     settings.setValue(QStringLiteral("session/urls"), urls);
+    settings.setValue(QStringLiteral("session/histories"), histories);
     settings.setValue(QStringLiteral("session/groups"),
                       QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("groups"), groupList},
                                                                   {QStringLiteral("tabs"), tabGroups}})
@@ -1721,6 +1852,26 @@ void BrowserWindow::showTabContextMenu(const QPoint &pos)
     showTabMenu(m_tabBar->tabAt(pos), m_tabBar->mapToGlobal(pos));
 }
 
+void BrowserWindow::toggleReaderView()
+{
+    WebView *view = currentView();
+    if (!view || !(isWebScheme(view->url()) || view->url().isLocalFile()))
+        return;
+    QPointer<WebView> target(view);
+    // In SpacePenguin's own script world, so the page's scripts cannot interfere.
+    view->page()->runJavaScript(readerViewScript(), QWebEngineScript::ApplicationWorld,
+                                [this, target](const QVariant &result) {
+                                    if (target && target == currentView() && result.toString() == QLatin1String("none"))
+                                        showToast(tr("Reader view found no article on this page."), 3000);
+                                });
+}
+
+void BrowserWindow::toggleMuted(int index)
+{
+    if (WebView *view = viewAt(index))
+        view->page()->setAudioMuted(!view->page()->isAudioMuted());
+}
+
 void BrowserWindow::showTabMenu(int index, const QPoint &globalPosition)
 {
     QMenu menu(this);
@@ -1731,6 +1882,12 @@ void BrowserWindow::showTabMenu(int index, const QPoint &globalPosition)
                 this, [this, index] { if (WebView *view = viewAt(index)) view->reload(); });
         connect(menu.addAction(tr("Duplicate")), &QAction::triggered, this,
                 [this, index] { duplicateTab(index); });
+        if (WebView *view = viewAt(index)) {
+            const bool muted = view->page()->isAudioMuted();
+            connect(menu.addAction(Icons::icon(muted ? Icons::Speaker : Icons::Muted),
+                                   muted ? tr("Unmute Tab") : tr("Mute Tab")),
+                    &QAction::triggered, this, [this, index] { toggleMuted(index); });
+        }
 
         menu.addSeparator();
         QObject *tab = tabObject(m_tabBar, index);
@@ -1811,6 +1968,11 @@ void BrowserWindow::updateTabLabel(WebView *view)
         icon = Icons::icon(Icons::Penguin);
     else if (icon.isNull())
         icon = Icons::icon(Icons::Globe);
+    // Sound shows instead of the site's icon; clicking it mutes or unmutes the tab.
+    if (view->page()->isAudioMuted())
+        icon = Icons::icon(Icons::Muted);
+    else if (view->page()->recentlyAudible())
+        icon = Icons::icon(Icons::Speaker);
     m_tabBar->setLabel(index, {title, icon, toolTip});
     syncSideTabs();
 }
@@ -2590,6 +2752,10 @@ void BrowserWindow::onOmniboxReturnPressed()
 
 void BrowserWindow::toggleFullScreen()
 {
+    if (m_pageFullScreen) {
+        exitPageFullScreen();
+        return;
+    }
     if (isFullScreen()) {
         showNormal();
         m_fullScreenAction->setChecked(false);
@@ -2597,6 +2763,56 @@ void BrowserWindow::toggleFullScreen()
         showFullScreen();
         m_fullScreenAction->setChecked(true);
     }
+}
+
+void BrowserWindow::setPageFullScreen(bool on)
+{
+    if (on == m_pageFullScreen)
+        return;
+    m_pageFullScreen = on;
+    if (on) {
+        // Only the page: every bar above and below it, and the side tabs, step aside.
+        m_wasFullScreen = isFullScreen();
+        m_wasMaximized = isMaximized();
+        m_hiddenForFullScreen.clear();
+        QLayout *layout = centralWidget()->layout();
+        for (int i = 0; i < layout->count(); ++i) {
+            QWidget *widget = layout->itemAt(i)->widget();
+            if (widget && widget->isVisible()) {
+                m_hiddenForFullScreen.append(widget);
+                widget->hide();
+            }
+        }
+        if (m_sideTabs->isVisible()) {
+            m_hiddenForFullScreen.append(m_sideTabs);
+            m_sideTabs->hide();
+        }
+        m_progressBar->hide();
+        showFullScreen();
+        showToast(tr("Press Esc to leave full screen"), 3000);
+    } else {
+        for (const QPointer<QWidget> &widget : std::as_const(m_hiddenForFullScreen)) {
+            if (widget)
+                widget->show();
+        }
+        m_hiddenForFullScreen.clear();
+        if (!m_wasFullScreen) {
+            if (m_wasMaximized)
+                showMaximized();
+            else
+                showNormal();
+        }
+    }
+    m_exitFullScreenShortcut->setEnabled(on);
+}
+
+void BrowserWindow::exitPageFullScreen()
+{
+    if (m_fullScreenView)
+        m_fullScreenView->triggerPageAction(QWebEnginePage::ExitFullScreen);
+    // A page that is gone, or does not answer, is left anyway.
+    m_fullScreenView = nullptr;
+    setPageFullScreen(false);
 }
 
 void BrowserWindow::setZoom(qreal factor)
@@ -2846,6 +3062,8 @@ void BrowserWindow::connectView(WebView *view)
             updateWindowTitle();
     });
     connect(view, &QWebEngineView::iconChanged, this, [this, view] { updateTabLabel(view); });
+    connect(view->page(), &QWebEnginePage::recentlyAudibleChanged, this, [this, view] { updateTabLabel(view); });
+    connect(view->page(), &QWebEnginePage::audioMutedChanged, this, [this, view] { updateTabLabel(view); });
     connect(view, &QWebEngineView::urlChanged, this,
             [this, view](const QUrl &url) { onUrlChanged(view, url); });
     connect(view, &QWebEngineView::loadStarted, this, [this, view] { onLoadStarted(view); });
@@ -2860,6 +3078,17 @@ void BrowserWindow::connectView(WebView *view)
         if (view == currentView())
             onLinkHovered(url);
     });
+    connect(view->page(), &QWebEnginePage::fullScreenRequested, this,
+            [this, view](QWebEngineFullScreenRequest request) {
+                // Only the tab in front may take the screen.
+                if (request.toggleOn() && view != currentView()) {
+                    request.reject();
+                    return;
+                }
+                request.accept();
+                m_fullScreenView = request.toggleOn() ? view : nullptr;
+                setPageFullScreen(request.toggleOn());
+            });
     connect(view->page(), &QWebEnginePage::windowCloseRequested, this,
             [this, view] { closeTab(indexOfView(view)); });
     connect(view->browserPage(), &BrowserPage::internalPageRequested, this,
@@ -2921,6 +3150,9 @@ void BrowserWindow::onCurrentTabChanged(int index)
     if (const int group = m_groups->groupOf(view); m_groups->isCollapsed(group))
         m_groups->setCollapsed(group, false);
 
+    // Another tab coming forward ends a video's full screen.
+    if (m_pageFullScreen && m_fullScreenView != view)
+        exitPageFullScreen();
     m_stack->setCurrentWidget(view);
     m_linkPreview->hide();
     m_omniboxEdited = false;

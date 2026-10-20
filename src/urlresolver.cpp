@@ -1,5 +1,8 @@
 #include "urlresolver.h"
 
+#include <QDir>
+#include <QFileInfo>
+
 namespace spacepenguin {
 namespace {
 
@@ -133,6 +136,13 @@ QUrl UrlResolver::resolve(const QString &input) const
 
     if (text.compare(QLatin1String("about:"), Qt::CaseInsensitive) == 0)
         return QUrl(QStringLiteral("about:about"));
+
+    // A file on this computer, typed or pasted as a path.
+    QString path = text;
+    if (path.startsWith(QLatin1String("~/")))
+        path = QDir::homePath() + path.mid(1);
+    if (QFileInfo(path).isAbsolute() && QFileInfo::exists(path))
+        return QUrl::fromLocalFile(path);
 
     if (!looksLikeUrl(text))
         return searchUrl(text);

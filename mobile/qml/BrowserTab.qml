@@ -9,6 +9,8 @@ Item {
     // The web view is a native view drawn above everything else on Android and
     // iOS, so it is shown only while nothing should cover it.
     property bool pageVisible: true
+    // A private tab is not recorded in history and not reopened with the app.
+    property bool isPrivate: false
 
     property bool onStartPage: true
     readonly property url url: onStartPage ? "" : view.url
@@ -50,6 +52,22 @@ Item {
         onOpenRequested: text => tab.openRequested(text)
     }
 
+    // Said plainly: the phone's web view cannot keep a tab's cookies apart.
+    Text {
+        visible: tab.onStartPage && tab.isPrivate
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 24
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.Wrap
+        color: Theme.muted
+        font.pixelSize: 13
+        text: qsTr("Private tab: what you visit here is not saved to history, and the tab is not "
+                   + "reopened with the app. Sites still share cookies with your other tabs; "
+                   + "Settings › Clear history and cookies removes them.")
+    }
+
     WebView {
         id: view
         anchors.fill: parent
@@ -57,7 +75,8 @@ Item {
 
         onLoadingChanged: request => {
             if (request.status === WebView.LoadSucceededStatus) {
-                BrowserBackend.recordVisit(view.title, view.url);
+                if (!tab.isPrivate)
+                    BrowserBackend.recordVisit(view.title, view.url);
                 tab.runPageScripts();
             }
         }

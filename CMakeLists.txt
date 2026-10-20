@@ -141,12 +141,16 @@ qt_add_executable(spacepenguin
     src/bookmarksdialog.cpp
     src/bookmarksdialog.h
     src/adblocker.cpp
+    src/filterlists.cpp
+    src/updatechecker.cpp
+    src/readerview.cpp
     src/adblocker.h
     src/cosmeticfilters.cpp
     src/cosmeticfilters.h
     src/downloadmanager.cpp
     src/downloadmanager.h
     src/bookmarkmanager.cpp
+    src/importer.cpp
     src/bookmarkmanager.h
     src/cookiemanager.cpp
     src/cookiemanager.h
@@ -317,6 +321,23 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_compile_definitions(tst_adblocker PRIVATE
             SPACEPENGUIN_TEST_FILTER_LIST="${CMAKE_CURRENT_SOURCE_DIR}/filters/default.txt")
         add_test(NAME adblocker COMMAND tst_adblocker)
+
+        qt_add_executable(tst_importer
+            tests/tst_importer.cpp
+            src/importer.cpp
+            src/importer.h
+            src/bookmarkmanager.cpp
+            src/bookmarkmanager.h
+            src/logins.cpp
+            src/logins.h
+            src/icons.cpp
+            src/icons.h
+            src/theme.cpp
+            src/theme.h
+        )
+        target_link_libraries(tst_importer PRIVATE Qt6::Test Qt6::Widgets)
+        target_include_directories(tst_importer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME importer COMMAND tst_importer)
 
         qt_add_executable(tst_userextensions
             tests/tst_userextensions.cpp

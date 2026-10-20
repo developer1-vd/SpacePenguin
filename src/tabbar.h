@@ -5,6 +5,8 @@
 #include <QPointer>
 #include <QTabBar>
 
+#include <functional>
+
 class QToolButton;
 
 namespace spacepenguin {
@@ -40,6 +42,9 @@ public:
     /** Brings the chips, the hidden tabs of collapsed groups and the group lines up to date. */
     void refreshGroups();
 
+    /** Which tabs' icons are buttons (a speaker, while the tab plays sound or is muted). */
+    void setIconClickable(std::function<bool(int index)> clickable) { m_iconClickable = std::move(clickable); }
+
     /** Takes a group's chip off a tab about to be removed, which would delete it. */
     void releaseChip(int index);
 
@@ -50,6 +55,8 @@ signals:
     void dragFinished(QObject *tab);
     void groupChipClicked(int group);
     void groupMenuRequested(int group, const QPoint &globalPosition);
+    /** The tab's icon was clicked (it shows a speaker while the tab plays sound). */
+    void iconClicked(int index);
 
 protected:
     QSize tabSizeHint(int index) const override;
@@ -67,6 +74,7 @@ private:
     /** The first tab of a collapsed group, which shows only the group's chip. */
     bool isChipOnly(int index) const;
     int chipWidth(int index) const;
+    QRect iconRect(int index) const;
     QToolButton *chip(int group);
 
     TabGroups *m_groups = nullptr;
@@ -74,6 +82,7 @@ private:
     QHash<int, QPointer<QToolButton>> m_chips;
     QPointer<QObject> m_pressed;
     QPointer<QObject> m_dragged;
+    std::function<bool(int)> m_iconClickable;
 };
 
 }

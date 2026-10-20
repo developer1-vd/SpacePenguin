@@ -167,7 +167,8 @@ trap 'rm -rf "${WORK}"' EXIT
 
 appimage_url() {
     # $1: a release API address. Prints the AppImage for this machine, if it has one.
-    curl -fsSL "$1" 2>/dev/null |
+    # A missing release is a 404, which is not an error here: say nothing.
+    { curl -fsSL "$1" 2>/dev/null || true; } |
         sed -n "s/.*\"browser_download_url\": *\"\([^\"]*-${ARCH}\.AppImage\)\".*/\1/p" | head -n1
 }
 

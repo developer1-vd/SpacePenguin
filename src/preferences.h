@@ -67,6 +67,12 @@ public:
     /** Skip sponsor segments in YouTube videos, with SponsorBlock's data. */
     bool skipSponsors() const;
     void setSkipSponsors(bool skip);
+    /** Whether utm_source, fbclid and the like are taken off addresses. */
+    bool stripTracking() const;
+    /** Whether to look, once a day, for a newer release (off: nothing is contacted). */
+    bool checkForUpdates() const;
+    void setCheckForUpdates(bool check);
+    void setStripTracking(bool strip);
 
     /** Announces a change made outside the setters, such as the theme. */
     void notifyChanged();

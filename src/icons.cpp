@@ -320,6 +320,32 @@ void drawGlyph(QPainter *p, Icons::Glyph glyph, const QColor &color, const QColo
         p->drawPath(piece);
         break;
     }
+    case Icons::Speaker:
+    case Icons::Muted: {
+        QPainterPath speaker;
+        speaker.moveTo(4.5, 9.5);
+        speaker.lineTo(8, 9.5);
+        speaker.lineTo(12.5, 5.5);
+        speaker.lineTo(12.5, 18.5);
+        speaker.lineTo(8, 14.5);
+        speaker.lineTo(4.5, 14.5);
+        speaker.closeSubpath();
+        p->drawPath(speaker);
+        if (glyph == Icons::Muted) {
+            p->drawLine(QPointF(15.5, 9.5), QPointF(20.5, 14.5));
+            p->drawLine(QPointF(20.5, 9.5), QPointF(15.5, 14.5));
+        } else {
+            p->drawArc(QRectF(10, 8.5, 7, 7), -60 * 16, 120 * 16);
+            p->drawArc(QRectF(9, 5.5, 12, 13), -60 * 16, 120 * 16);
+        }
+        break;
+    }
+    case Icons::Reader:
+        p->drawRoundedRect(QRectF(5, 3.5, 14, 17), 2, 2);
+        p->drawLine(QPointF(8.5, 8), QPointF(15.5, 8));
+        p->drawLine(QPointF(8.5, 11.5), QPointF(15.5, 11.5));
+        p->drawLine(QPointF(8.5, 15), QPointF(13, 15));
+        break;
     case Icons::Globe:
         p->drawEllipse(QPointF(12, 12), 8.2, 8.2);
         p->drawEllipse(QPointF(12, 12), 3.6, 8.2);
