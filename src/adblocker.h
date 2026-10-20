@@ -5,6 +5,7 @@
 #include <QHash>
 
 #include <memory>
+#include <mutex>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -145,7 +146,13 @@ private:
     static bool anyMatches(const QList<NetworkRule> &rules, const Index &index, const QUrl &url,
                            const QStringList &tokens, const QString &documentHost, RequestType type);
     /** The rules in use. Requests are checked on Qt's network thread, so they are swapped whole. */
-    std::shared_ptr<const Filters> filters() const { return std::atomic_load(&m_filters); }
+    // (std::atomic_load on a shared_ptr would do, but C++20 deprecates it and MSVC rejects it.)
+    std::shared_ptr<const Filters> filters() const
+    {
+        const std::lock_guard<std::mutex> lock(m_filtersMutex);
+        return m_filters;
+    }
+    mutable std::mutex m_filtersMutex;
     std::shared_ptr<const Filters> m_filters = std::make_shared<const Filters>();
     QString m_listPath;
     QString m_lastListError;
