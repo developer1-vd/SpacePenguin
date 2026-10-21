@@ -26,6 +26,10 @@ on:
         description: 'The release name, such as "Almost To Stable" (empty: the tag)'
         required: false
         default: ''
+      replace:
+        description: 'If that release already exists, delete it and its tag first and publish this build in its place'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -373,8 +377,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
           INPUT_TAG: ${{ inputs.tag }}
           INPUT_NAME: ${{ inputs.name }}
+          INPUT_REPLACE: ${{ inputs.replace }}
         run: |
           ls -l packages
+          if [ -n "${INPUT_TAG}" ] && [ "${INPUT_REPLACE}" = true ]; then
+            gh release delete "${INPUT_TAG}" --cleanup-tag --yes || true
+            gh api -X DELETE "repos/${GH_REPO}/git/refs/tags/${INPUT_TAG}" 2>/dev/null || true
+          fi
           if [ -n "${INPUT_TAG}" ]; then
             echo "tag=${INPUT_TAG}" >> "${GITHUB_OUTPUT}"
             echo "name=${INPUT_NAME:-${INPUT_TAG}}" >> "${GITHUB_OUTPUT}"
