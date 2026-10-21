@@ -381,7 +381,10 @@ jobs:
         run: |
           ls -l packages
           if [ -n "${INPUT_TAG}" ] && [ "${INPUT_REPLACE}" = true ]; then
-            gh release delete "${INPUT_TAG}" --cleanup-tag --yes || true
+            # Drafts as well: a draft has no tag of its own to find it by.
+            gh api "repos/${GH_REPO}/releases?per_page=100" \
+              --jq ".[] | select(.tag_name == \"${INPUT_TAG}\") | .id" |
+              while read -r id; do gh api -X DELETE "repos/${GH_REPO}/releases/${id}"; done
             gh api -X DELETE "repos/${GH_REPO}/git/refs/tags/${INPUT_TAG}" 2>/dev/null || true
           fi
           if [ -n "${INPUT_TAG}" ]; then
@@ -404,6 +407,21 @@ jobs:
           name: ${{ steps.name.outputs.name }}
           files: packages/*
           generate_release_notes: true
+
+      # A tag deleted moments before (a replaced release) can leave the new
+      # release a draft on an "untagged-…" name; publish it on its tag.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.name.outputs.tag }}
+        run: |
+          id=$(gh api "repos/${GH_REPO}/releases?per_page=100" \
+                 --jq ".[] | select(.tag_name == \"${TAG}\") | .id" | head -n 1)
+          [ -n "${id}" ] || { echo "no release for ${TAG}" >&2; exit 1; }
+          gh api -X PATCH "repos/${GH_REPO}/releases/${id}" -F draft=false \
+            -f tag_name="${TAG}" -f target_commitish="${GITHUB_SHA}" -f make_latest=true \
+            --jq '"\(.html_url) draft=\(.draft)"'
 
   # The newest build of main as the "nightly" pre-release, which install.sh falls
   # back to while there is no release. Only the Linux AppImages: the installer's.
