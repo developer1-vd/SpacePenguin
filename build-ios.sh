@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${ROOT}"
 
-VERSION="$(sed -n 's/^ *VERSION \([0-9][0-9.]*\)$/\1/p' CMakeLists.txt | head -n1)"
+VERSION="$(sed -n 's/^set(SPACEPENGUIN_VERSION_NAME "\(.*\)")$/\1/p' CMakeLists.txt | head -n1)"
 QT_VERSION="${QT_VERSION:-6.8.3}"
 BUILD_DIR="${BUILD_DIR:-build-ios}"
 OUTPUT_DIR="dist"

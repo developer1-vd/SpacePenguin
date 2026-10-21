@@ -28,7 +28,7 @@ if ($Help) {
     @"
 Usage: build-windows.ps1 [options]
 
-  -Version <x.y.z>               version in the file names (default: from CMakeLists.txt)
+  -Version <name>                 version in the file names (default: from CMakeLists.txt)
   -Qt <prefix>                   Qt to build against (default: .qt\, then CMAKE_PREFIX_PATH)
   -BuildDir <dir>                build directory (default build-windows)
   -OutputDir <dir>               where the packages go (default dist)
@@ -46,10 +46,13 @@ function Step($message) { Write-Host ""; Write-Host "==> $message" }
 function Check($what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (exit code $LASTEXITCODE)" } }
 
 if (-not $Version) {
-    $Version = (Select-String -Path CMakeLists.txt -Pattern '^\s*VERSION\s+([0-9][0-9.]*)\s*$' |
+    $Version = (Select-String -Path CMakeLists.txt -Pattern '^set\(SPACEPENGUIN_VERSION_NAME "(.+)"\)$' |
                 Select-Object -First 1).Matches.Groups[1].Value
 }
-$VersionQuad = (@($Version.Split('.')) + @('0', '0', '0', '0'))[0..3] -join '.'
+# Windows file properties take four numbers, so they come from the numeric VERSION.
+$NumericVersion = (Select-String -Path CMakeLists.txt -Pattern '^\s*VERSION\s+([0-9][0-9.]*)\s*$' |
+                   Select-Object -First 1).Matches.Groups[1].Value
+$VersionQuad = (@($NumericVersion.Split('.')) + @('0', '0', '0', '0'))[0..3] -join '.'
 
 # ---- Find Qt ------------------------------------------------------------------------
 

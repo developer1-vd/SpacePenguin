@@ -11,6 +11,10 @@ cmake_minimum_required(VERSION 3.21)
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../CMakeLists.txt" _spacepenguin_version_line
      REGEX "^    VERSION [0-9.]+$")
 string(REGEX MATCH "[0-9.]+" _spacepenguin_version "${_spacepenguin_version_line}")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../CMakeLists.txt" _spacepenguin_version_name_line
+     REGEX "^set\\(SPACEPENGUIN_VERSION_NAME ")
+string(REGEX MATCH "\"[^\"]+\"" SPACEPENGUIN_VERSION_NAME "${_spacepenguin_version_name_line}")
+string(REPLACE "\"" "" SPACEPENGUIN_VERSION_NAME "${SPACEPENGUIN_VERSION_NAME}")
 
 project(SpacePenguinMobile
     VERSION ${_spacepenguin_version}
@@ -60,7 +64,7 @@ qt_add_executable(spacepenguin_mobile
 )
 set_target_properties(spacepenguin_mobile PROPERTIES OUTPUT_NAME SpacePenguin)
 target_include_directories(spacepenguin_mobile PRIVATE ${SHARED} ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(spacepenguin_mobile PRIVATE SPACEPENGUIN_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(spacepenguin_mobile PRIVATE SPACEPENGUIN_VERSION="${SPACEPENGUIN_VERSION_NAME}")
 target_link_libraries(spacepenguin_mobile PRIVATE
     Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::WebView)
 
@@ -102,7 +106,7 @@ if(ANDROID)
     # The manifest, launcher icons and app name live in android/.
     set_target_properties(spacepenguin_mobile PROPERTIES
         QT_ANDROID_PACKAGE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/android
-        QT_ANDROID_VERSION_NAME ${PROJECT_VERSION}
+        QT_ANDROID_VERSION_NAME ${SPACEPENGUIN_VERSION_NAME}
         QT_ANDROID_VERSION_CODE 1
         QT_ANDROID_MIN_SDK_VERSION 28
         QT_ANDROID_TARGET_SDK_VERSION 34)

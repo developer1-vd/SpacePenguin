@@ -8,6 +8,11 @@ project(SpacePenguin
     DESCRIPTION "A secure, lightweight, and usable browser written in Qt"
     LANGUAGES CXX)
 
+# The version people see: the app's About page and --version, the download file
+# names and the release. Package formats, Windows file properties and Info.plist
+# need plain numbers and take VERSION above.
+set(SPACEPENGUIN_VERSION_NAME "0.1-A")
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -197,7 +202,7 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
     endif()
 endif()
 target_compile_definitions(spacepenguin PRIVATE
-    SPACEPENGUIN_VERSION="${PROJECT_VERSION}"
+    SPACEPENGUIN_VERSION="${SPACEPENGUIN_VERSION_NAME}"
     SPACEPENGUIN_BUILD_TYPE="$<CONFIG>")
 
 if(MSVC)
