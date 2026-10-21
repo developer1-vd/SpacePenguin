@@ -16,7 +16,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${ROOT}"
 
 APP_ID="org.spacepenguin.SpacePenguin"
-VERSION="$(sed -n 's/^ *VERSION \([0-9][0-9.]*\)$/\1/p' CMakeLists.txt | head -n1)"
+VERSION="$(sed -n 's/^set(SPACEPENGUIN_VERSION_NAME "\(.*\)")$/\1/p' CMakeLists.txt | head -n1)"
 ARCH="$(uname -m)"
 BUILD_DIR="${BUILD_DIR:-build-appimage}"
 OUTPUT_DIR="dist"
@@ -30,7 +30,7 @@ usage() {
     cat <<EOF
 Usage: ./build-appimage.sh [options] [version]
 
-  --version <x.y.z>     version in the file name (default ${VERSION}, from CMakeLists.txt)
+  --version <name>      version in the file name (default ${VERSION}, from CMakeLists.txt)
   --qt <prefix>         Qt installation to bundle (default: .qt/, CMAKE_PREFIX_PATH, QMAKE)
   --build-dir <dir>     build directory (default ${BUILD_DIR}; env BUILD_DIR)
   --output-dir <dir>    where the AppImage goes (default ${OUTPUT_DIR})

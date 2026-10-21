@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${ROOT}"
 
-VERSION="$(sed -n 's/^ *VERSION \([0-9][0-9.]*\)$/\1/p' CMakeLists.txt | head -n1)"
+VERSION="$(sed -n 's/^set(SPACEPENGUIN_VERSION_NAME "\(.*\)")$/\1/p' CMakeLists.txt | head -n1)"
 BUILD_DIR="${BUILD_DIR:-build-macos}"
 OUTPUT_DIR="dist"
 QT_PREFIX=""
@@ -30,7 +30,7 @@ usage() {
     cat <<EOF
 Usage: ./build-dmg.sh [options] [version]
 
-  --version <x.y.z>     version in the file names (default ${VERSION})
+  --version <name>      version in the file names (default ${VERSION})
   --qt <prefix>         Qt to build against (default: .qt/, CMAKE_PREFIX_PATH, Homebrew)
   --universal           build for both arm64 and x86_64 (Qt from install-deps is universal)
   --arch <arm64|x86_64> build for one architecture (default: this Mac's)
