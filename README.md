@@ -4,7 +4,9 @@ A secure, lightweight, and usable browser written in Qt.
 
 **Website:** <https://developer1-vd.github.io/SpacePenguin/> (from [`docs/`](docs/))
 
-**Status: pre-alpha (v0.0.1).** It opens web pages in tabs and gets out of the
+![SpacePenguin's start page, with three tabs open](docs/screenshot.png)
+
+**Status: 0.1-A, "Almost To A Final".** It opens web pages in tabs and gets out of the
 way. Everything below is what actually exists in the tree today — no aspirational
 checkbox list.
 
