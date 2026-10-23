@@ -47,22 +47,24 @@ QString description(Role role)
                      "a game is full screen.");
     case Role::Student:
         return QCoreApplication::translate(
-            "Roles", "Focus mode keeps distracting sites away; Copy Citation puts a reference to "
-                     "the page on the clipboard.");
+            "Roles", "Join your teacher's class with its code: sites they block show their reason, and "
+                     "you can ask to unblock one. Also Focus mode, and Copy Citation for a reference "
+                     "to the page.");
     case Role::Worker:
         return QCoreApplication::translate(
             "Roles", "Focus mode, and your work pages opened together, from the menu or at start-up.");
     case Role::Teacher:
         return QCoreApplication::translate(
-            "Roles", "Focus mode for the class, and a larger page size that reads well on a projector.");
+            "Roles", "Run a class on the school network: block up to 100 sites for the students who "
+                     "join, each with your reason, and answer their requests to unblock. Your own "
+                     "browsing is not restricted. Also a larger page size for the projector.");
     }
     return QString();
 }
 
 bool hasFocusMode(const QStringList &roles)
 {
-    return roles.contains(key(Role::Student)) || roles.contains(key(Role::Worker))
-        || roles.contains(key(Role::Teacher));
+    return roles.contains(key(Role::Student)) || roles.contains(key(Role::Worker));
 }
 
 QString normalizeSite(const QString &text)

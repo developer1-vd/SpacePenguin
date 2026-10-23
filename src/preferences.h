@@ -23,7 +23,16 @@ class Preferences : public QObject
 public:
     static Preferences *instance();
 
+    /** The search engines to choose from: the built-in ones, then those added. */
     static QList<SearchEngine> searchEngines();
+    static QList<SearchEngine> builtInSearchEngines();
+    static QList<SearchEngine> addedSearchEngines();
+    /** Adds (or renames) a search engine; "%s" in @p searchTemplate counts as {query}.
+     *  False if the address is not an http(s) one with a place for the search. */
+    bool addSearchEngine(const QString &name, QString searchTemplate);
+    void removeSearchEngine(const QString &searchTemplate);
+    /** "%s" replaced by {query}; empty if the address cannot be a search engine's. */
+    static QString normalizeSearchTemplate(QString searchTemplate);
 
     QString homePage() const;
     void setHomePage(const QString &url);

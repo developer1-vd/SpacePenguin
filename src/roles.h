@@ -14,9 +14,9 @@ namespace spacepenguin {
  *
  *   developer  developer tools (F12), page source (Ctrl+U), no cache, own user agent
  *   gamer      games lock the mouse pointer without asking; other tabs go quiet in full screen
- *   student    Focus mode, Copy citation
+ *   student    joins a teacher's class (classroom.h), Focus mode, Copy citation
  *   worker     Focus mode, work pages opened together (and at start-up)
- *   teacher    Focus mode, a larger page size for the projector
+ *   teacher    runs a class (classroom.h), a larger page size for the projector
  */
 namespace Roles {
 
@@ -28,7 +28,7 @@ QString key(Role role);
 QString label(Role role);
 QString description(Role role);
 
-/** Focus mode comes with the student, worker and teacher roles. */
+/** Focus mode comes with the student and worker roles. */
 bool hasFocusMode(const QStringList &roles);
 
 /** "youtube.com" from "https://www.youtube.com/watch", " YouTube.com/ " or "www.youtube.com". */

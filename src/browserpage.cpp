@@ -1,14 +1,19 @@
 #include "browserpage.h"
 
+#include "classroom.h"
 #include "logins.h"
 #include "preferences.h"
 #include "roles.h"
+#include "tor.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTimer>
+#include <QUrlQuery>
 
 #include <QWebEngineSettings>
+
+#include <memory>
 
 namespace spacepenguin {
 namespace {
@@ -29,6 +34,9 @@ BrowserPage::BrowserPage(QWebEngineProfile *profile, QObject *parent)
     // PDFs open in Chromium's own viewer, which Qt counts as a plugin.
     settings()->setAttribute(QWebEngineSettings::PluginsEnabled, true);
     settings()->setAttribute(QWebEngineSettings::PdfViewerEnabled, true);
+    // Through Tor, WebRTC may not tell sites the addresses of this computer.
+    if (Tor::isActive())
+        settings()->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, true);
 
     // Remember the internal link last under the pointer. The hover is cleared just
     // before a click navigates, so keep it for a moment afterwards.
@@ -80,10 +88,37 @@ bool BrowserPage::isAllowedScheme(const QString &scheme)
 
 bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame)
 {
+    // A class's blocked site stays out of other pages' frames too (embedded videos).
     if (!isMainFrame)
-        return true;
+        return !Classroom::instance()->blocks(url);
 
-    // Focus mode (student, worker, teacher) keeps its sites away, with a page that says so.
+    // Student mode: "Ask to unblock" on a class's blocked page goes to the teacher.
+    if (url.scheme() == QLatin1String("sp") && url.host() == QLatin1String("classroom")
+        && url.path() == QLatin1String("/ask")) {
+        const QUrlQuery query(url);
+        const QString site = query.queryItemValue(QStringLiteral("site"), QUrl::FullyDecoded);
+        const QString note = query.queryItemValue(QStringLiteral("note"), QUrl::FullyDecoded).replace(QLatin1Char('+'), QLatin1Char(' '));
+        // The page keeps the blocked site's address, so an allowed site loads in its place.
+        const QUrl blocked = this->url();
+        auto connection = std::make_shared<QMetaObject::Connection>();
+        *connection = connect(Classroom::instance(), &Classroom::askFinished, this,
+                              [this, site, blocked, connection](bool ok) {
+                                  disconnect(*connection);
+                                  setHtml(Classroom::askedPage(site, ok), blocked);
+                              });
+        Classroom::instance()->ask(site, note);
+        return false;
+    }
+    // Student mode: the class's blocked sites, with the teacher's reason.
+    QString classSite, classReason;
+    if (Classroom::instance()->blocks(url, &classSite, &classReason)) {
+        const QString className = Classroom::instance()->joinedClassName();
+        QTimer::singleShot(0, this, [this, url, classSite, classReason, className] {
+            setHtml(Classroom::blockedPage(url, classSite, classReason, className), url);
+        });
+        return false;
+    }
+    // Focus mode (student, worker) keeps its sites away, with a page that says so.
     const Preferences *preferences = Preferences::instance();
     if (preferences->focusMode() && Roles::hasFocusMode(preferences->roles())
         && Roles::isBlocked(url, preferences->focusSites())) {
@@ -92,6 +127,11 @@ bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, 
     }
     if (m_navigationFilter && !m_navigationFilter(url, type))
         return false;
+    // Onion sites exist only on the Tor network, which only Tor windows reach.
+    if (!Tor::isActive() && Tor::isOnion(url)) {
+        emit onionRequested(url);
+        return false;
+    }
 
     const bool userInitiated = type == NavigationTypeLinkClicked
         || type == NavigationTypeFormSubmitted || type == NavigationTypeTyped;

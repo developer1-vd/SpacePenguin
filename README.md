@@ -105,14 +105,43 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
     (`Ctrl`+`U`), browsing without the cache, a user agent of your own
   - *Gamer*: games lock the mouse pointer without asking (`Esc` gives it back), and
     the other tabs go quiet while a game is full screen
-  - *Student*: Focus mode, and *Copy Citation* (`Ctrl`+`Alt`+`C`): the page's title,
-    site, address and today's date on the clipboard
+  - *Teacher mode*: runs a class on the school network. Block up to 100 sites for the
+    students who join, each with a reason they see; answer their requests to unblock
+    (for that student, for everyone, or not) from a bar above the page. The teacher's
+    own browsing isn't restricted. Pages can also open larger (up to 200%) for a
+    projector
+  - *Student mode*: pairs with Teacher mode. Join with the class code your teacher
+    shows (or `code@address` on networks that keep devices apart): the teacher's
+    blocked sites show their reason and an *Ask to unblock* box with a note, and the
+    answer pops up — an allowed site loads by itself. The last list keeps applying
+    while the teacher's computer is away. In a class, the usual ways around it are
+    closed: Tor windows, the site embedded in other pages, view-source, Google
+    Translate's proxy, the Wayback Machine and Google's cache, the site's other
+    addresses (youtu.be, twitter.com…), and web proxy and mirror sites. Student mode
+    can't be switched off mid-class: *Ask to Leave* goes to the teacher, and students
+    are let go when the teacher closes the class or makes a new code (or after two
+    weeks without reaching the teacher's computer). Also Focus mode, and *Copy Citation*
+    (`Ctrl`+`Alt`+`C`): the page's title, site, address and today's date
   - *Worker*: Focus mode, and your work pages opened together, from the menu or at
     start-up
-  - *Teacher*: Focus mode, and pages that open larger (up to 200%) for a projector
 
   Focus mode (in the menu) shows a reminder instead of the sites on its list —
-  YouTube, TikTok, Instagram and the like to begin with; edit the list in Settings
+  YouTube, TikTok, Instagram and the like to begin with; edit the list in Settings.
+  Classes stay on the local network (TCP 47800, UDP 47801), with nothing on the
+  internet. It is a classroom tool, not device management: another browser on the
+  same computer is out of its reach
+- **Search engines** — DuckDuckGo, Startpage, Brave Search, Ecosia, Google, Bing,
+  Qwant, Mojeek, Kagi, Yahoo and Wikipedia built in; add any other in *Settings ›
+  General* (*Add…*: a name and its results address with `%s` where the words go).
+  Switch from the menu (*Search With*)
+- **Tor windows** — *New Tor Window* (`Ctrl`+`Alt`+`N`) opens a private window whose
+  pages all go through Tor: sites don't see your address, and `.onion` sites open
+  (an onion link in a normal window offers to open it there). Normal and private
+  windows never use Tor. It needs Tor: the tor service (`sudo apt install tor`,
+  `brew install tor`) or a running Tor Browser, whose connection it uses; with only
+  the tor program installed, SpacePenguin starts it while the window is open. Tor
+  windows run in a process of their own, as Chromium takes one proxy per process. It
+  is not Tor Browser: it hides your address, not the browser's fingerprint
 - **Install sites as apps** — *Install … as App* in the menu turns a site into an app
   on your computer: SpacePenguin reads its web app manifest (progressive web apps)
   for the name, icon, start page and scope, and adds a launcher to your app menu
@@ -358,6 +387,7 @@ the desktop — macOS gets the binding Safari and Chrome use there instead.
 | Go to tab 1–8 / last  | `Ctrl+1` … `Ctrl+8` / `Ctrl+9`  | `⌘1` … `⌘8` / `⌘9`            |
 | New window            | `Ctrl+N`                        | `⌘N`                          |
 | New private window    | `Ctrl+Shift+N`                  | `⇧⌘N`                         |
+| New Tor window        | `Ctrl+Alt+N`                    | `⌥⌘N`                         |
 | Close window          | `Ctrl+Shift+W`                  | `⇧⌘W`                         |
 | Quit                  | `Ctrl+Q`                        | `⌘Q`                          |
 | Back / forward        | `Alt+Left` / `Alt+Right`        | `⌘[` / `⌘]`                   |
@@ -807,6 +837,8 @@ src/browserpage.*     QWebEnginePage subclass holding the security policy
 src/webview.*         per-tab view: load state, links opened as new tabs
 src/icons.*           painted icon set that follows the theme
 src/preferences.*     QSettings-backed preferences shared by every window
+src/tor.*             Tor windows: finding or starting Tor, the Tor process's proxy
+src/classroom.*       Teacher and Student mode: the class on the local network
 src/roles.*           Made for you: the roles, Focus mode's site matching, citations
 src/webapps.*         installed web apps: manifests, launchers for each system
 src/appwindow.*       an installed web app's own window

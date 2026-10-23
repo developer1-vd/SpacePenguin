@@ -30,6 +30,8 @@ signals:
     void userScriptRequested(const QUrl &url);
     /** Someone signed in on the page; see LoginStore::captureScript. */
     void loginSubmitted(const QString &username, const QString &password);
+    /** An onion site, outside a Tor window: it can only open in one (see tor.h). */
+    void onionRequested(const QUrl &url);
 
 protected:
     bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override;

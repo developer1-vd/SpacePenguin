@@ -1,6 +1,8 @@
 #include <QtTest>
 
+#include "preferences.h"
 #include "roles.h"
+#include "tor.h"
 #include "webapps.h"
 
 using namespace spacepenguin;
@@ -20,13 +22,17 @@ private slots:
     void manifestStaysOnItsSite();
     void appContainsItsScope();
     void desktopEntryQuotesAndNamesTheApp();
+    void searchTemplates();
+    void onions();
 };
 
 void TestRoles::focusModeComesWithSomeRoles()
 {
     QVERIFY(Roles::hasFocusMode({QStringLiteral("student")}));
-    QVERIFY(Roles::hasFocusMode({QStringLiteral("gamer"), QStringLiteral("teacher")}));
+    QVERIFY(Roles::hasFocusMode({QStringLiteral("gamer"), QStringLiteral("worker")}));
     QVERIFY(!Roles::hasFocusMode({QStringLiteral("developer"), QStringLiteral("gamer")}));
+    // A teacher's own browsing is not restricted.
+    QVERIFY(!Roles::hasFocusMode({QStringLiteral("teacher")}));
     QVERIFY(!Roles::hasFocusMode({}));
 }
 
@@ -141,6 +147,29 @@ void TestRoles::desktopEntryQuotesAndNamesTheApp()
     QVERIFY(entry.contains(QStringLiteral("\nName=Example 100%\n")));
     QVERIFY(entry.contains(QStringLiteral("\nExec=\"/opt/Space Penguin/AppRun\" --app=example-com-abc123\n")));
     QVERIFY(entry.contains(QStringLiteral("\nIcon=/icons/a.png\n")));
+}
+
+void TestRoles::searchTemplates()
+{
+    QCOMPARE(Preferences::normalizeSearchTemplate(QStringLiteral(" https://example.com/find?q=%s ")),
+             QStringLiteral("https://example.com/find?q={query}"));
+    QCOMPARE(Preferences::normalizeSearchTemplate(QStringLiteral("https://example.com/?q={query}")),
+             QStringLiteral("https://example.com/?q={query}"));
+    QVERIFY(Preferences::normalizeSearchTemplate(QStringLiteral("https://example.com/")).isEmpty());
+    QVERIFY(Preferences::normalizeSearchTemplate(QStringLiteral("javascript:alert(%s)")).isEmpty());
+    QVERIFY(Preferences::normalizeSearchTemplate(QStringLiteral("example.com/?q=%s")).isEmpty());
+}
+
+void TestRoles::onions()
+{
+    QVERIFY(Tor::isOnion(QUrl(QStringLiteral("http://abc.onion/path"))));
+    QVERIFY(Tor::isOnion(QUrl(QStringLiteral("https://www.ABC.ONION/"))));
+    QVERIFY(!Tor::isOnion(QUrl(QStringLiteral("https://onion.example.com/"))));
+    QCOMPARE(Tor::searchTemplate(QStringLiteral("https://duckduckgo.com/?q={query}")).section(QLatin1Char('/'), 2, 2)
+                 .endsWith(QLatin1String(".onion")),
+             true);
+    QCOMPARE(Tor::searchTemplate(QStringLiteral("https://www.bing.com/search?q={query}")),
+             QStringLiteral("https://www.bing.com/search?q={query}"));
 }
 
 QTEST_GUILESS_MAIN(TestRoles)

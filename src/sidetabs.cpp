@@ -1,6 +1,7 @@
 #include "sidetabs.h"
 
 #include "icons.h"
+#include "tor.h"
 #include "tabbar.h"
 #include "tabgroups.h"
 #include "theme.h"
@@ -203,7 +204,7 @@ SideTabs::SideTabs(TabBar *tabs, TabGroups *groups, QAction *newTabAction, bool 
         m_privateIcon = new QLabel;
         m_privateIcon->setPixmap(Icons::icon(Icons::Private).pixmap(18, 18));
         m_privateIcon->setToolTip(tr("Private window: nothing from it is written to disk"));
-        m_privateLabel = new QLabel(tr("Private"));
+        m_privateLabel = new QLabel(Tor::isActive() ? tr("Private · Tor") : tr("Private"));
         m_privateLabel->setObjectName(QStringLiteral("privateBadge"));
         badge->addWidget(m_privateIcon);
         badge->addWidget(m_privateLabel, 1);

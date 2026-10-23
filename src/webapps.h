@@ -58,8 +58,9 @@ public:
     static WebApp fromManifest(const QByteArray &json, const QUrl &manifestUrl, const QUrl &pageUrl,
                                QUrl *iconUrl = nullptr);
 
-    /** The command a launcher runs to start this SpacePenguin. */
-    static QString launcherProgram();
+    /** The program and arguments that start this SpacePenguin again (an AppImage,
+     *  an unpacked AppImage, a Flatpak or a plain binary). */
+    static QStringList launcherCommand();
     /** The Linux launcher for @p app (a .desktop file). Exposed for testing. */
     static QString desktopEntry(const WebApp &app, const QString &program, const QString &iconPath);
 

@@ -81,6 +81,14 @@ void TestUrlResolver::resolve_data()
                                     << QStringLiteral("https://example.com/a");
     QTest::newRow("localhost") << QStringLiteral("localhost:3000")
                                << QStringLiteral("https://localhost:3000");
+    QTest::newRow("onion is http") << QStringLiteral("duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/about")
+                                   << QStringLiteral("http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/about");
+    QTest::newRow("onion https kept") << QStringLiteral("https://example.onion")
+                                      << QStringLiteral("https://example.onion");
+    QTest::newRow("onion is http") << QStringLiteral("duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/about")
+                                   << QStringLiteral("http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/about");
+    QTest::newRow("onion https kept") << QStringLiteral("https://example.onion")
+                                      << QStringLiteral("https://example.onion");
     QTest::newRow("protocol relative") << QStringLiteral("//example.com")
                                        << QStringLiteral("https://example.com");
     QTest::newRow("about index") << QStringLiteral("about:")

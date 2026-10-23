@@ -1,6 +1,7 @@
 #include "settingsdialog.h"
 
 #include "adblocker.h"
+#include "classroom.h"
 #include "filterlists.h"
 #include "updatechecker.h"
 #include "bookmarkmanager.h"
@@ -12,6 +13,7 @@
 #include "preferences.h"
 #include "roles.h"
 #include "theme.h"
+#include "tor.h"
 #include "userextensions.h"
 #include "webapps.h"
 
@@ -26,6 +28,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QHeaderView>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -37,7 +40,9 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QStackedWidget>
+#include <QTableWidget>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -239,60 +244,85 @@ QWidget *SettingsDialog::createGeneralTab()
     layout->addWidget(mutedLabel(tr("Opened by the Home button and in every new tab.")));
 
     layout->addWidget(sectionTitle(tr("Search engine")));
+    auto *engineRow = new QHBoxLayout;
     auto *engineCombo = new QComboBox;
-    const QString currentTemplate = preferences->searchTemplate();
-    int currentIndex = -1;
-    for (const SearchEngine &engine : Preferences::searchEngines()) {
-        engineCombo->addItem(engine.name, engine.searchTemplate);
-        if (engine.searchTemplate == currentTemplate)
-            currentIndex = engineCombo->count() - 1;
-    }
-    engineCombo->addItem(tr("Custom…"), QString());
-    const int customIndex = engineCombo->count() - 1;
+    auto *addEngine = new QPushButton(Icons::icon(Icons::Plus), tr("Add…"));
+    auto *removeEngine = new QPushButton(Icons::icon(Icons::Trash), tr("Remove"));
+    engineRow->addWidget(engineCombo, 1);
+    engineRow->addWidget(addEngine);
+    engineRow->addWidget(removeEngine);
+    layout->addLayout(engineRow);
 
-    auto *customEdit = new QLineEdit;
-    customEdit->setPlaceholderText(QStringLiteral("https://example.com/search?q={query}"));
-    customEdit->setVisible(currentIndex < 0);
-    if (currentIndex < 0) {
-        customEdit->setText(currentTemplate);
-        currentIndex = customIndex;
-    }
-    engineCombo->setCurrentIndex(currentIndex);
-
-    auto *customHint = mutedLabel(tr("Use {query} where the search terms go."));
-    customHint->setVisible(customEdit->isVisible());
-
-    connect(engineCombo, &QComboBox::currentIndexChanged, this,
-            [engineCombo, customEdit, customHint, customIndex](int index) {
-                const bool custom = index == customIndex;
-                customEdit->setVisible(custom);
-                customHint->setVisible(custom);
-                if (!custom)
-                    Preferences::instance()->setSearchTemplate(
-                        engineCombo->itemData(index).toString());
-                else
-                    customEdit->setFocus();
-            });
-    connect(customEdit, &QLineEdit::editingFinished, this, [this, customEdit] {
-        const QString text = customEdit->text().trimmed();
-        if (text.isEmpty())
-            return;
-        const QUrl url(text);
-        if (!text.contains(QLatin1String("{query}"))
-            || (url.scheme() != QLatin1String("https") && url.scheme() != QLatin1String("http"))) {
-            QMessageBox::warning(this, tr("Search engine"),
-                                 tr("A custom search address must start with https:// and "
-                                    "contain {query}."));
-            return;
+    // The list: built-in engines, then added ones (data: template, and whether added).
+    const auto fillEngines = [engineCombo, removeEngine] {
+        const QSignalBlocker blocker(engineCombo);
+        engineCombo->clear();
+        const QString current = Preferences::instance()->searchTemplate();
+        for (const SearchEngine &engine : Preferences::builtInSearchEngines())
+            engineCombo->addItem(engine.name, engine.searchTemplate);
+        const QList<SearchEngine> added = Preferences::addedSearchEngines();
+        if (!added.isEmpty())
+            engineCombo->insertSeparator(engineCombo->count());
+        for (const SearchEngine &engine : added)
+            engineCombo->addItem(engine.name, engine.searchTemplate);
+        int index = engineCombo->findData(current);
+        if (index < 0) {
+            // An address typed in an earlier version: shown under its site's name.
+            engineCombo->addItem(QUrl(current).host(), current);
+            index = engineCombo->count() - 1;
         }
-        Preferences::instance()->setSearchTemplate(text);
+        engineCombo->setCurrentIndex(index);
+        bool isAdded = false;
+        for (const SearchEngine &engine : added)
+            isAdded = isAdded || engine.searchTemplate == current;
+        removeEngine->setEnabled(isAdded);
+    };
+    fillEngines();
+    connect(engineCombo, &QComboBox::currentIndexChanged, this, [engineCombo, fillEngines](int index) {
+        Preferences::instance()->setSearchTemplate(engineCombo->itemData(index).toString());
+        // Refilled once the combo box is done announcing the change.
+        QTimer::singleShot(0, engineCombo, fillEngines);
+    });
+    connect(addEngine, &QPushButton::clicked, this, [this, fillEngines] {
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Add Search Engine"));
+        auto *form = new QFormLayout(&dialog);
+        auto *name = new QLineEdit;
+        name->setPlaceholderText(tr("Example Search"));
+        auto *address = new QLineEdit;
+        address->setPlaceholderText(QStringLiteral("https://example.com/search?q=%s"));
+        address->setMinimumWidth(360);
+        form->addRow(tr("Name"), name);
+        form->addRow(tr("Address"), address);
+        form->addRow(QString(), mutedLabel(tr("Search the site for anything, then copy the address of the "
+                                              "results and put %s (or {query}) where your words were.")));
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
+        buttons->addButton(tr("Add"), QDialogButtonBox::AcceptRole);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, [&dialog, name, address] {
+            const QString searchTemplate = Preferences::normalizeSearchTemplate(address->text());
+            if (searchTemplate.isEmpty()) {
+                QMessageBox::warning(&dialog, tr("Add Search Engine"),
+                                     tr("The address must start with https:// and contain %s or {query}."));
+                return;
+            }
+            const QString title = name->text().trimmed().isEmpty() ? QUrl(searchTemplate).host()
+                                                                    : name->text().trimmed();
+            Preferences::instance()->addSearchEngine(title, searchTemplate);
+            Preferences::instance()->setSearchTemplate(searchTemplate);
+            dialog.accept();
+        });
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        form->addRow(buttons);
+        dialog.exec();
+        fillEngines();
+    });
+    connect(removeEngine, &QPushButton::clicked, this, [fillEngines] {
+        Preferences::instance()->removeSearchEngine(Preferences::instance()->searchTemplate());
+        fillEngines();
     });
 
-    layout->addWidget(engineCombo);
-    layout->addWidget(customEdit);
-    layout->addWidget(customHint);
     layout->addWidget(mutedLabel(tr("Anything typed in the address bar that is not an "
-                                    "address is sent here.")));
+                                    "address is sent here. Switch quickly from the menu (Search With).")));
     layout->addStretch(1);
     return page;
 }
@@ -614,6 +644,26 @@ QWidget *SettingsDialog::createPrivacyTab()
     dataButtons->addStretch(1);
     layout->addLayout(dataButtons);
 
+    layout->addWidget(sectionTitle(tr("Tor windows")));
+    layout->addWidget(mutedLabel(
+        tr("A Tor window is a private window whose pages all go through the Tor network: sites don't see "
+           "your address, and .onion sites open. Normal and private windows never use Tor. It is not Tor "
+           "Browser: sites can still tell this browser apart, so it keeps your address, not your identity, "
+           "to yourself. Searches with DuckDuckGo use its onion site.")));
+    layout->addWidget(mutedLabel(tr("It uses the Tor already running on this computer, or starts the tor "
+                                    "program. %1")
+                                     .arg(Tor::installHint())));
+    auto *torButton = new QPushButton(Icons::icon(Icons::Private), tr("Open a Tor Window"));
+    connect(torButton, &QPushButton::clicked, this, [this] {
+        QString error;
+        if (!Tor::openWindow({}, &error))
+            QMessageBox::warning(this, tr("Tor windows"), error);
+    });
+    auto *torRow = new QHBoxLayout;
+    torRow->addWidget(torButton);
+    torRow->addStretch(1);
+    layout->addLayout(torRow);
+
     layout->addWidget(sectionTitle(tr("Built-in protections")));
     layout->addWidget(mutedLabel(
         tr("Always on: websites cannot open local files or javascript: links, no mixed "
@@ -798,6 +848,291 @@ QPlainTextEdit *lineListEdit(const QStringList &lines, const QString &placeholde
     return edit;
 }
 
+
+/** Student mode: joining the teacher's class, and where it stands. */
+void addStudentClass(QVBoxLayout *layout, QWidget *owner)
+{
+    Classroom *classroom = Classroom::instance();
+    auto *status = new QLabel;
+    status->setWordWrap(true);
+    status->setTextFormat(Qt::RichText);
+    layout->addWidget(status);
+
+    auto *joinBox = new QWidget;
+    auto *join = new QHBoxLayout(joinBox);
+    join->setContentsMargins(0, 0, 0, 0);
+    auto *name = new QLineEdit(classroom->studentName());
+    name->setPlaceholderText(SettingsDialog::tr("Your name"));
+    name->setMaxLength(40);
+    auto *code = new QLineEdit;
+    code->setPlaceholderText(SettingsDialog::tr("Class code"));
+    auto *joinButton = new QPushButton(SettingsDialog::tr("Join Class"));
+    join->addWidget(name, 1);
+    join->addWidget(code, 1);
+    join->addWidget(joinButton);
+    layout->addWidget(joinBox);
+    auto *leaveButton = new QPushButton;
+    auto *leaveRow = new QHBoxLayout;
+    leaveRow->addWidget(leaveButton);
+    leaveRow->addStretch(1);
+    layout->addLayout(leaveRow);
+    auto *hint = mutedLabel(SettingsDialog::tr("Your teacher gives the code. If the class isn't found, they "
+                                               "can give it as code@address."));
+    layout->addWidget(hint);
+
+    const auto update = [classroom, status, joinBox, leaveButton, hint] {
+        const bool in = classroom->inClass();
+        joinBox->setVisible(!in);
+        hint->setVisible(!in);
+        leaveButton->setVisible(in);
+        // Leaving is the teacher's to allow, unless their computer has been away for long.
+        leaveButton->setText(classroom->canLeaveFreely() ? SettingsDialog::tr("Leave Class")
+                                                         : SettingsDialog::tr("Ask to Leave"));
+        if (!in) {
+            status->setText(SettingsDialog::tr("Not in a class."));
+            return;
+        }
+        status->setText(SettingsDialog::tr("In <b>%1</b> as %2. %3 %4")
+                            .arg(classroom->joinedClassName().toHtmlEscaped(), classroom->studentName().toHtmlEscaped(),
+                                 SettingsDialog::tr("%n site(s) blocked by your teacher.", nullptr,
+                                                    classroom->joinedSiteCount()),
+                                 classroom->teacherReachable()
+                                     ? SettingsDialog::tr("Connected.")
+                                     : SettingsDialog::tr("The teacher's computer isn't answering; the last list "
+                                                          "still applies.")));
+    };
+    update();
+    QObject::connect(classroom, &Classroom::changed, status, update);
+    QObject::connect(joinButton, &QPushButton::clicked, owner, [classroom, name, code, joinButton] {
+        if (name->text().trimmed().isEmpty()) {
+            name->setFocus();
+            return;
+        }
+        joinButton->setEnabled(false);
+        joinButton->setText(SettingsDialog::tr("Looking for the class…"));
+        classroom->join(code->text(), name->text());
+    });
+    QObject::connect(classroom, &Classroom::joinFinished, joinButton, [owner, joinButton, update](bool ok, const QString &message) {
+        joinButton->setEnabled(true);
+        joinButton->setText(SettingsDialog::tr("Join Class"));
+        if (!ok)
+            QMessageBox::warning(owner, SettingsDialog::tr("Join Class"), message);
+        update();
+    });
+    QObject::connect(leaveButton, &QPushButton::clicked, owner, [owner, classroom, leaveButton] {
+        if (classroom->canLeaveFreely()) {
+            if (QMessageBox::question(owner, SettingsDialog::tr("Leave Class"),
+                                      SettingsDialog::tr("Your teacher's computer hasn't answered in two weeks. "
+                                                         "Leave %1?").arg(classroom->joinedClassName()))
+                == QMessageBox::Yes)
+                classroom->leave();
+            return;
+        }
+        leaveButton->setEnabled(false);
+        auto connection = std::make_shared<QMetaObject::Connection>();
+        *connection = QObject::connect(classroom, &Classroom::askFinished, leaveButton,
+                                       [owner, leaveButton, connection](bool ok) {
+            QObject::disconnect(*connection);
+            leaveButton->setEnabled(true);
+            QMessageBox::information(owner, SettingsDialog::tr("Ask to Leave"),
+                                     ok ? SettingsDialog::tr("Your teacher has your request. When they let you go, "
+                                                             "you leave the class by yourself.")
+                                        : SettingsDialog::tr("Your teacher's computer didn't answer. Try again later."));
+        });
+        classroom->askToLeave();
+    });
+}
+
+/** Teacher mode: the class, its blocked sites, its students and their requests. */
+void addTeacherClass(QVBoxLayout *layout, QWidget *owner)
+{
+    Classroom *classroom = Classroom::instance();
+    auto *open = new QCheckBox(SettingsDialog::tr("Class is open: students on this network can join"));
+    open->setChecked(classroom->classOpen());
+    QObject::connect(open, &QCheckBox::toggled, owner, [classroom](bool on) { classroom->setClassOpen(on); });
+    layout->addWidget(open);
+
+    auto *nameRow = new QHBoxLayout;
+    nameRow->addWidget(new QLabel(SettingsDialog::tr("Class name")));
+    auto *name = new QLineEdit(classroom->className());
+    name->setMaxLength(60);
+    QObject::connect(name, &QLineEdit::editingFinished, owner, [classroom, name] { classroom->setClassName(name->text()); });
+    nameRow->addWidget(name, 1);
+    layout->addLayout(nameRow);
+
+    auto *codeRow = new QHBoxLayout;
+    auto *codeLabel = new QLabel;
+    codeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    codeLabel->setTextFormat(Qt::RichText);
+    auto *newCode = new QPushButton(SettingsDialog::tr("New Code"));
+    QObject::connect(newCode, &QPushButton::clicked, owner, [owner, classroom] {
+        if (confirm(owner, SettingsDialog::tr("New Code"),
+                    SettingsDialog::tr("Students who joined with the old code will have to join again.")))
+            classroom->newCode();
+    });
+    codeRow->addWidget(codeLabel, 1);
+    codeRow->addWidget(newCode);
+    layout->addLayout(codeRow);
+    auto *where = mutedLabel(QString());
+    where->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    layout->addWidget(where);
+
+    // The blocked sites, with the reason students see.
+    auto *table = new QTableWidget(0, 2);
+    table->setHorizontalHeaderLabels({SettingsDialog::tr("Site"), SettingsDialog::tr("Reason students see")});
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    table->horizontalHeader()->setStretchLastSection(true);
+    table->verticalHeader()->hide();
+    table->setMinimumHeight(180);
+    layout->addWidget(table);
+    auto *tableButtons = new QHBoxLayout;
+    auto *add = new QPushButton(Icons::icon(Icons::Plus), SettingsDialog::tr("Block a Site"));
+    auto *remove = new QPushButton(Icons::icon(Icons::Trash), SettingsDialog::tr("Remove"));
+    auto *count = new QLabel;
+    count->setProperty("muted", true);
+    tableButtons->addWidget(add);
+    tableButtons->addWidget(remove);
+    tableButtons->addStretch(1);
+    tableButtons->addWidget(count);
+    layout->addLayout(tableButtons);
+
+    auto *students = new QLabel;
+    students->setWordWrap(true);
+    layout->addWidget(students);
+    auto *requests = new QListWidget;
+    requests->setMaximumHeight(110);
+    layout->addWidget(requests);
+    auto *answerRow = new QHBoxLayout;
+    auto *allowOne = new QPushButton(SettingsDialog::tr("Allow for Student"));
+    auto *allowAll = new QPushButton(SettingsDialog::tr("Allow for Everyone"));
+    auto *decline = new QPushButton(SettingsDialog::tr("Decline"));
+    answerRow->addWidget(allowOne);
+    answerRow->addWidget(allowAll);
+    answerRow->addWidget(decline);
+    answerRow->addStretch(1);
+    layout->addLayout(answerRow);
+    layout->addWidget(mutedLabel(SettingsDialog::tr(
+        "Only students who join are affected, and only on the sites you list; your own browsing isn't "
+        "restricted. This is a classroom tool, not device management: students can leave the class, and "
+        "you see who is in it.")));
+
+    auto saving = std::make_shared<bool>(false);
+    const auto fillTable = [classroom, table, count, remove, add, saving] {
+        if (*saving)
+            return;
+        const QSignalBlocker blocker(table);
+        const QList<BlockedSite> sites = classroom->blockedSites();
+        table->setRowCount(int(sites.size()));
+        for (int row = 0; row < sites.size(); ++row) {
+            table->setItem(row, 0, new QTableWidgetItem(sites.at(row).site));
+            table->setItem(row, 1, new QTableWidgetItem(sites.at(row).reason));
+        }
+        count->setText(SettingsDialog::tr("%1 of %2").arg(sites.size()).arg(Classroom::kMaxSites));
+        add->setEnabled(sites.size() < Classroom::kMaxSites);
+        remove->setEnabled(!sites.isEmpty());
+    };
+    const auto saveTable = [classroom, table, saving] {
+        QList<BlockedSite> sites;
+        for (int row = 0; row < table->rowCount(); ++row) {
+            const QTableWidgetItem *site = table->item(row, 0);
+            const QTableWidgetItem *reason = table->item(row, 1);
+            if (site && !site->text().trimmed().isEmpty())
+                sites.append({site->text(), reason ? reason->text() : QString()});
+        }
+        *saving = true;
+        classroom->setBlockedSites(sites);
+        *saving = false;
+    };
+    QObject::connect(table, &QTableWidget::itemChanged, owner, [saveTable, fillTable](QTableWidgetItem *item) {
+        saveTable();
+        // A site typed as an address is shown as it was kept: "youtube.com".
+        if (item->column() == 0)
+            QTimer::singleShot(0, item->tableWidget(), fillTable);
+    });
+    QObject::connect(add, &QPushButton::clicked, owner, [table] {
+        const int row = table->rowCount();
+        table->insertRow(row);
+        table->setItem(row, 1, new QTableWidgetItem);
+        auto *site = new QTableWidgetItem;
+        table->setItem(row, 0, site);
+        table->setCurrentItem(site);
+        table->editItem(site);
+    });
+    QObject::connect(remove, &QPushButton::clicked, owner, [table, saveTable, fillTable] {
+        const int row = table->currentRow();
+        if (row < 0)
+            return;
+        table->removeRow(row);
+        saveTable();
+        fillTable();
+    });
+
+    const auto selectedRequest = [requests] {
+        const QListWidgetItem *item = requests->currentItem();
+        return item ? item->data(Qt::UserRole).toString() : QString();
+    };
+    QObject::connect(allowOne, &QPushButton::clicked, owner, [classroom, selectedRequest] {
+        classroom->answer(selectedRequest(), Classroom::Answer::AllowStudent);
+    });
+    QObject::connect(allowAll, &QPushButton::clicked, owner, [classroom, selectedRequest] {
+        classroom->answer(selectedRequest(), Classroom::Answer::AllowEveryone);
+    });
+    QObject::connect(decline, &QPushButton::clicked, owner, [classroom, selectedRequest] {
+        classroom->answer(selectedRequest(), Classroom::Answer::Decline);
+    });
+
+    const auto update = [classroom, codeLabel, where, newCode, students, requests, allowOne, allowAll, decline, fillTable] {
+        const bool open = classroom->classOpen();
+        newCode->setEnabled(open);
+        if (!open) {
+            codeLabel->setText(SettingsDialog::tr("Open the class to get its code."));
+            where->clear();
+        } else {
+            codeLabel->setText(SettingsDialog::tr("Class code: <b style=\"font-size:16pt;letter-spacing:2px\">%1</b>")
+                                   .arg(classroom->code()));
+            QStringList manual;
+            for (const QString &address : Classroom::localAddresses())
+                manual.append(classroom->port() && classroom->port() != Classroom::kHttpPort
+                                  ? QStringLiteral("%1@%2:%3").arg(classroom->code(), address).arg(classroom->port())
+                                  : QStringLiteral("%1@%2").arg(classroom->code(), address));
+            where->setText(!classroom->serving()
+                               ? SettingsDialog::tr("The class could not open on this computer's network ports.")
+                               : manual.isEmpty() ? SettingsDialog::tr("This computer is not on a network.")
+                                                  : SettingsDialog::tr("Students type the code. Where the network "
+                                                                       "keeps devices apart, they type %1.")
+                                                        .arg(manual.join(SettingsDialog::tr(" or "))));
+        }
+        QStringList names;
+        const QDateTime now = QDateTime::currentDateTime();
+        for (const ClassStudent &student : classroom->students()) {
+            const qint64 minutes = student.lastSeen.secsTo(now) / 60;
+            names.append(minutes < 1 ? student.name
+                                     : SettingsDialog::tr("%1 (%2 min ago)").arg(student.name).arg(minutes));
+        }
+        students->setText(names.isEmpty() ? SettingsDialog::tr("No students have joined yet.")
+                                          : SettingsDialog::tr("Students: %1").arg(names.join(QStringLiteral(", "))));
+        requests->clear();
+        for (const UnblockRequest &request : classroom->requests()) {
+            auto *item = new QListWidgetItem(
+                request.leave          ? SettingsDialog::tr("%1 asks to leave the class").arg(request.student)
+                : request.note.isEmpty() ? SettingsDialog::tr("%1 asks for %2").arg(request.student, request.site)
+                                       : SettingsDialog::tr("%1 asks for %2: “%3”").arg(request.student, request.site, request.note),
+                requests);
+            item->setData(Qt::UserRole, request.id);
+        }
+        if (requests->count() == 0)
+            new QListWidgetItem(SettingsDialog::tr("No requests to unblock."), requests);
+        else
+            requests->setCurrentRow(0);
+        const bool any = !classroom->requests().isEmpty();
+        allowOne->setEnabled(any);
+        allowAll->setEnabled(any);
+        decline->setEnabled(any);
+        fillTable();
+    };
+    update();
+    QObject::connect(classroom, &Classroom::changed, codeLabel, update);
+}
 } // namespace
 
 QWidget *SettingsDialog::createRolesTab()
@@ -882,6 +1217,7 @@ QWidget *SettingsDialog::createRolesTab()
 
     QVBoxLayout *studentLayout = nullptr;
     QWidget *student = panel(tr("Student"), &studentLayout);
+    addStudentClass(studentLayout, this);
     studentLayout->addWidget(mutedLabel(tr("Copy Citation (Ctrl+Alt+C, or in the menu) puts a reference "
                                            "to the page on the clipboard: its title, site, address and "
                                            "today's date.")));
@@ -902,6 +1238,7 @@ QWidget *SettingsDialog::createRolesTab()
 
     QVBoxLayout *teacherLayout = nullptr;
     QWidget *teacher = panel(tr("Teacher"), &teacherLayout);
+    addTeacherClass(teacherLayout, this);
     auto *zoomRow = new QHBoxLayout;
     zoomRow->addWidget(new QLabel(tr("Pages open at")));
     auto *zoom = new QComboBox;
@@ -938,6 +1275,15 @@ QWidget *SettingsDialog::createRolesTab()
     };
     for (QCheckBox *box : boxes)
         connect(box, &QCheckBox::toggled, this, [sync] { Preferences::instance()->setRoles(sync()); });
+    // In a class, student mode stays on until the teacher lets the student go.
+    QCheckBox *studentBox = boxes.value(Roles::Role::Student);
+    const auto lockStudent = [studentBox] {
+        const bool locked = Classroom::instance()->locked();
+        studentBox->setEnabled(!locked);
+        studentBox->setToolTip(locked ? tr("You're in a class: ask your teacher to let you leave first.") : QString());
+    };
+    lockStudent();
+    connect(Classroom::instance(), &Classroom::changed, studentBox, lockStudent);
     sync();
 
     layout->addStretch(1);
