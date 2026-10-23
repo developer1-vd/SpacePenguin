@@ -132,4 +132,17 @@ QString citation(const QString &title, const QUrl &url, const QDate &accessed)
         .arg(name, site, url.toString(QUrl::RemoveUserInfo), date);
 }
 
+QStringList gamerFlags(bool gpuBoost, bool uncapFrameRate, bool fpsCounter, bool gpuOff)
+{
+    QStringList flags;
+    if (gpuBoost && !gpuOff)
+        flags << QStringLiteral("--ignore-gpu-blocklist") << QStringLiteral("--enable-gpu-rasterization")
+              << QStringLiteral("--enable-zero-copy");
+    if (uncapFrameRate)
+        flags << QStringLiteral("--disable-frame-rate-limit") << QStringLiteral("--disable-gpu-vsync");
+    if (fpsCounter)
+        flags << QStringLiteral("--show-fps-counter");
+    return flags;
+}
+
 }

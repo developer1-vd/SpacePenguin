@@ -101,10 +101,16 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
 - **Reader view** — `F9` shows a page's article alone, in clean type
 - **Made for you** — *Settings › Made for you* asks what you use SpacePenguin for, and
   each role you pick adds its own settings and tools (pick as many as fit):
-  - *Developer*: developer tools (`F12`, `Ctrl`+`Shift`+`I`), page source
-    (`Ctrl`+`U`), browsing without the cache, a user agent of your own
-  - *Gamer*: games lock the mouse pointer without asking (`Esc` gives it back), and
-    the other tabs go quiet while a game is full screen
+  - *Developer*: developer tools (`F12`, `Ctrl`+`Shift`+`I`) docked at the bottom or
+    on the right of the window (or in their own), following the tab in front; the
+    JavaScript console (`Ctrl`+`Shift`+`J`); *Inspect* in the page's right-click
+    menu; page source (`Ctrl`+`U`); browsing without the cache; a user agent of your
+    own
+  - *Gamer*: games lock the mouse pointer without asking (`Esc` gives it back); while
+    a game is full screen the other tabs go quiet and pause, leaving the computer to
+    the game; GPU drawing even on graphics chips Chromium distrusts, an uncapped
+    frame rate for fast screens and an FPS counter (from the next start; never where
+    SpacePenguin had to turn the GPU off)
   - *Teacher mode*: runs a class on the school network. Block up to 100 sites for the
     students who join, each with a reason they see; answer their requests to unblock
     (for that student, for everyone, or not) from a bar above the page. The teacher's
@@ -401,6 +407,7 @@ the desktop — macOS gets the binding Safari and Chrome use there instead.
 | Reader view           | `F9`                            | `F9`                          |
 | Mute tab              | `Ctrl+M`                        | `⌃M`                          |
 | Developer tools ¹     | `F12`, `Ctrl+Shift+I`           | `⌥⌘I`, `F12`                  |
+| JavaScript console ¹  | `Ctrl+Shift+J`                  | `⌥⌘J`                         |
 | Page source ¹         | `Ctrl+U`                        | `⌘U`                          |
 | Copy citation ²       | `Ctrl+Alt+C`                    | `⌥⌘C`                         |
 | Open file             | `Ctrl+O`                        | `⌘O`                          |

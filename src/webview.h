@@ -4,6 +4,7 @@
 
 #include <functional>
 
+class QContextMenuEvent;
 class QWebEngineProfile;
 
 namespace spacepenguin {
@@ -31,8 +32,14 @@ public:
     int loadProgress() const { return m_progress; }
     bool lastLoadFailed() const { return m_failed; }
 
+signals:
+    /** Developer mode: Inspect was chosen in the page's context menu. */
+    void inspectRequested();
+
 protected:
     QWebEngineView *createWindow(QWebEnginePage::WebWindowType type) override;
+    /** The standard menu; Inspect only for developers, opening the window's developer tools. */
+    void contextMenuEvent(QContextMenuEvent *event) override;
 
 private:
     WebView *openDialog();

@@ -1,8 +1,27 @@
 #include "webview.h"
 
 #include "browserpage.h"
+#include "preferences.h"
+#include "roles.h"
+
+#include <QContextMenuEvent>
+#include <QMenu>
 
 namespace spacepenguin {
+
+void WebView::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu *menu = createStandardContextMenu();
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    // Qt's own Inspect needs developer tools already attached; the window attaches them.
+    menu->removeAction(pageAction(QWebEnginePage::InspectElement));
+    if (Preferences::instance()->hasRole(Roles::key(Roles::Role::Developer))) {
+        menu->addSeparator();
+        QAction *inspect = menu->addAction(tr("Inspect"));
+        connect(inspect, &QAction::triggered, this, &WebView::inspectRequested);
+    }
+    menu->popup(event->globalPos());
+}
 
 WebView::WebView(QWebEngineProfile *profile, QWidget *parent)
     : QWebEngineView(parent)

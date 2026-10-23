@@ -97,6 +97,23 @@ public:
     QString userAgent() const;
     void setUserAgent(const QString &userAgent);
 
+    /** Developer: where the developer tools open: "bottom", "right" or "window". */
+    QString devToolsDock() const;
+    void setDevToolsDock(const QString &dock);
+
+    /** Gamer: GPU drawing even on graphics chips Chromium distrusts (from the next start). */
+    bool gpuBoost() const;
+    void setGpuBoost(bool boost);
+    /** Gamer: no 60 fps cap, for high refresh rate screens (from the next start). */
+    bool uncapFrameRate() const;
+    void setUncapFrameRate(bool uncap);
+    /** Gamer: Chromium's frame rate counter over pages (from the next start). */
+    bool showFpsCounter() const;
+    void setShowFpsCounter(bool show);
+    /** Gamer: the other tabs are paused while a game is full screen. */
+    bool pauseOthersInFullScreen() const;
+    void setPauseOthersInFullScreen(bool pause);
+
     /** Gamer: games may hide and lock the mouse pointer without asking. */
     bool allowPointerLock() const;
     void setAllowPointerLock(bool allow);

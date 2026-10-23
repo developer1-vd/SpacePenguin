@@ -16,7 +16,9 @@
 #include "classroom.h"
 #include "devicetuning.h"
 #include "icons.h"
+#include "preferences.h"
 #include "profiles.h"
+#include "roles.h"
 #include "sandbox.h"
 #include "singleinstance.h"
 #include "startuptrace.h"
@@ -135,6 +137,19 @@ int main(int argc, char *argv[])
     }
 
     spacepenguin::StartupTrace::mark("single-instance check done");
+    // Gamer mode's Chromium switches, read once: they take effect from this start.
+    {
+        spacepenguin::Preferences *preferences = spacepenguin::Preferences::instance();
+        QStringList flags = qEnvironmentVariable("QTWEBENGINE_CHROMIUM_FLAGS").split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        const QStringList gamer = preferences->hasRole(spacepenguin::Roles::key(spacepenguin::Roles::Role::Gamer))
+            ? spacepenguin::Roles::gamerFlags(preferences->gpuBoost(), preferences->uncapFrameRate(),
+                                              preferences->showFpsCounter(),
+                                              flags.contains(QStringLiteral("--disable-gpu")))
+            : QStringList();
+        qApp->setProperty("spacepenguin.gamerFlags", gamer);
+        if (!gamer.isEmpty())
+            qputenv("QTWEBENGINE_CHROMIUM_FLAGS", (flags + gamer).join(QLatin1Char(' ')).toLocal8Bit());
+    }
     // Teacher and student mode talk over the school network; the Tor process never does.
     if (!torMode)
         spacepenguin::Classroom::instance()->start();

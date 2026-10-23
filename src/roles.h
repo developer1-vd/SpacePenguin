@@ -38,6 +38,12 @@ bool isBlocked(const QUrl &url, const QStringList &sites);
 /** The page shown in place of a site that Focus mode keeps away. */
 QString blockedPage(const QUrl &url);
 
+/**
+ * Chromium switches for gamer mode: GPU drawing on distrusted chips (@p gpuBoost,
+ * never where @p gpuOff says the GPU is off), no frame rate cap, the FPS counter.
+ */
+QStringList gamerFlags(bool gpuBoost, bool uncapFrameRate, bool fpsCounter, bool gpuOff);
+
 /** A reference to a web page: Title. Site. URL (accessed 21 October 2026). */
 QString citation(const QString &title, const QUrl &url, const QDate &accessed);
 

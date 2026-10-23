@@ -81,6 +81,7 @@
 #include <QSet>
 #include <QSettings>
 #include <QShortcut>
+#include <QSplitter>
 #include <QStackedWidget>
 #include <QStandardItemModel>
 #include <QStyle>
@@ -611,7 +612,13 @@ void BrowserWindow::createActions()
     m_devToolsAction = makeAction(tr("Developer Tools"),
                                   {QKeySequence(Qt::Key_F12), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I)});
 #endif
-    connect(m_devToolsAction, &QAction::triggered, this, &BrowserWindow::openDevTools);
+    connect(m_devToolsAction, &QAction::triggered, this, [this] { openDevTools(); });
+#ifdef Q_OS_MACOS
+    m_consoleAction = makeAction(tr("JavaScript Console"), {QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_J)});
+#else
+    m_consoleAction = makeAction(tr("JavaScript Console"), {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_J)});
+#endif
+    connect(m_consoleAction, &QAction::triggered, this, [this] { openDevTools(DevToolsPanel::Console); });
     m_viewSourceAction = makeAction(tr("View Page Source"), {QKeySequence(Qt::CTRL | Qt::Key_U)});
     connect(m_viewSourceAction, &QAction::triggered, this, [this] {
         if (WebView *view = currentView(); view && !view->url().isEmpty())
@@ -693,7 +700,11 @@ void BrowserWindow::createChrome()
     contentLayout->setContentsMargins(0, 0, 0, 0);
     contentLayout->setSpacing(0);
     m_stack = new QStackedWidget;
-    contentLayout->addWidget(m_stack);
+    // The pages, and docked developer tools below or beside them.
+    m_contentSplitter = new QSplitter(Qt::Vertical);
+    m_contentSplitter->setChildrenCollapsible(false);
+    m_contentSplitter->addWidget(m_stack);
+    contentLayout->addWidget(m_contentSplitter);
     m_progressBar->setParent(content);
     content->installEventFilter(this);
 
@@ -1101,6 +1112,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_workPagesAction);
     menu->addAction(m_citationAction);
     menu->addAction(m_devToolsAction);
+    menu->addAction(m_consoleAction);
     menu->addAction(m_viewSourceAction);
     menu->addSeparator();
 
@@ -1217,6 +1229,7 @@ void BrowserWindow::createMenus()
     toolsMenu->addAction(m_workPagesAction);
     toolsMenu->addAction(m_citationAction);
     toolsMenu->addAction(m_devToolsAction);
+    toolsMenu->addAction(m_consoleAction);
     toolsMenu->addAction(m_viewSourceAction);
     toolsMenu->addSeparator();
     QAction *blockingAction = toolsMenu->addAction(Icons::icon(Icons::Shield), tr("Ad Blocking"));
@@ -3288,6 +3301,24 @@ void BrowserWindow::connectView(WebView *view)
                     }
                     m_mutedForFullScreen.clear();
                 }
+                // Gamer: the other tabs pause too, so the game has the computer to itself.
+                if (request.toggleOn() && preferences->hasRole(Roles::key(Roles::Role::Gamer))
+                    && preferences->pauseOthersInFullScreen()) {
+                    for (int i = 0; i < m_tabBar->count(); ++i) {
+                        WebView *other = viewAt(i);
+                        if (other && other != view
+                            && other->page()->lifecycleState() == QWebEnginePage::LifecycleState::Active) {
+                            other->page()->setLifecycleState(QWebEnginePage::LifecycleState::Frozen);
+                            m_pausedForFullScreen.append(other);
+                        }
+                    }
+                } else if (!request.toggleOn()) {
+                    for (const QPointer<WebView> &other : std::as_const(m_pausedForFullScreen)) {
+                        if (other && other->page()->lifecycleState() == QWebEnginePage::LifecycleState::Frozen)
+                            other->page()->setLifecycleState(QWebEnginePage::LifecycleState::Active);
+                    }
+                    m_pausedForFullScreen.clear();
+                }
                 setPageFullScreen(request.toggleOn());
             });
     connect(view->page(), &QWebEnginePage::windowCloseRequested, this,
@@ -3324,6 +3355,7 @@ void BrowserWindow::connectView(WebView *view)
     connect(view, &QWebEngineView::titleChanged, this, [this, view] { offerWebStoreExtension(view); });
     connect(view->browserPage(), &BrowserPage::userScriptRequested, this,
             [this, view](const QUrl &url) { offerUserScript(view, url, false); });
+    connect(view, &WebView::inspectRequested, this, [this] { openDevTools(DevToolsPanel::Inspect); });
     connect(view->browserPage(), &BrowserPage::onionRequested, this, [this, view](const QUrl &url) {
         Prompt prompt;
         prompt.key = QStringLiteral("onion");
@@ -3370,6 +3402,10 @@ void BrowserWindow::onCurrentTabChanged(int index)
     // tab) opens the group.
     if (const int group = m_groups->groupOf(view); m_groups->isCollapsed(group))
         m_groups->setCollapsed(group, false);
+
+    // Docked developer tools follow the tab in front.
+    if (m_dockedDevTools && m_dockedDevTools->isVisible())
+        m_dockedDevTools->page()->setInspectedPage(view->page());
 
     // Another tab coming forward ends a video's full screen.
     if (m_pageFullScreen && m_fullScreenView != view)
@@ -3532,6 +3568,12 @@ void BrowserWindow::applyRoles()
         action->setEnabled(on);
     };
     show(m_devToolsAction, developer);
+    show(m_consoleAction, developer);
+    if (!developer || preferences->devToolsDock() == QLatin1String("window"))
+        closeDockedDevTools();
+    else if (m_dockedDevTools)
+        m_contentSplitter->setOrientation(preferences->devToolsDock() == QLatin1String("right") ? Qt::Horizontal
+                                                                                                : Qt::Vertical);
     show(m_viewSourceAction, developer);
     show(m_focusModeAction, Roles::hasFocusMode(roles));
     show(m_citationAction, roles.contains(Roles::key(Roles::Role::Student)));
@@ -3573,16 +3615,71 @@ qreal BrowserWindow::defaultZoom() const
     return preferences->hasRole(Roles::key(Roles::Role::Teacher)) ? preferences->pageZoom() / 100.0 : 1.0;
 }
 
-void BrowserWindow::openDevTools()
+void BrowserWindow::openDevTools(DevToolsPanel panel)
 {
     WebView *view = currentView();
     if (!view)
         return;
+    const QString dock = Preferences::instance()->devToolsDock();
+
+    // What the tools do once open: switch to the console, or pick the clicked element.
+    const auto finish = [view, panel](QWebEnginePage *tools) {
+        if (panel == DevToolsPanel::Inspect) {
+            view->triggerPageAction(QWebEnginePage::InspectElement);
+        } else if (panel == DevToolsPanel::Console) {
+            const auto showConsole = [tools] {
+                tools->runJavaScript(QStringLiteral("window.DevToolsAPI && DevToolsAPI.showPanel('console')"));
+            };
+            showConsole();
+            // A frontend still loading switches once it is there.
+            auto connection = std::make_shared<QMetaObject::Connection>();
+            *connection = connect(tools, &QWebEnginePage::loadFinished, tools, [showConsole, connection] {
+                disconnect(*connection);
+                QTimer::singleShot(300, showConsole);
+            });
+        }
+    };
+
+    if (dock != QLatin1String("window")) {
+        // A splitter shows a widget as it is added, so a new panel counts as opening.
+        const bool created = !m_dockedDevTools;
+        if (created) {
+            m_dockedDevTools = new QWebEngineView;
+            m_dockedDevTools->setPage(new QWebEnginePage(m_services.profile, m_dockedDevTools));
+            m_dockedDevTools->setMinimumSize(200, 120);
+            m_contentSplitter->addWidget(m_dockedDevTools);
+            m_contentSplitter->setStretchFactor(0, 3);
+            m_contentSplitter->setStretchFactor(1, 2);
+            connect(m_dockedDevTools->page(), &QWebEnginePage::windowCloseRequested, this,
+                    &BrowserWindow::closeDockedDevTools);
+        }
+        // F12 again (not Inspect or the console) puts them away.
+        const bool opening = created || !m_dockedDevTools->isVisible();
+        if (!opening && panel == DevToolsPanel::Default && m_dockedDevTools->page()->inspectedPage() == view->page()) {
+            closeDockedDevTools();
+            return;
+        }
+        m_contentSplitter->setOrientation(dock == QLatin1String("right") ? Qt::Horizontal : Qt::Vertical);
+        if (opening) {
+            m_dockedDevTools->show();
+            // Two fifths of the window, once the splitter has made room for them.
+            QTimer::singleShot(50, this, [this] {
+                const int total = m_contentSplitter->orientation() == Qt::Vertical ? m_contentSplitter->height()
+                                                                                   : m_contentSplitter->width();
+                m_contentSplitter->setSizes({total * 3 / 5, total * 2 / 5});
+            });
+        }
+        m_dockedDevTools->page()->setInspectedPage(view->page());
+        finish(m_dockedDevTools->page());
+        return;
+    }
+
     if (QWebEnginePage *open = view->page()->devToolsPage()) {
-        if (QWebEngineView *tools = QWebEngineView::forPage(open)) {
+        if (QWebEngineView *tools = QWebEngineView::forPage(open); tools && tools != m_dockedDevTools) {
             tools->window()->show();
             tools->window()->raise();
             tools->window()->activateWindow();
+            finish(open);
             return;
         }
     }
@@ -3596,6 +3693,15 @@ void BrowserWindow::openDevTools()
     tools->resize(960, 680);
     tools->show();
     connect(view, &QObject::destroyed, tools, &QWidget::close);
+    finish(page);
+}
+
+void BrowserWindow::closeDockedDevTools()
+{
+    if (!m_dockedDevTools)
+        return;
+    m_dockedDevTools->page()->setInspectedPage(nullptr);
+    m_dockedDevTools->hide();
 }
 
 void BrowserWindow::copyCitation()

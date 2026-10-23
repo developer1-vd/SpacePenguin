@@ -23,6 +23,7 @@ private slots:
     void appContainsItsScope();
     void desktopEntryQuotesAndNamesTheApp();
     void searchTemplates();
+    void gamerFlags();
     void onions();
 };
 
@@ -170,6 +171,19 @@ void TestRoles::onions()
              true);
     QCOMPARE(Tor::searchTemplate(QStringLiteral("https://www.bing.com/search?q={query}")),
              QStringLiteral("https://www.bing.com/search?q={query}"));
+}
+
+void TestRoles::gamerFlags()
+{
+    const QStringList boost = Roles::gamerFlags(true, false, false, false);
+    QVERIFY(boost.contains(QStringLiteral("--ignore-gpu-blocklist")));
+    QVERIFY(boost.contains(QStringLiteral("--enable-gpu-rasterization")));
+    // Where the GPU is off (no working driver, a Chromebook without one), it stays off.
+    QVERIFY(Roles::gamerFlags(true, false, false, true).isEmpty());
+    const QStringList all = Roles::gamerFlags(false, true, true, true);
+    QVERIFY(all.contains(QStringLiteral("--disable-frame-rate-limit")));
+    QVERIFY(all.contains(QStringLiteral("--show-fps-counter")));
+    QVERIFY(!all.contains(QStringLiteral("--ignore-gpu-blocklist")));
 }
 
 QTEST_GUILESS_MAIN(TestRoles)

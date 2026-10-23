@@ -30,6 +30,11 @@ const QString kRoles = QStringLiteral("roles/roles");
 const QString kBypassCache = QStringLiteral("roles/developer/bypassCache");
 const QString kUserAgent = QStringLiteral("roles/developer/userAgent");
 const QString kPointerLock = QStringLiteral("roles/gamer/allowPointerLock");
+const QString kDevToolsDock = QStringLiteral("roles/developer/devToolsDock");
+const QString kGpuBoost = QStringLiteral("roles/gamer/gpuBoost");
+const QString kUncapFrameRate = QStringLiteral("roles/gamer/uncapFrameRate");
+const QString kFpsCounter = QStringLiteral("roles/gamer/fpsCounter");
+const QString kPauseOthers = QStringLiteral("roles/gamer/pauseOthersInFullScreen");
 const QString kMuteOthers = QStringLiteral("roles/gamer/muteOthersInFullScreen");
 const QString kFocusMode = QStringLiteral("roles/focus/on");
 const QString kFocusSites = QStringLiteral("roles/focus/sites");
@@ -402,6 +407,57 @@ int Preferences::pageZoom() const
 void Preferences::setPageZoom(int percent)
 {
     write(kPageZoom, qBound(50, percent, 300));
+}
+
+QString Preferences::devToolsDock() const
+{
+    const QString dock = QSettings().value(kDevToolsDock, QStringLiteral("bottom")).toString();
+    return dock == QLatin1String("right") || dock == QLatin1String("window") ? dock : QStringLiteral("bottom");
+}
+
+void Preferences::setDevToolsDock(const QString &dock)
+{
+    write(kDevToolsDock, dock);
+}
+
+bool Preferences::gpuBoost() const
+{
+    return QSettings().value(kGpuBoost, true).toBool();
+}
+
+void Preferences::setGpuBoost(bool boost)
+{
+    write(kGpuBoost, boost);
+}
+
+bool Preferences::uncapFrameRate() const
+{
+    return QSettings().value(kUncapFrameRate, false).toBool();
+}
+
+void Preferences::setUncapFrameRate(bool uncap)
+{
+    write(kUncapFrameRate, uncap);
+}
+
+bool Preferences::showFpsCounter() const
+{
+    return QSettings().value(kFpsCounter, false).toBool();
+}
+
+void Preferences::setShowFpsCounter(bool show)
+{
+    write(kFpsCounter, show);
+}
+
+bool Preferences::pauseOthersInFullScreen() const
+{
+    return QSettings().value(kPauseOthers, true).toBool();
+}
+
+void Preferences::setPauseOthersInFullScreen(bool pause)
+{
+    write(kPauseOthers, pause);
 }
 
 }
