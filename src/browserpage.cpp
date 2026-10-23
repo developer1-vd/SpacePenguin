@@ -1,9 +1,12 @@
 #include "browserpage.h"
 
 #include "logins.h"
+#include "preferences.h"
+#include "roles.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTimer>
 
 #include <QWebEngineSettings>
 
@@ -69,6 +72,8 @@ bool BrowserPage::isAllowedScheme(const QString &scheme)
         || scheme.compare(QLatin1String("qrc"), Qt::CaseInsensitive) == 0
         || scheme.compare(QLatin1String("about"), Qt::CaseInsensitive) == 0
         || scheme.compare(QLatin1String("data"), Qt::CaseInsensitive) == 0
+        // Page source, for developers (Ctrl+U).
+        || scheme.compare(QLatin1String("view-source"), Qt::CaseInsensitive) == 0
         // Local files: Chromium itself keeps websites from opening them.
         || scheme.compare(QLatin1String("file"), Qt::CaseInsensitive) == 0;
 }
@@ -77,6 +82,16 @@ bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, 
 {
     if (!isMainFrame)
         return true;
+
+    // Focus mode (student, worker, teacher) keeps its sites away, with a page that says so.
+    const Preferences *preferences = Preferences::instance();
+    if (preferences->focusMode() && Roles::hasFocusMode(preferences->roles())
+        && Roles::isBlocked(url, preferences->focusSites())) {
+        QTimer::singleShot(0, this, [this, url] { setHtml(Roles::blockedPage(url), url); });
+        return false;
+    }
+    if (m_navigationFilter && !m_navigationFilter(url, type))
+        return false;
 
     const bool userInitiated = type == NavigationTypeLinkClicked
         || type == NavigationTypeFormSubmitted || type == NavigationTypeTyped;

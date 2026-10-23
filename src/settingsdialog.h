@@ -45,6 +45,8 @@ signals:
     void extensionsRequested();
     void savedLoginsRequested();
     void sitePermissionsRequested();
+    /** Open the installed web app @p id (Settings › Apps). */
+    void appOpenRequested(const QString &id);
 
 private:
     void setupTabs();
@@ -54,6 +56,8 @@ private:
     QWidget *createPrivacyTab();
     QWidget *createExtensionsTab();
     QWidget *createDownloadsTab();
+    QWidget *createRolesTab();
+    QWidget *createAppsTab();
     QWidget *createAboutTab();
     void updateBlockingSummary();
 

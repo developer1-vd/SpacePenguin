@@ -24,6 +24,16 @@ const QString kSponsors = QStringLiteral("adblock/skipSponsors");
 const QString kStripTracking = QStringLiteral("adblock/stripTracking");
 const QString kCheckUpdates = QStringLiteral("updates/check");
 const QString kSaveLogins = QStringLiteral("privacy/offerToSaveLogins");
+const QString kRoles = QStringLiteral("roles/roles");
+const QString kBypassCache = QStringLiteral("roles/developer/bypassCache");
+const QString kUserAgent = QStringLiteral("roles/developer/userAgent");
+const QString kPointerLock = QStringLiteral("roles/gamer/allowPointerLock");
+const QString kMuteOthers = QStringLiteral("roles/gamer/muteOthersInFullScreen");
+const QString kFocusMode = QStringLiteral("roles/focus/on");
+const QString kFocusSites = QStringLiteral("roles/focus/sites");
+const QString kWorkPages = QStringLiteral("roles/worker/pages");
+const QString kWorkPagesOnStart = QStringLiteral("roles/worker/openOnStart");
+const QString kPageZoom = QStringLiteral("roles/teacher/pageZoom");
 
 } // namespace
 
@@ -219,6 +229,116 @@ bool Preferences::blockingEnabled() const
 void Preferences::setBlockingEnabled(bool enabled)
 {
     write(kBlocking, enabled);
+}
+
+QStringList Preferences::roles() const
+{
+    return QSettings().value(kRoles).toStringList();
+}
+
+void Preferences::setRoles(const QStringList &roles)
+{
+    write(kRoles, roles);
+}
+
+bool Preferences::hasRole(const QString &role) const
+{
+    return roles().contains(role);
+}
+
+bool Preferences::bypassCache() const
+{
+    return QSettings().value(kBypassCache, false).toBool();
+}
+
+void Preferences::setBypassCache(bool bypass)
+{
+    write(kBypassCache, bypass);
+}
+
+QString Preferences::userAgent() const
+{
+    return QSettings().value(kUserAgent).toString();
+}
+
+void Preferences::setUserAgent(const QString &userAgent)
+{
+    write(kUserAgent, userAgent.trimmed());
+}
+
+bool Preferences::allowPointerLock() const
+{
+    return QSettings().value(kPointerLock, true).toBool();
+}
+
+void Preferences::setAllowPointerLock(bool allow)
+{
+    write(kPointerLock, allow);
+}
+
+bool Preferences::muteOthersInFullScreen() const
+{
+    return QSettings().value(kMuteOthers, true).toBool();
+}
+
+void Preferences::setMuteOthersInFullScreen(bool mute)
+{
+    write(kMuteOthers, mute);
+}
+
+bool Preferences::focusMode() const
+{
+    return QSettings().value(kFocusMode, false).toBool();
+}
+
+void Preferences::setFocusMode(bool on)
+{
+    write(kFocusMode, on);
+}
+
+QStringList Preferences::focusSites() const
+{
+    static const QStringList defaults = {
+        QStringLiteral("youtube.com"), QStringLiteral("tiktok.com"),   QStringLiteral("instagram.com"),
+        QStringLiteral("facebook.com"), QStringLiteral("x.com"),       QStringLiteral("twitter.com"),
+        QStringLiteral("reddit.com"),   QStringLiteral("twitch.tv"),   QStringLiteral("netflix.com"),
+    };
+    return QSettings().value(kFocusSites, defaults).toStringList();
+}
+
+void Preferences::setFocusSites(const QStringList &sites)
+{
+    write(kFocusSites, sites);
+}
+
+QStringList Preferences::workPages() const
+{
+    return QSettings().value(kWorkPages).toStringList();
+}
+
+void Preferences::setWorkPages(const QStringList &pages)
+{
+    write(kWorkPages, pages);
+}
+
+bool Preferences::openWorkPagesOnStart() const
+{
+    return QSettings().value(kWorkPagesOnStart, false).toBool();
+}
+
+void Preferences::setOpenWorkPagesOnStart(bool open)
+{
+    write(kWorkPagesOnStart, open);
+}
+
+int Preferences::pageZoom() const
+{
+    return qBound(50, QSettings().value(kPageZoom, 100).toInt(), 300);
+}
+
+void Preferences::setPageZoom(int percent)
+{
+    write(kPageZoom, qBound(50, percent, 300));
 }
 
 }

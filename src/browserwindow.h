@@ -15,6 +15,7 @@
 #include "tabbar.h"
 #include "theme.h"
 #include "urlresolver.h"
+#include "webapps.h"
 
 class QAction;
 class QActionGroup;
@@ -57,6 +58,17 @@ public:
 
     bool isPrivate() const { return m_isPrivate; }
 
+    /** Opens an installed web app's window (see WebApps). */
+    void openApp(const QString &id);
+    /** A new tab, for a page coming from outside a browser window (an app's
+     *  window): in the window in front, or a new one if there is none. */
+    static WebView *tabForOutside(bool background);
+    /** The browser window in front, or a new one if none is open. */
+    static BrowserWindow *frontWindow();
+    /** Makes @p services the normal profile's before any window is open (an app
+     *  launched on its own), so a window opened later shares them. */
+    static void registerServices(const ProfileServices &services);
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -92,6 +104,16 @@ private:
     void applyPreferences();
     void applyTheme(Theme::Mode mode);
     void syncThemeMenu();
+
+    // Made for you (roles.h) and installed apps (webapps.h).
+    void applyRoles();
+    qreal defaultZoom() const;
+    void openDevTools();
+    void copyCitation();
+    void openWorkPages();
+    void installCurrentPageAsApp();
+    void finishAppInstall(WebView *view, WebApp app, const QUrl &iconUrl, const QList<QUrl> &pageIcons);
+    void confirmAppInstall(const WebApp &app, const QImage &icon);
 
     // Dialogs.
     void showExtensionsDialog();
@@ -304,7 +326,15 @@ private:
     QAction *m_settingsAction = nullptr;
     QAction *m_shortcutsAction = nullptr;
     QAction *m_aboutAction = nullptr;
+    QAction *m_installAppAction = nullptr;
+    QAction *m_devToolsAction = nullptr;
+    QAction *m_viewSourceAction = nullptr;
+    QAction *m_focusModeAction = nullptr;
+    QAction *m_citationAction = nullptr;
+    QAction *m_workPagesAction = nullptr;
     QActionGroup *m_themeGroup = nullptr;
+    // Gamer: the tabs this window muted while a page was full screen.
+    QList<QPointer<WebView>> m_mutedForFullScreen;
 };
 
 }
