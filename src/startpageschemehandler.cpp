@@ -85,6 +85,10 @@ void StartPageSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
         m_store->handle(job);
         return;
     }
+    if (const auto handler = m_hosts.constFind(job->requestUrl().host()); handler != m_hosts.cend()) {
+        (*handler)(job);
+        return;
+    }
 
     if (m_template.isEmpty()) {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);

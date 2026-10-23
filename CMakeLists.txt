@@ -109,6 +109,8 @@ qt_add_executable(spacepenguin
     src/chromeextensions.h
     src/logins.cpp
     src/logins.h
+    src/loginspage.cpp
+    src/loginspage.h
     src/notifications.cpp
     src/notifications.h
     src/sidetabs.cpp
@@ -355,12 +357,14 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/bookmarkmanager.h
             src/logins.cpp
             src/logins.h
+            src/loginspage.cpp
+            src/loginspage.h
             src/icons.cpp
             src/icons.h
             src/theme.cpp
             src/theme.h
         )
-        target_link_libraries(tst_importer PRIVATE Qt6::Test Qt6::Widgets)
+        target_link_libraries(tst_importer PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
         if(WIN32)
             # Saved logins are encrypted with the Windows account (logins.cpp).
             target_link_libraries(tst_importer PRIVATE crypt32)

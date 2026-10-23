@@ -164,7 +164,8 @@ bool isWebScheme(const QUrl &url)
 
 bool isStartPage(const QUrl &url)
 {
-    return url.scheme() == QLatin1String("sp") && url.host() != QLatin1String("store");
+    return url.scheme() == QLatin1String("sp") && url.host() != QLatin1String("store")
+        && url.host() != QLatin1String("logins");
 }
 
 const QUrl kStoreUrl(QStringLiteral("sp://store/"));
@@ -212,6 +213,7 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
 
     m_groups = new TabGroups(this);
     connect(m_groups, &TabGroups::changed, this, &BrowserWindow::refreshGroups);
+    connect(m_groups, &TabGroups::changed, this, &BrowserWindow::scheduleSessionSave);
 
     createActions();
     createChrome();
@@ -787,6 +789,7 @@ QWidget *BrowserWindow::createTabStrip()
     connect(m_tabBar, &QTabBar::currentChanged, this, &BrowserWindow::onCurrentTabChanged);
     connect(m_tabBar, &QTabBar::currentChanged, this, &BrowserWindow::syncSideTabs);
     connect(m_tabBar, &QTabBar::tabMoved, this, &BrowserWindow::syncSideTabs);
+    connect(m_tabBar, &QTabBar::tabMoved, this, &BrowserWindow::scheduleSessionSave);
     connect(m_tabBar, &TabBar::tabsChanged, this, &BrowserWindow::syncSideTabs);
     connect(m_tabBar, &TabBar::dragFinished, this, &BrowserWindow::onTabDragFinished);
     connect(m_tabBar, &TabBar::groupChipClicked, this, &BrowserWindow::toggleGroupCollapsed);
@@ -1724,24 +1727,56 @@ void BrowserWindow::restoreSession()
     if (!geometry.isEmpty())
         restoreGeometry(geometry);
 
-    if (!Preferences::instance()->restoreSession()) {
-        newTab();
+    // "running" stays set while SpacePenguin runs and is cleared when it quits; found
+    // set at start, the last run ended without quitting (a crash, a power cut).
+    const bool unclean = settings.value(QStringLiteral("session/running"), false).toBool();
+    settings.setValue(QStringLiteral("session/running"), true);
+    connect(qApp, &QCoreApplication::aboutToQuit, qApp,
+            [] { QSettings().setValue(QStringLiteral("session/running"), false); },
+            Qt::UniqueConnection);
+
+    if (Preferences::instance()->restoreSession()) {
+        if (!restoreTabs())
+            newTab();
+        else if (unclean)
+            QTimer::singleShot(800, this, [this] {
+                showToast(tr("SpacePenguin didn't close properly last time; your tabs are back."), 5000);
+            });
         return;
     }
-
-    const QStringList urls =
-        settings.value(QStringLiteral("session/urls")).toStringList().mid(0, kMaximumRestoredTabs);
-
-    if (urls.isEmpty()) {
-        newTab();
-        return;
+    // Tabs aren't brought back at start here, but after a crash they may be wanted. They
+    // are kept aside first: this window's own tabs will be saved over them.
+    const bool offer = unclean && !settings.value(QStringLiteral("session/urls")).toStringList().isEmpty();
+    if (offer) {
+        settings.remove(QStringLiteral("crashedSession"));
+        for (const QString &key : {QStringLiteral("urls"), QStringLiteral("histories"), QStringLiteral("currentTab"),
+                                   QStringLiteral("groups")})
+            settings.setValue(QStringLiteral("crashedSession/") + key, settings.value(QStringLiteral("session/") + key));
     }
+    newTab();
+    if (offer) {
+        Prompt prompt;
+        prompt.key = QStringLiteral("restore");
+        prompt.icon = Icons::History;
+        prompt.text = tr("SpacePenguin didn't close properly last time.");
+        prompt.buttons = {{tr("Restore Tabs"), [this] { restoreTabs(QStringLiteral("crashedSession")); }}};
+        addPrompt(currentView(), prompt);
+    }
+}
 
-    const int current = qBound(0, settings.value(QStringLiteral("session/currentTab")).toInt(),
+bool BrowserWindow::restoreTabs(const QString &group)
+{
+    QSettings settings;
+    settings.beginGroup(group);
+    const QStringList urls = settings.value(QStringLiteral("urls")).toStringList().mid(0, kMaximumRestoredTabs);
+    if (urls.isEmpty())
+        return false;
+    const int current = qBound(0, settings.value(QStringLiteral("currentTab")).toInt(),
                                int(urls.size()) - 1);
     // Each tab's back and forward history, with what Chromium keeps for each page
     // (where it was scrolled to, what was typed into forms); the address alone if not.
-    const QStringList histories = settings.value(QStringLiteral("session/histories")).toStringList();
+    const int offset = m_tabBar->count();
+    const QStringList histories = settings.value(QStringLiteral("histories")).toStringList();
     for (int index = 0; index < urls.size(); ++index) {
         WebView *view = addTab(false);
         const QByteArray history = QByteArray::fromBase64(histories.value(index).toLatin1());
@@ -1755,12 +1790,12 @@ void BrowserWindow::restoreSession()
     }
 
     const QJsonObject saved =
-        QJsonDocument::fromJson(settings.value(QStringLiteral("session/groups")).toString().toUtf8())
+        QJsonDocument::fromJson(settings.value(QStringLiteral("groups")).toString().toUtf8())
             .object();
     const QJsonArray groupList = saved.value(QStringLiteral("groups")).toArray();
     const QJsonArray tabGroups = saved.value(QStringLiteral("tabs")).toArray();
     QHash<int, int> ids; // place in the saved list -> new group
-    for (int index = 0; index < tabGroups.size() && index < m_tabBar->count(); ++index) {
+    for (int index = 0; index < tabGroups.size() && offset + index < m_tabBar->count(); ++index) {
         const int place = tabGroups.at(index).toInt(-1);
         if (place < 0 || place >= groupList.size())
             continue;
@@ -1769,7 +1804,7 @@ void BrowserWindow::restoreSession()
             ids.insert(place, m_groups->create(group.value(QStringLiteral("title")).toString(),
                                                group.value(QStringLiteral("color")).toInt()));
         }
-        m_groups->setGroupOf(viewAt(index), ids.value(place));
+        m_groups->setGroupOf(viewAt(offset + index), ids.value(place));
     }
     for (auto it = ids.cbegin(); it != ids.cend(); ++it) {
         m_groups->setCollapsed(it.value(),
@@ -1777,7 +1812,9 @@ void BrowserWindow::restoreSession()
     }
     m_groups->arrange(m_tabBar);
     refreshGroups();
-    m_tabBar->setCurrentIndex(current);
+    // Tabs already open (the start tab of a window that offered to restore) come first.
+    m_tabBar->setCurrentIndex(m_tabBar->count() - int(urls.size()) + current);
+    return true;
 }
 
 void BrowserWindow::saveSession() const
@@ -1828,6 +1865,19 @@ void BrowserWindow::saveSession() const
                                             .toJson(QJsonDocument::Compact)));
     settings.setValue(QStringLiteral("session/currentTab"), m_tabBar->currentIndex());
     settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
+}
+
+void BrowserWindow::scheduleSessionSave()
+{
+    if (m_isPrivate)
+        return;
+    if (!m_sessionTimer) {
+        m_sessionTimer = new QTimer(this);
+        m_sessionTimer->setSingleShot(true);
+        m_sessionTimer->setInterval(1500);
+        connect(m_sessionTimer, &QTimer::timeout, this, &BrowserWindow::saveSession);
+    }
+    m_sessionTimer->start();
 }
 
 void BrowserWindow::closeEvent(QCloseEvent *event)
@@ -2350,8 +2400,15 @@ void BrowserWindow::showSavedLogins()
 {
     if (!m_services.logins)
         return;
-    LoginsDialog dialog(m_services.logins, this);
-    dialog.exec();
+    // Reuse an open about:logins rather than opening another.
+    for (int i = 0; i < m_tabBar->count(); ++i) {
+        const WebView *view = viewAt(i);
+        if (view && view->url().scheme() == QLatin1String("sp") && view->url().host() == QLatin1String("logins")) {
+            m_tabBar->setCurrentIndex(i);
+            return;
+        }
+    }
+    newTab(QUrl(QStringLiteral("about:logins")));
 }
 
 void BrowserWindow::showSitePermissions()
@@ -2922,6 +2979,11 @@ void BrowserWindow::loadAboutPage(WebView *view, const QString &id)
         return;
 
     const QString normalized = id.trimmed().toLower();
+    // about:logins is a real page with its own API, served as sp://logins.
+    if (normalized == QLatin1String("about:logins")) {
+        view->setUrl(QUrl(QStringLiteral("sp://logins/")));
+        return;
+    }
     const AboutPageContext context = aboutContext();
     QString html = AboutPages::isKnown(normalized) ? AboutPages::render(normalized, context)
                                                    : AboutPages::renderUnknown(id);
@@ -3262,6 +3324,9 @@ void BrowserWindow::connectView(WebView *view)
     connect(view->page(), &QWebEnginePage::audioMutedChanged, this, [this, view] { updateTabLabel(view); });
     connect(view, &QWebEngineView::urlChanged, this,
             [this, view](const QUrl &url) { onUrlChanged(view, url); });
+    // Every change of address is in the next save: a crash then loses next to nothing.
+    connect(view, &QWebEngineView::urlChanged, this, &BrowserWindow::scheduleSessionSave);
+    connect(view, &QObject::destroyed, this, &BrowserWindow::scheduleSessionSave);
     connect(view, &QWebEngineView::loadStarted, this, [this, view] { onLoadStarted(view); });
     connect(view, &QWebEngineView::loadProgress, this,
             [this, view](int progress) { onLoadProgress(view, progress); });
@@ -3550,7 +3615,11 @@ void BrowserWindow::syncOmnibox(const QUrl &url)
         return;
 
     // The start page leaves the box empty, ready to type into.
-    m_omnibox->setText(isStartPage(url) ? QString() : url.toDisplayString());
+    // about:logins is served as sp://logins; show the name people type.
+    if (url.scheme() == QLatin1String("sp") && url.host() == QLatin1String("logins"))
+        m_omnibox->setText(QStringLiteral("about:logins"));
+    else
+        m_omnibox->setText(isStartPage(url) ? QString() : url.toDisplayString());
     m_omnibox->setCursorPosition(0);
     m_omniboxEdited = false;
 }

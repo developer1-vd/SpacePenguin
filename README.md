@@ -44,6 +44,10 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
   each tab's back/forward history and scroll position. Links that ask for a new tab
   or window (`target=_blank`, "Open link in new tab") open as tabs. A tab playing
   sound shows a speaker; click it (or `Ctrl`+`M`) to mute it
+- **Crash recovery** — the open tabs are saved a moment after every change, not only
+  on close, so a crash, power cut or killed process loses nothing: on the next start
+  the tabs come back (or a bar offers *Restore Tabs*, if restoring is off). A tab
+  whose page crashes or runs out of memory shows a *Reload* page instead of going blank
 - **Tabs on the side** — the button at the start of the tab row (or *View › Tabs on
   the Side*) moves the tabs into a panel down the left of the window, as in Edge and
   Firefox; the window buttons move onto the toolbar. The panel's arrow narrows it
@@ -56,8 +60,8 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
   with the session
 - **Saved logins** — after you sign in, a bar offers to save the login; on the site
   again, the key in the address bar fills it in (only when you pick it, so a page
-  never gets it unasked). *Settings › Privacy › Saved logins* shows, copies and
-  deletes them. On Windows they are encrypted with your Windows account; elsewhere
+  never gets it unasked). `about:logins` (or *Settings › Privacy › Saved logins*)
+  lists them to search, add, edit, show, copy and delete; websites can't read it. On Windows they are encrypted with your Windows account; elsewhere
   they are in a file only your account can read
 - **Site permissions** — a site that wants your camera, microphone, location,
   notifications, clipboard or screen asks in a bar above the page; answers are kept
@@ -866,6 +870,8 @@ src/theme.*           System / Light / Dark setting, palette and stylesheet
 src/adblocker.*       QWebEngineUrlRequestInterceptor, filter and cosmetic parsing
 src/filterlists.*     filter list subscriptions: download, update, parse off-thread
 src/importer.*        bookmark and login import from other browsers
+src/logins.*          saved logins: the store, capture and fill scripts
+src/loginspage.*      about:logins (html/logins.html) and its API
 src/readerview.*      reader view script
 src/updatechecker.*   opt-in check for a newer release
 src/cookiemanager.*   cookie list and the cookies-by-site window
@@ -876,6 +882,7 @@ src/startpageschemehandler.*  serves html/start.html over sp://, with search and
 src/urlresolver.*     URL, about: or search resolution (unit tested)
 src/main.cpp          profile setup, command line, entry point
 html/start.html       built-in start page
+html/logins.html      about:logins
 filters/default.txt   built-in starter filter list
 cmake/                Info.plist and qt.conf templates
 flake.nix, package.nix, default.nix, shell.nix

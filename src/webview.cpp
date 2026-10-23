@@ -6,8 +6,28 @@
 
 #include <QContextMenuEvent>
 #include <QMenu>
+#include <QTimer>
 
 namespace spacepenguin {
+
+QString WebView::crashedPage(const QUrl &url, bool outOfMemory)
+{
+    const QString title = outOfMemory ? tr("This tab was stopped") : tr("This tab crashed");
+    const QString text = outOfMemory
+        ? tr("The computer ran low on memory, so the page was stopped to keep everything else running. "
+             "Closing other tabs may help.")
+        : tr("Something went wrong while showing this page. The rest of the browser is fine.");
+    return QStringLiteral(
+               "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"color-scheme\" "
+               "content=\"light dark\"><title>%1</title><style>body{font:16px/1.5 system-ui,sans-serif;"
+               "display:grid;place-items:center;min-height:90vh;margin:0;text-align:center}main{max-width:32rem;"
+               "padding:2rem}a.button{display:inline-block;margin-top:1rem;padding:.5rem 1.4rem;border-radius:999px;"
+               "background:#3166e0;color:#fff;text-decoration:none}</style></head><body><main>"
+               "<div style=\"font-size:3rem\">%2</div><h1>%1</h1><p>%3</p><a class=\"button\" href=\"%4\">%5</a>"
+               "</main></body></html>")
+        .arg(title.toHtmlEscaped(), outOfMemory ? QStringLiteral("🧠") : QStringLiteral("💥"), text.toHtmlEscaped(),
+             url.toString(QUrl::FullyEncoded).toHtmlEscaped(), tr("Reload").toHtmlEscaped());
+}
 
 void WebView::contextMenuEvent(QContextMenuEvent *event)
 {
@@ -42,6 +62,18 @@ WebView::WebView(QWebEngineProfile *profile, QWidget *parent)
         m_failed = !ok;
         m_progress = 100;
     });
+    // A page whose process died (a crash, or the system running out of memory) says
+    // so, with a Reload button, instead of staying blank.
+    connect(m_page, &QWebEnginePage::renderProcessTerminated, this,
+            [this](QWebEnginePage::RenderProcessTerminationStatus status, int) {
+                if (status == QWebEnginePage::NormalTerminationStatus)
+                    return;
+                const QUrl address = url();
+                const bool outOfMemory = status == QWebEnginePage::KilledTerminationStatus;
+                QTimer::singleShot(0, this, [this, address, outOfMemory] {
+                    setHtml(crashedPage(address, outOfMemory), address);
+                });
+            });
 }
 
 WebView *WebView::openDialog()

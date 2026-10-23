@@ -2,6 +2,7 @@
 
 #include "chromeextensions.h"
 #include "logins.h"
+#include "loginspage.h"
 #include "notifications.h"
 
 #include "adblocker.h"
@@ -161,6 +162,13 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
         return tiles;
     });
     services.profile->installUrlSchemeHandler(QByteArrayLiteral("sp"), startPage);
+    startPage->setHostHandler(QStringLiteral("logins"), [logins = services.logins](QWebEngineUrlRequestJob *job) {
+        static const QByteArray page = [] {
+            QFile file(QStringLiteral(":/html/logins.html"));
+            return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+        }();
+        LoginsPage::handle(job, logins, page);
+    });
 
     const bool explicitList = !filterListPath.isEmpty();
     const QString listPath = explicitList ? filterListPath : defaultFilterListPath();

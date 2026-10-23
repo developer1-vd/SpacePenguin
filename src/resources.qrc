@@ -3,6 +3,7 @@
     <qresource prefix="/">
         <file>../html/start.html</file>
         <file>../html/store.html</file>
+        <file>../html/logins.html</file>
         <file>../filters/default.txt</file>
     </qresource>
 </RCC>

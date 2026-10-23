@@ -51,12 +51,14 @@ The largest file. `BrowserWindow` owns:
   `shortcuts.cpp`, shared by the ☰ menu and the menu bar.
 - **Prompts:** the bar above the page that asks questions (site permissions, saving a
   login, a student's request to unblock) — `addPrompt()`.
-- **Session:** tabs and their back/forward history are saved on close and restored
-  on start.
+- **Session:** tabs and their back/forward history are saved a moment after every
+  change (`scheduleSessionSave()`) and restored on start. A `session/running` flag
+  left set means the last run crashed; the tabs are then restored, or offered back.
 - **Roles' tools** (developer tools, Focus mode, citations…) and installing sites as
   apps — see below.
 
 Each tab is a `WebView` (`webview.cpp`) holding a `BrowserPage` (`browserpage.cpp`).
+A tab whose renderer crashes shows a page with a Reload button (`WebView::crashedPage`).
 **`BrowserPage::acceptNavigationRequest` is the policy point:** it decides about every
 page load. In order, it handles:
 
@@ -86,6 +88,8 @@ page load. In order, it handles:
 - `sp://start` and `sp://store` — `html/start.html` and `html/store.html`, served by
   `startpageschemehandler.cpp` and `store.cpp` (the store searches Greasy Fork and
   OpenUserJS for user scripts).
+- `about:logins` — `html/logins.html`, served as `sp://logins` by `loginspage.cpp`.
+  Its small JSON API answers only requests made from that page itself.
 - `about:` pages (`about:history`, `about:version`, `about:mozilla`…) —
   `aboutpages.cpp`.
 - Reader view — a script in `readerview.cpp` that redraws the page as its article.
@@ -180,7 +184,7 @@ Qt Test, one executable per area; run them with `ctest --test-dir build`.
 | `tst_urlresolver` | turning typed text into an address or a search |
 | `tst_classroom` | runs a whole class over 127.0.0.1: join, block, ask, allow, leave |
 | `tst_roles` | Focus mode, citations, manifests, search templates, onions, gamer switches |
-| `tst_importer` | bookmark and login import |
+| `tst_importer` | bookmark and login import; only about:logins may use its API |
 | `tst_userextensions` | user-script installation and injection |
 | `tst_aboutpages` | the `about:` pages |
 | `tst_startpage` | the start page |

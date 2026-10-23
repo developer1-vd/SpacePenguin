@@ -1,27 +1,15 @@
 #include "logins.h"
 
-#include "icons.h"
 #include "importer.h"
 
 #include <QApplication>
-#include <QClipboard>
-#include <QDialogButtonBox>
-#include <QFileDialog>
-#include <QMessageBox>
 #include <QDir>
 #include <QFile>
-#include <QHBoxLayout>
-#include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QLabel>
-#include <QLineEdit>
-#include <QPushButton>
 #include <QSaveFile>
-#include <QTreeWidget>
 #include <QUuid>
-#include <QVBoxLayout>
 
 #ifdef Q_OS_WIN
 #    include <windows.h>
@@ -331,146 +319,6 @@ QString LoginStore::fillScript(const QString &username, const QString &password)
   return !!(field || user);
 })(%1, %2);)JS")
         .arg(jsString(username), jsString(password));
-}
-
-// ---- LoginsDialog -------------------------------------------------------------
-
-LoginsDialog::LoginsDialog(LoginStore *store, QWidget *parent)
-    : QDialog(parent)
-    , m_store(store)
-{
-    setWindowTitle(tr("Saved Logins"));
-    resize(640, 480);
-
-    m_search = new QLineEdit;
-    m_search->setPlaceholderText(tr("Search saved logins"));
-    m_search->setClearButtonEnabled(true);
-    connect(m_search, &QLineEdit::textChanged, this, &LoginsDialog::rebuild);
-
-    m_list = new QTreeWidget;
-    m_list->setColumnCount(3);
-    m_list->setHeaderLabels({tr("Site"), tr("Username"), tr("Password")});
-    m_list->setRootIsDecorated(false);
-    m_list->header()->setSectionResizeMode(0, QHeaderView::Stretch);
-
-    auto *show = new QPushButton(tr("Show password"));
-    auto *copyUser = new QPushButton(tr("Copy username"));
-    auto *copyPassword = new QPushButton(tr("Copy password"));
-    auto *remove = new QPushButton(Icons::icon(Icons::Trash), tr("Delete"));
-    const auto selected = [this]() -> QTreeWidgetItem * {
-        const auto items = m_list->selectedItems();
-        return items.isEmpty() ? nullptr : items.first();
-    };
-    const auto updateButtons = [=] {
-        QTreeWidgetItem *item = selected();
-        const bool login = item && !item->data(0, kNeverRole).toBool();
-        show->setEnabled(login);
-        copyUser->setEnabled(login);
-        copyPassword->setEnabled(login);
-        remove->setEnabled(item != nullptr);
-    };
-    connect(m_list, &QTreeWidget::itemSelectionChanged, this, updateButtons);
-    connect(show, &QPushButton::clicked, this, [selected] {
-        if (QTreeWidgetItem *item = selected())
-            item->setText(2, item->data(0, kPasswordRole).toString());
-    });
-    connect(copyUser, &QPushButton::clicked, this, [selected] {
-        if (QTreeWidgetItem *item = selected())
-            QApplication::clipboard()->setText(item->data(0, kUsernameRole).toString());
-    });
-    connect(copyPassword, &QPushButton::clicked, this, [selected] {
-        if (QTreeWidgetItem *item = selected())
-            QApplication::clipboard()->setText(item->data(0, kPasswordRole).toString());
-    });
-    connect(remove, &QPushButton::clicked, this, [this, selected] {
-        QTreeWidgetItem *item = selected();
-        if (!item)
-            return;
-        const QString origin = item->data(0, kOriginRole).toString();
-        if (item->data(0, kNeverRole).toBool())
-            m_store->setNeverSave(origin, false);
-        else
-            m_store->remove(origin, item->data(0, kUsernameRole).toString());
-    });
-    connect(m_store, &LoginStore::changed, this, &LoginsDialog::rebuild);
-
-    auto *buttons = new QHBoxLayout;
-    buttons->addWidget(show);
-    buttons->addWidget(copyUser);
-    buttons->addWidget(copyPassword);
-    buttons->addStretch(1);
-    auto *import = new QPushButton(tr("Import…"));
-    import->setToolTip(tr("From a passwords CSV file exported by Chrome, Edge, Firefox or a password manager"));
-    connect(import, &QPushButton::clicked, this, [this] {
-        const QString path = QFileDialog::getOpenFileName(this, tr("Import logins"), QDir::homePath(),
-                                                          tr("Passwords file (*.csv);;All files (*)"));
-        if (path.isEmpty())
-            return;
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly))
-            return;
-        const QList<Login> found = Importer::parseLoginsCsv(QString::fromUtf8(file.readAll()));
-        const int added = m_store->importLogins(found);
-        QMessageBox::information(
-            this, tr("Import logins"),
-            found.isEmpty() ? tr("No logins were found. The file should be a passwords CSV, with url, "
-                                 "username and password columns.")
-                            : tr("Imported %n login(s). Delete the CSV file now: it holds your passwords "
-                                 "unprotected.", nullptr, added));
-    });
-    buttons->addWidget(import);
-    buttons->addWidget(remove);
-
-    auto *note = new QLabel(LoginStore::storageDescription());
-    note->setWordWrap(true);
-    note->setProperty("muted", true);
-
-    auto *close = new QDialogButtonBox(QDialogButtonBox::Close);
-    connect(close, &QDialogButtonBox::rejected, this, &QDialog::accept);
-
-    auto *layout = new QVBoxLayout(this);
-    layout->addWidget(m_search);
-    layout->addWidget(m_list, 1);
-    layout->addLayout(buttons);
-    layout->addWidget(note);
-    layout->addWidget(close);
-
-    rebuild();
-    updateButtons();
-}
-
-void LoginsDialog::rebuild()
-{
-    m_list->clear();
-    const QString filter = m_search->text().trimmed();
-    const auto matches = [&filter](const QString &a, const QString &b) {
-        return filter.isEmpty() || a.contains(filter, Qt::CaseInsensitive)
-            || b.contains(filter, Qt::CaseInsensitive);
-    };
-    for (const Login &login : m_store->logins()) {
-        if (!matches(login.origin, login.username))
-            continue;
-        auto *item = new QTreeWidgetItem(m_list, {login.origin, login.username,
-                                                  QString(8, QChar(0x2022))});
-        item->setData(0, kOriginRole, login.origin);
-        item->setData(0, kUsernameRole, login.username);
-        item->setData(0, kPasswordRole, login.password);
-    }
-    for (const QString &origin : m_store->neverSaved()) {
-        if (!matches(origin, QString()))
-            continue;
-        auto *item = new QTreeWidgetItem(m_list, {origin, tr("Never saved"), QString()});
-        item->setData(0, kOriginRole, origin);
-        item->setData(0, kNeverRole, true);
-        item->setForeground(1, palette().color(QPalette::PlaceholderText));
-    }
-    m_list->sortItems(0, Qt::AscendingOrder);
-    if (m_list->topLevelItemCount() == 0) {
-        auto *empty = new QTreeWidgetItem(m_list, {tr("No saved logins yet. When you sign in to "
-                                                      "a site, SpacePenguin offers to save it.")});
-        empty->setFlags(Qt::NoItemFlags);
-        empty->setFirstColumnSpanned(true);
-    }
 }
 
 }
