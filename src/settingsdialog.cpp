@@ -1179,8 +1179,22 @@ QWidget *SettingsDialog::createRolesTab()
     connect(userAgent, &QLineEdit::editingFinished, this,
             [userAgent] { Preferences::instance()->setUserAgent(userAgent->text()); });
     developerLayout->addWidget(userAgent);
-    developerLayout->addWidget(mutedLabel(tr("F12 or Ctrl+Shift+I opens the developer tools for the page; "
-                                             "Ctrl+U shows its source. Both are in the menu too.")));
+    auto *dockRow = new QHBoxLayout;
+    dockRow->addWidget(new QLabel(tr("Developer tools open")));
+    auto *dock = new QComboBox;
+    dock->addItem(tr("At the bottom of the window"), QStringLiteral("bottom"));
+    dock->addItem(tr("On the right of the window"), QStringLiteral("right"));
+    dock->addItem(tr("In a window of their own"), QStringLiteral("window"));
+    dock->setCurrentIndex(qMax(0, dock->findData(preferences->devToolsDock())));
+    connect(dock, &QComboBox::currentIndexChanged, this,
+            [dock] { Preferences::instance()->setDevToolsDock(dock->currentData().toString()); });
+    dockRow->addWidget(dock);
+    dockRow->addStretch(1);
+    developerLayout->addLayout(dockRow);
+    developerLayout->addWidget(mutedLabel(tr("F12 or Ctrl+Shift+I opens (and closes) the developer tools for the "
+                                             "tab in front; Ctrl+Shift+J opens them on the JavaScript console; "
+                                             "Inspect in a page's right-click menu picks that element; Ctrl+U "
+                                             "shows the page's source. All are in the menu too.")));
 
     QVBoxLayout *gamerLayout = nullptr;
     QWidget *gamer = panel(tr("Gamer"), &gamerLayout);
@@ -1194,6 +1208,43 @@ QWidget *SettingsDialog::createRolesTab()
     connect(mute, &QCheckBox::toggled, this,
             [](bool on) { Preferences::instance()->setMuteOthersInFullScreen(on); });
     gamerLayout->addWidget(mute);
+    auto *pause = new QCheckBox(tr("Pause the other tabs while a game is full screen"));
+    pause->setChecked(preferences->pauseOthersInFullScreen());
+    connect(pause, &QCheckBox::toggled, this,
+            [](bool on) { Preferences::instance()->setPauseOthersInFullScreen(on); });
+    gamerLayout->addWidget(pause);
+    gamerLayout->addWidget(mutedLabel(tr("Paused tabs use no processor time and pick up where they were when "
+                                         "the game leaves full screen.")));
+
+    auto *boost = new QCheckBox(tr("Use the graphics chip for drawing, even ones Chromium distrusts"));
+    boost->setChecked(preferences->gpuBoost());
+    connect(boost, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setGpuBoost(on); });
+    gamerLayout->addWidget(boost);
+    auto *uncap = new QCheckBox(tr("Uncap the frame rate (for screens faster than 60 Hz; uses more power)"));
+    uncap->setChecked(preferences->uncapFrameRate());
+    connect(uncap, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setUncapFrameRate(on); });
+    gamerLayout->addWidget(uncap);
+    auto *fps = new QCheckBox(tr("Show a frame rate (FPS) counter over pages"));
+    fps->setChecked(preferences->showFpsCounter());
+    connect(fps, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setShowFpsCounter(on); });
+    gamerLayout->addWidget(fps);
+    auto *restartNote = mutedLabel(QString());
+    gamerLayout->addWidget(restartNote);
+    // These are Chromium's own switches, read when SpacePenguin starts.
+    const auto syncRestart = [restartNote] {
+        const Preferences *preferences = Preferences::instance();
+        const QStringList running = qApp->property("spacepenguin.gamerFlags").toStringList();
+        const QStringList wanted = preferences->hasRole(Roles::key(Roles::Role::Gamer))
+            ? Roles::gamerFlags(preferences->gpuBoost(), preferences->uncapFrameRate(), preferences->showFpsCounter(),
+                                qEnvironmentVariable("QTWEBENGINE_CHROMIUM_FLAGS").contains(QLatin1String("--disable-gpu")))
+            : QStringList();
+        restartNote->setText(wanted == running
+                                 ? tr("Graphics settings are in use. Where the computer has no working graphics "
+                                      "chip, SpacePenguin draws without it whatever is ticked here.")
+                                 : tr("<b>Restart SpacePenguin</b> to use the new graphics settings."));
+    };
+    syncRestart();
+    connect(Preferences::instance(), &Preferences::changed, restartNote, syncRestart);
 
     QVBoxLayout *focusLayout = nullptr;
     QWidget *focus = panel(tr("Focus mode"), &focusLayout);

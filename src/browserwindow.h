@@ -26,6 +26,7 @@ class QNetworkAccessManager;
 class QMenu;
 class QProgressBar;
 class QShortcut;
+class QSplitter;
 class QStackedWidget;
 class QStandardItemModel;
 class QToolBar;
@@ -108,7 +109,11 @@ private:
     // Made for you (roles.h) and installed apps (webapps.h).
     void applyRoles();
     qreal defaultZoom() const;
-    void openDevTools();
+    /** Developer tools for the current tab: docked (and toggled) or in their own window,
+     *  as Settings says; @p panel opens on the console, @p inspect picks the clicked element. */
+    enum class DevToolsPanel { Default, Console, Inspect };
+    void openDevTools(DevToolsPanel panel = DevToolsPanel::Default);
+    void closeDockedDevTools();
     void copyCitation();
     void openWorkPages();
     void installCurrentPageAsApp();
@@ -329,6 +334,9 @@ private:
     QAction *m_installAppAction = nullptr;
     QAction *m_newTorWindowAction = nullptr;
     QAction *m_devToolsAction = nullptr;
+    QAction *m_consoleAction = nullptr;
+    QSplitter *m_contentSplitter = nullptr;
+    QWebEngineView *m_dockedDevTools = nullptr;
     QAction *m_viewSourceAction = nullptr;
     QAction *m_focusModeAction = nullptr;
     QAction *m_citationAction = nullptr;
@@ -336,6 +344,7 @@ private:
     QActionGroup *m_themeGroup = nullptr;
     // Gamer: the tabs this window muted while a page was full screen.
     QList<QPointer<WebView>> m_mutedForFullScreen;
+    QList<QPointer<WebView>> m_pausedForFullScreen;
 };
 
 }
