@@ -323,6 +323,16 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
             : tr("<b>%1</b> asks to unblock <b>%2</b>: “%3”")
                   .arg(request.student.toHtmlEscaped(), request.site.toHtmlEscaped(), request.note.toHtmlEscaped());
         const QString id = request.id;
+        if (request.leave) {
+            prompt.text = tr("<b>%1</b> asks to leave the class.").arg(request.student.toHtmlEscaped());
+            prompt.buttons = {
+                {tr("Let %1 Leave").arg(request.student), [id] { Classroom::instance()->answer(id, Classroom::Answer::AllowStudent); }},
+                {tr("Decline"), [id] { Classroom::instance()->answer(id, Classroom::Answer::Decline); }},
+            };
+            addPrompt(currentView(), prompt);
+            QApplication::alert(this);
+            return;
+        }
         prompt.buttons = {
             {tr("Allow for %1").arg(request.student), [id] { Classroom::instance()->answer(id, Classroom::Answer::AllowStudent); }},
             {tr("Allow for everyone"), [id] { Classroom::instance()->answer(id, Classroom::Answer::AllowEveryone); }},
@@ -332,9 +342,15 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
         QApplication::alert(this);
     });
     // Student mode: the teacher's answer; an allowed site's blocked tabs load again.
+    connect(Classroom::instance(), &Classroom::released, this, [this](const QString &message) {
+        if (isActiveWindow() || (!QApplication::activeWindow() && frontWindow() == this))
+            showToast(message, 6000);
+    });
     connect(Classroom::instance(), &Classroom::answerReceived, this, [this](const QString &site, bool allowed) {
         if (isActiveWindow() || (!QApplication::activeWindow() && frontWindow() == this))
-            showToast(allowed ? tr("Your teacher allowed %1.").arg(site) : tr("Your teacher kept %1 blocked.").arg(site),
+            showToast(site.isEmpty() ? tr("Your teacher wants you to stay in the class for now.")
+                      : allowed      ? tr("Your teacher allowed %1.").arg(site)
+                                     : tr("Your teacher kept %1 blocked.").arg(site),
                       5000);
         if (!allowed)
             return;
@@ -3520,6 +3536,8 @@ void BrowserWindow::applyRoles()
     show(m_focusModeAction, Roles::hasFocusMode(roles));
     show(m_citationAction, roles.contains(Roles::key(Roles::Role::Student)));
     show(m_workPagesAction, roles.contains(Roles::key(Roles::Role::Worker)));
+    // In a class, Tor would get around its blocks.
+    m_newTorWindowAction->setEnabled(!Classroom::instance()->locked());
     {
         const QSignalBlocker blocker(m_focusModeAction);
         m_focusModeAction->setChecked(preferences->focusMode());

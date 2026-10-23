@@ -88,8 +88,9 @@ bool BrowserPage::isAllowedScheme(const QString &scheme)
 
 bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame)
 {
+    // A class's blocked site stays out of other pages' frames too (embedded videos).
     if (!isMainFrame)
-        return true;
+        return !Classroom::instance()->blocks(url);
 
     // Student mode: "Ask to unblock" on a class's blocked page goes to the teacher.
     if (url.scheme() == QLatin1String("sp") && url.host() == QLatin1String("classroom")

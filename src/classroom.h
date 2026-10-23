@@ -5,6 +5,7 @@
 #include <QHostAddress>
 #include <QList>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QUrl>
 
@@ -14,6 +15,7 @@ class QNetworkAccessManager;
 class QTcpServer;
 class QTimer;
 class QUdpSocket;
+class QJsonObject;
 
 namespace spacepenguin {
 
@@ -29,6 +31,7 @@ struct UnblockRequest {
     QString site;
     QString note;
     QDateTime when;
+    bool leave = false; // asks to leave the class, not to unblock a site
 };
 
 struct ClassStudent {
@@ -51,8 +54,13 @@ struct ClassStudent {
  * declines, and the student hears back.
  *
  * Nothing goes through the internet, and the teacher's own browsing is not
- * restricted. It is a classroom tool, not device management: a student can leave
- * the class, and the teacher sees who is in it.
+ * restricted. While in a class, the usual ways around its blocks are closed too
+ * (see blocks()): Tor windows, the site inside other pages, behind view-source,
+ * a translation proxy or an archive, its other addresses, and web proxies. A
+ * student leaves when the teacher lets them (asked from Settings), closes the
+ * class or makes a new code, or once the teacher's computer has been out of reach
+ * for 14 days. It is a classroom tool, not device management: a browser installed
+ * elsewhere is out of its reach.
  *
  * The teacher's browser serves a small JSON API over HTTP on port 47800 (or the
  * next free one) and answers discovery on UDP port 47801:
@@ -96,6 +104,12 @@ public:
 
     // ---- Student ----------------------------------------------------------------
     bool inClass() const;
+    /** In a class as a student: its blocks apply, and ways around them are closed. */
+    bool locked() const;
+    /** The teacher's computer has been out of reach so long that the student may leave alone. */
+    bool canLeaveFreely() const;
+    /** Asks the teacher to let this student leave. Answers with askFinished. */
+    void askToLeave();
     QString joinedClassName() const;
     QString studentName() const;
     /** Joins the class: @p code, or code@address[:port]. Answers with joinFinished. */
@@ -104,7 +118,11 @@ public:
     /** Whether the teacher's computer answered lately. */
     bool teacherReachable() const { return m_reachable; }
     int joinedSiteCount() const;
-    /** Whether the class blocks @p url for this student; @p site and @p reason say why. */
+    /**
+     * Whether the class blocks @p url for this student; @p site and @p reason say why.
+     * Covers the site's other addresses, the page wrapped by view-source:, a
+     * translation proxy or an archive, and web proxy and mirror sites.
+     */
     bool blocks(const QUrl &url, QString *site = nullptr, QString *reason = nullptr) const;
     /** Asks the teacher to unblock @p site. Answers with askFinished. */
     void ask(const QString &site, const QString &note);
@@ -114,6 +132,13 @@ public:
     static QString makeCode();
     /** "ABC234", "abc234@10.0.0.5" or "ABC234@10.0.0.5:47802" → code, host and port. */
     static bool parseJoinCode(const QString &text, QString *code, QString *host, quint16 *port);
+    /** The page another address shows: view-source:, Google Translate and its .translate.goog
+     *  proxy, the Wayback Machine, Google's cache. Invalid when @p url wraps nothing. */
+    static QUrl unwrap(const QUrl &url);
+    /** Other addresses of the same site: youtu.be for youtube.com, twitter.com for x.com. */
+    static QStringList aliases(const QString &site);
+    /** Web proxies, mirrors and paywall skippers, which get around any block. */
+    static bool isBypassSite(const QUrl &url);
     /** The site of @p sites that covers @p url, if any, and not in @p allowed. */
     static const BlockedSite *match(const QUrl &url, const QList<BlockedSite> &sites,
                                     const QStringList &allowed = {});
@@ -133,6 +158,8 @@ signals:
     void answerReceived(const QString &site, bool allowed);
     void joinFinished(bool ok, const QString &message);
     void askFinished(bool ok);
+    /** Student: out of the class, because the teacher let them go or ended it. */
+    void released(const QString &message);
 
 private:
     explicit Classroom(QObject *parent = nullptr);
@@ -159,6 +186,9 @@ private:
     QList<UnblockRequest> m_requests;
     QHash<QString, ClassStudent> m_students;
     QHash<QString, QList<std::pair<QString, bool>>> m_answers; // per student, not yet delivered
+    QSet<QString> m_released; // students the teacher let leave, told at their next visit
+    void postRequest(const QJsonObject &fields);
+    void forceLeave(const QString &message);
 
     // Student.
     QTimer *m_poll = nullptr;

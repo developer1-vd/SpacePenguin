@@ -871,7 +871,7 @@ void addStudentClass(QVBoxLayout *layout, QWidget *owner)
     join->addWidget(code, 1);
     join->addWidget(joinButton);
     layout->addWidget(joinBox);
-    auto *leaveButton = new QPushButton(SettingsDialog::tr("Leave Class"));
+    auto *leaveButton = new QPushButton;
     auto *leaveRow = new QHBoxLayout;
     leaveRow->addWidget(leaveButton);
     leaveRow->addStretch(1);
@@ -885,6 +885,9 @@ void addStudentClass(QVBoxLayout *layout, QWidget *owner)
         joinBox->setVisible(!in);
         hint->setVisible(!in);
         leaveButton->setVisible(in);
+        // Leaving is the teacher's to allow, unless their computer has been away for long.
+        leaveButton->setText(classroom->canLeaveFreely() ? SettingsDialog::tr("Leave Class")
+                                                         : SettingsDialog::tr("Ask to Leave"));
         if (!in) {
             status->setText(SettingsDialog::tr("Not in a class."));
             return;
@@ -916,12 +919,27 @@ void addStudentClass(QVBoxLayout *layout, QWidget *owner)
             QMessageBox::warning(owner, SettingsDialog::tr("Join Class"), message);
         update();
     });
-    QObject::connect(leaveButton, &QPushButton::clicked, owner, [owner, classroom] {
-        if (QMessageBox::question(owner, SettingsDialog::tr("Leave Class"),
-                                  SettingsDialog::tr("Leave %1? Your teacher will see you are no longer in the class.")
-                                      .arg(classroom->joinedClassName()))
-            == QMessageBox::Yes)
-            classroom->leave();
+    QObject::connect(leaveButton, &QPushButton::clicked, owner, [owner, classroom, leaveButton] {
+        if (classroom->canLeaveFreely()) {
+            if (QMessageBox::question(owner, SettingsDialog::tr("Leave Class"),
+                                      SettingsDialog::tr("Your teacher's computer hasn't answered in two weeks. "
+                                                         "Leave %1?").arg(classroom->joinedClassName()))
+                == QMessageBox::Yes)
+                classroom->leave();
+            return;
+        }
+        leaveButton->setEnabled(false);
+        auto connection = std::make_shared<QMetaObject::Connection>();
+        *connection = QObject::connect(classroom, &Classroom::askFinished, leaveButton,
+                                       [owner, leaveButton, connection](bool ok) {
+            QObject::disconnect(*connection);
+            leaveButton->setEnabled(true);
+            QMessageBox::information(owner, SettingsDialog::tr("Ask to Leave"),
+                                     ok ? SettingsDialog::tr("Your teacher has your request. When they let you go, "
+                                                             "you leave the class by yourself.")
+                                        : SettingsDialog::tr("Your teacher's computer didn't answer. Try again later."));
+        });
+        classroom->askToLeave();
     });
 }
 
@@ -1096,7 +1114,8 @@ void addTeacherClass(QVBoxLayout *layout, QWidget *owner)
         requests->clear();
         for (const UnblockRequest &request : classroom->requests()) {
             auto *item = new QListWidgetItem(
-                request.note.isEmpty() ? SettingsDialog::tr("%1 asks for %2").arg(request.student, request.site)
+                request.leave          ? SettingsDialog::tr("%1 asks to leave the class").arg(request.student)
+                : request.note.isEmpty() ? SettingsDialog::tr("%1 asks for %2").arg(request.student, request.site)
                                        : SettingsDialog::tr("%1 asks for %2: “%3”").arg(request.student, request.site, request.note),
                 requests);
             item->setData(Qt::UserRole, request.id);
@@ -1256,6 +1275,15 @@ QWidget *SettingsDialog::createRolesTab()
     };
     for (QCheckBox *box : boxes)
         connect(box, &QCheckBox::toggled, this, [sync] { Preferences::instance()->setRoles(sync()); });
+    // In a class, student mode stays on until the teacher lets the student go.
+    QCheckBox *studentBox = boxes.value(Roles::Role::Student);
+    const auto lockStudent = [studentBox] {
+        const bool locked = Classroom::instance()->locked();
+        studentBox->setEnabled(!locked);
+        studentBox->setToolTip(locked ? tr("You're in a class: ask your teacher to let you leave first.") : QString());
+    };
+    lockStudent();
+    connect(Classroom::instance(), &Classroom::changed, studentBox, lockStudent);
     sync();
 
     layout->addStretch(1);

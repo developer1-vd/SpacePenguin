@@ -36,6 +36,33 @@ constexpr int kMaxRequestBytes = 32 * 1024;
 constexpr int kMaxPendingPerStudent = 10;
 constexpr int kMaxNote = 300;
 constexpr int kMaxName = 40;
+constexpr qint64 kLeaveAloneAfterDays = 14;
+
+// Ways around any block: web proxies, mirrors and paywall skippers, Tor gateways.
+const QStringList kBypassSites = {
+    QStringLiteral("croxyproxy.com"), QStringLiteral("croxyproxy.rocks"), QStringLiteral("croxy.network"),
+    QStringLiteral("proxysite.com"),  QStringLiteral("hidester.com"),     QStringLiteral("kproxy.com"),
+    QStringLiteral("4everproxy.com"), QStringLiteral("blockaway.net"),    QStringLiteral("proxyium.com"),
+    QStringLiteral("proxyorb.com"),   QStringLiteral("hide.me"),          QStringLiteral("hidemyass.com"),
+    QStringLiteral("eu-proxy.startpage.com"), QStringLiteral("us-proxy.startpage.com"),
+    QStringLiteral("webcache.googleusercontent.com"), QStringLiteral("archive.ph"), QStringLiteral("archive.today"),
+    QStringLiteral("archive.is"),     QStringLiteral("archive.li"),       QStringLiteral("12ft.io"),
+    QStringLiteral("removepaywall.com"), QStringLiteral("onion.ly"),      QStringLiteral("onion.ws"),
+    QStringLiteral("onion.pet"),      QStringLiteral("tor2web.org"),
+};
+
+// The same site under other names.
+const QList<QStringList> kAliasGroups = {
+    {QStringLiteral("youtube.com"), QStringLiteral("youtu.be"), QStringLiteral("youtube-nocookie.com"),
+     QStringLiteral("youtubekids.com")},
+    {QStringLiteral("x.com"), QStringLiteral("twitter.com")},
+    {QStringLiteral("facebook.com"), QStringLiteral("fb.com"), QStringLiteral("fb.watch")},
+    {QStringLiteral("instagram.com"), QStringLiteral("instagr.am")},
+    {QStringLiteral("reddit.com"), QStringLiteral("redd.it")},
+    {QStringLiteral("discord.com"), QStringLiteral("discord.gg"), QStringLiteral("discordapp.com")},
+    {QStringLiteral("twitch.tv"), QStringLiteral("twitch.com")},
+    {QStringLiteral("tiktok.com"), QStringLiteral("tiktokv.com")},
+};
 
 bool hasRole(Roles::Role role)
 {
@@ -111,7 +138,8 @@ void Classroom::start()
 
 void Classroom::refresh()
 {
-    if (hasRole(Roles::Role::Teacher) && classOpen())
+    // A closed class still answers its students, to tell them it ended.
+    if (hasRole(Roles::Role::Teacher) && !code().isEmpty())
         serve();
     else
         stopServing();
@@ -209,6 +237,17 @@ void Classroom::answer(const QString &requestId, Answer answer)
         if (request.id != requestId)
             continue;
         m_requests.removeAt(i);
+        if (request.leave) {
+            if (answer == Answer::Decline)
+                m_answers[request.studentId].append({QString(), false});
+            else
+                m_released.insert(request.studentId);
+            m_requests.removeIf([&request](const UnblockRequest &other) {
+                return other.studentId == request.studentId && other.leave;
+            });
+            emit changed();
+            return;
+        }
         if (answer == Answer::AllowStudent) {
             QSettings settings;
             const QString key = kTeacher + QStringLiteral("allowed/") + request.studentId;
@@ -224,7 +263,7 @@ void Classroom::answer(const QString &requestId, Answer answer)
         m_answers[request.studentId].append({request.site, answer != Answer::Decline});
         // The same request from the same student is answered with it.
         m_requests.removeIf([&request](const UnblockRequest &other) {
-            return other.studentId == request.studentId && other.site == request.site;
+            return other.studentId == request.studentId && other.site == request.site && !other.leave;
         });
         emit changed();
         return;
@@ -297,7 +336,7 @@ void Classroom::handleDiscovery()
     while (m_discovery && m_discovery->hasPendingDatagrams()) {
         const QNetworkDatagram datagram = m_discovery->receiveDatagram(512);
         const QByteArray data = datagram.data();
-        if (!data.startsWith("SPCLASS?") || !serving())
+        if (!data.startsWith("SPCLASS?") || !serving() || !classOpen())
             continue;
         if (QString::fromUtf8(data.mid(8)).trimmed().compare(code(), Qt::CaseInsensitive) != 0)
             continue;
@@ -345,6 +384,12 @@ QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target
             return error("wrong class code");
         }
         const QString id = clip(query.queryItemValue(QStringLiteral("id"), QUrl::FullyDecoded), 64);
+        // A closed class, and a student the teacher let go, are told so; the student leaves.
+        if (!classOpen() || m_released.remove(id)) {
+            m_students.remove(id);
+            *status = 410;
+            return error(classOpen() ? "released" : "class ended");
+        }
         if (!id.isEmpty()) {
             ClassStudent &student = m_students[id];
             const bool isNew = student.id.isEmpty();
@@ -378,7 +423,8 @@ QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target
         entry.student = clip(request.value(QStringLiteral("name")).toString(), kMaxName);
         entry.site = Roles::normalizeSite(request.value(QStringLiteral("site")).toString());
         entry.note = clip(request.value(QStringLiteral("note")).toString(), kMaxNote);
-        if (entry.studentId.isEmpty() || entry.site.isEmpty()) {
+        entry.leave = request.value(QStringLiteral("kind")).toString() == QLatin1String("leave");
+        if (entry.studentId.isEmpty() || (entry.site.isEmpty() && !entry.leave)) {
             *status = 400;
             return error("missing student or site");
         }
@@ -386,7 +432,7 @@ QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target
         for (const UnblockRequest &other : std::as_const(m_requests)) {
             if (other.studentId == entry.studentId)
                 ++pending;
-            if (other.studentId == entry.studentId && other.site == entry.site)
+            if (other.studentId == entry.studentId && other.site == entry.site && other.leave == entry.leave)
                 return QJsonDocument(QJsonObject{{QStringLiteral("ok"), true}}).toJson(QJsonDocument::Compact);
         }
         if (pending >= kMaxPendingPerStudent) {
@@ -429,20 +475,44 @@ int Classroom::joinedSiteCount() const
     return int(QSettings().value(kStudent + QStringLiteral("sites")).toStringList().size());
 }
 
+bool Classroom::locked() const
+{
+    return hasRole(Roles::Role::Student) && inClass();
+}
+
+bool Classroom::canLeaveFreely() const
+{
+    const QDateTime last = QSettings().value(kStudent + QStringLiteral("lastContact")).toDateTime();
+    return !last.isValid() || last.daysTo(QDateTime::currentDateTime()) >= kLeaveAloneAfterDays;
+}
+
 bool Classroom::blocks(const QUrl &url, QString *site, QString *reason) const
 {
-    if (!hasRole(Roles::Role::Student) || !inClass())
+    if (!locked())
         return false;
     QSettings settings;
     const QList<BlockedSite> sites = decodeSites(settings.value(kStudent + QStringLiteral("sites")).toStringList());
-    const BlockedSite *blocked = match(url, sites, settings.value(kStudent + QStringLiteral("allowed")).toStringList());
-    if (!blocked)
-        return false;
-    if (site)
-        *site = blocked->site;
-    if (reason)
-        *reason = blocked->reason;
-    return true;
+    const QStringList allowed = settings.value(kStudent + QStringLiteral("allowed")).toStringList();
+    // The address itself, and the page it wraps (view-source:, a translation, an archive).
+    for (const QUrl &candidate : {url, unwrap(url)}) {
+        if (!candidate.isValid())
+            continue;
+        if (const BlockedSite *blocked = match(candidate, sites, allowed)) {
+            if (site)
+                *site = blocked->site;
+            if (reason)
+                *reason = blocked->reason;
+            return true;
+        }
+    }
+    if (isBypassSite(url) && !Roles::isBlocked(url, allowed)) {
+        if (site)
+            *site = Roles::normalizeSite(url.host());
+        if (reason)
+            *reason = tr("Proxy and mirror sites are off while you're in a class, as they get around its blocks.");
+        return true;
+    }
+    return false;
 }
 
 QUrl Classroom::teacherUrl(const QString &path) const
@@ -535,12 +605,15 @@ void Classroom::join(const QString &text, const QString &name)
         connect(reply, &QNetworkReply::finished, this, [this, reply, code, studentName, address, port, fixed] {
             reply->deleteLater();
             if (reply->error() != QNetworkReply::NoError) {
-                emit joinFinished(false, reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 403
-                                             ? tr("The teacher's computer answered, but not to that code.")
-                                             : tr("The teacher's computer did not answer (%1).").arg(reply->errorString()));
+                const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                emit joinFinished(false, status == 403 ? tr("The teacher's computer answered, but not to that code.")
+                                         : status == 410 ? tr("That class is closed.")
+                                                         : tr("The teacher's computer did not answer (%1).")
+                                                               .arg(reply->errorString()));
                 return;
             }
             QSettings settings;
+            settings.setValue(kStudent + QStringLiteral("lastContact"), QDateTime::currentDateTime());
             settings.setValue(kStudent + QStringLiteral("code"), code);
             settings.setValue(kStudent + QStringLiteral("host"), address.toString());
             settings.setValue(kStudent + QStringLiteral("port"), port);
@@ -566,7 +639,7 @@ void Classroom::leave()
     QSettings settings;
     for (const QString &key : {QStringLiteral("code"), QStringLiteral("host"), QStringLiteral("port"),
                                QStringLiteral("fixedHost"), QStringLiteral("className"), QStringLiteral("sites"),
-                               QStringLiteral("allowed")})
+                               QStringLiteral("allowed"), QStringLiteral("lastContact")})
         settings.remove(kStudent + key);
     refresh();
     emit changed();
@@ -594,9 +667,20 @@ void Classroom::poll()
             const bool was = m_reachable;
             m_reachable = true;
             m_failures = 0;
+            QSettings().setValue(kStudent + QStringLiteral("lastContact"), QDateTime::currentDateTime());
             applyClass(reply->readAll());
             if (!was)
                 emit changed();
+            return;
+        }
+        // The teacher's computer answered: the class ended, let this student go, or
+        // has a new code. Any of these ends the student's part in it.
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (status == 403 || status == 410) {
+            const QString why = QJsonDocument::fromJson(reply->readAll()).object().value(QStringLiteral("error")).toString();
+            forceLeave(why == QLatin1String("released") ? tr("Your teacher let you leave the class.")
+                       : status == 410                  ? tr("Your teacher ended the class.")
+                                                        : tr("The class has a new code; ask your teacher for it to join again."));
             return;
         }
         const bool was = m_reachable;
@@ -656,14 +740,31 @@ void Classroom::ask(const QString &site, const QString &note)
         emit askFinished(false);
         return;
     }
+    postRequest({{QStringLiteral("site"), site}, {QStringLiteral("note"), clip(note, kMaxNote)}});
+}
+
+void Classroom::askToLeave()
+{
+    if (!inClass()) {
+        emit askFinished(false);
+        return;
+    }
+    postRequest({{QStringLiteral("kind"), QStringLiteral("leave")}});
+}
+
+void Classroom::forceLeave(const QString &message)
+{
+    leave();
+    emit released(message);
+}
+
+void Classroom::postRequest(const QJsonObject &fields)
+{
     QSettings settings;
-    const QJsonObject body{
-        {QStringLiteral("code"), settings.value(kStudent + QStringLiteral("code")).toString()},
-        {QStringLiteral("id"), settings.value(kStudent + QStringLiteral("id")).toString()},
-        {QStringLiteral("name"), studentName()},
-        {QStringLiteral("site"), site},
-        {QStringLiteral("note"), clip(note, kMaxNote)},
-    };
+    QJsonObject body = fields;
+    body.insert(QStringLiteral("code"), settings.value(kStudent + QStringLiteral("code")).toString());
+    body.insert(QStringLiteral("id"), settings.value(kStudent + QStringLiteral("id")).toString());
+    body.insert(QStringLiteral("name"), studentName());
     QNetworkRequest request(teacherUrl(QStringLiteral("/v1/request")));
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setTransferTimeout(5000);
@@ -716,13 +817,70 @@ const BlockedSite *Classroom::match(const QUrl &url, const QList<BlockedSite> &s
 {
     if (url.scheme() != QLatin1String("http") && url.scheme() != QLatin1String("https"))
         return nullptr;
-    if (Roles::isBlocked(url, allowed))
+    QStringList allowedNames;
+    for (const QString &site : allowed)
+        allowedNames << site << aliases(site);
+    if (Roles::isBlocked(url, allowedNames))
         return nullptr;
     for (const BlockedSite &site : sites) {
-        if (Roles::isBlocked(url, {site.site}))
+        if (Roles::isBlocked(url, QStringList{site.site} + aliases(site.site)))
             return &site;
     }
     return nullptr;
+}
+
+QStringList Classroom::aliases(const QString &site)
+{
+    const QString name = Roles::normalizeSite(site);
+    for (const QStringList &group : kAliasGroups) {
+        if (group.contains(name)) {
+            QStringList others = group;
+            others.removeAll(name);
+            return others;
+        }
+    }
+    return {};
+}
+
+bool Classroom::isBypassSite(const QUrl &url)
+{
+    return Roles::isBlocked(url, kBypassSites);
+}
+
+QUrl Classroom::unwrap(const QUrl &url)
+{
+    const QString scheme = url.scheme().toLower();
+    const QString host = url.host().toLower();
+    if (scheme == QLatin1String("view-source"))
+        return QUrl(url.path() + (url.hasQuery() ? QLatin1Char('?') + url.query() : QString()));
+    if (scheme != QLatin1String("http") && scheme != QLatin1String("https"))
+        return QUrl();
+    // Google Translate's proxy: www-example-com.translate.goog is www.example.com
+    // (a dash stands for a dot, two dashes for a dash).
+    if (host.endsWith(QLatin1String(".translate.goog"))) {
+        QString name = host.chopped(int(QStringLiteral(".translate.goog").size()));
+        name.replace(QLatin1String("--"), QStringLiteral("\x01"));
+        name.replace(QLatin1Char('-'), QLatin1Char('.'));
+        name.replace(QLatin1Char('\x01'), QLatin1Char('-'));
+        QUrl inner = url;
+        inner.setHost(name);
+        return inner;
+    }
+    const QUrlQuery query(url);
+    if (host.startsWith(QLatin1String("translate.google."))) {
+        const QString inner = query.queryItemValue(QStringLiteral("u"), QUrl::FullyDecoded);
+        return inner.isEmpty() ? QUrl() : QUrl::fromUserInput(inner);
+    }
+    if (host == QLatin1String("web.archive.org") && url.path().startsWith(QLatin1String("/web/"))) {
+        const QString rest = url.path().section(QLatin1Char('/'), 3);
+        return rest.isEmpty() ? QUrl() : QUrl::fromUserInput(rest);
+    }
+    if (host == QLatin1String("webcache.googleusercontent.com")) {
+        const QString q = query.queryItemValue(QStringLiteral("q"), QUrl::FullyDecoded);
+        if (q.startsWith(QLatin1String("cache:")))
+            return QUrl::fromUserInput(q.mid(6).section(QLatin1Char('+'), 0, 0));
+    }
+    return QUrl();
 }
 
 QString Classroom::blockedPage(const QUrl &url, const QString &site, const QString &reason, const QString &className)

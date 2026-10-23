@@ -380,6 +380,8 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/urlresolver.h
             src/tor.cpp
             src/tor.h
+            src/classroom.cpp
+            src/classroom.h
         )
         target_include_directories(tst_roles PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_link_libraries(tst_roles PRIVATE Qt6::Test Qt6::Widgets Qt6::Network)

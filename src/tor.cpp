@@ -1,5 +1,6 @@
 #include "tor.h"
 
+#include "classroom.h"
 #include "webapps.h"
 
 #include <QApplication>
@@ -157,6 +158,11 @@ QString installHint()
 
 bool start(QString *error)
 {
+    if (Classroom::instance()->locked()) {
+        if (error)
+            *error = QCoreApplication::translate("Tor", "Tor windows are off while you're in a class.");
+        return false;
+    }
     QString message;
     // The port can be given; otherwise the tor service's, then Tor Browser's.
     quint16 port = 0;
@@ -202,6 +208,12 @@ bool isOnion(const QUrl &url)
 
 bool openWindow(const QStringList &urls, QString *error)
 {
+    // In a class, Tor would get around its blocks.
+    if (Classroom::instance()->locked()) {
+        if (error)
+            *error = QCoreApplication::translate("Tor", "Tor windows are off while you're in a class.");
+        return false;
+    }
     // Inside a Flatpak this process starts its own binary; launchers outside it use
     // "flatpak run".
     const QStringList command = qEnvironmentVariableIsSet("FLATPAK_ID")

@@ -17,6 +17,7 @@ private slots:
     void parsesHttp();
     void keepsAtMostAHundredSites();
     void teacherAndStudent();
+    void bypasses();
     void cleanupTestCase();
 };
 
@@ -150,12 +151,72 @@ void TestClassroom::teacherAndStudent()
     QVERIFY(!classroom->blocks(QUrl(QStringLiteral("https://www.youtube.com/watch?v=1"))));
     QVERIFY(classroom->blocks(QUrl(QStringLiteral("https://games.example/"))));
 
-    // Leaving lifts the class's blocks.
-    classroom->leave();
+    // The usual ways around a block are blocked too.
+    QVERIFY(classroom->blocks(QUrl(QStringLiteral("view-source:https://games.example/"))));
+    QVERIFY(classroom->blocks(QUrl(QStringLiteral("https://games-example.translate.goog/?_x_tr_sl=auto"))));
+    QVERIFY(classroom->blocks(QUrl(QStringLiteral("https://web.archive.org/web/2024/https://games.example/"))));
+    QVERIFY(classroom->blocks(QUrl(QStringLiteral("https://www.croxyproxy.com/"))));
+    // ... while the site Sam may use stays usable under its other names.
+    QVERIFY(!classroom->blocks(QUrl(QStringLiteral("https://youtu.be/abc"))));
+
+    // Leaving is the teacher's to allow.
+    QSignalSpy leaveAsked(classroom, &Classroom::askFinished);
+    classroom->askToLeave();
+    QVERIFY(leaveAsked.wait(5000));
+    QCOMPARE(classroom->requests().size(), 1);
+    QVERIFY(classroom->requests().constFirst().leave);
+    QSignalSpy released(classroom, &Classroom::released);
+    classroom->answer(classroom->requests().constFirst().id, Classroom::Answer::AllowStudent);
+    QVERIFY(released.wait(20000));
     QVERIFY(!classroom->inClass());
     QVERIFY(!classroom->blocks(QUrl(QStringLiteral("https://games.example/"))));
+    QVERIFY(classroom->students().isEmpty());
+
+    // Back in, until the teacher closes the class: then everyone is let go.
+    joined.clear();
+    classroom->join(QStringLiteral("%1@127.0.0.1:%2").arg(classroom->code()).arg(classroom->port()),
+                    QStringLiteral("Sam"));
+    QVERIFY(joined.wait(8000));
+    QVERIFY(joined.last().at(0).toBool());
+    QVERIFY(classroom->inClass());
+    released.clear();
     classroom->setClassOpen(false);
-    QVERIFY(!classroom->serving());
+    QVERIFY(classroom->serving()); // still there to tell its students
+    QVERIFY(released.wait(20000));
+    QVERIFY(!classroom->inClass());
+
+    // A closed class takes no one in.
+    joined.clear();
+    classroom->join(QStringLiteral("%1@127.0.0.1:%2").arg(classroom->code()).arg(classroom->port()),
+                    QStringLiteral("Alex"));
+    QVERIFY(joined.wait(8000));
+    QVERIFY(!joined.last().at(0).toBool());
+}
+
+void TestClassroom::bypasses()
+{
+    QCOMPARE(Classroom::unwrap(QUrl(QStringLiteral("view-source:https://example.com/a?b=1"))),
+             QUrl(QStringLiteral("https://example.com/a?b=1")));
+    QCOMPARE(Classroom::unwrap(QUrl(QStringLiteral("https://www-my--site-com.translate.goog/page"))).host(),
+             QStringLiteral("www.my-site.com"));
+    QCOMPARE(Classroom::unwrap(QUrl(QStringLiteral("https://translate.google.com/translate?sl=auto&u=https://example.com/x"))).host(),
+             QStringLiteral("example.com"));
+    QCOMPARE(Classroom::unwrap(QUrl(QStringLiteral("https://web.archive.org/web/20240101000000/https://example.com/x"))).host(),
+             QStringLiteral("example.com"));
+    QVERIFY(!Classroom::unwrap(QUrl(QStringLiteral("https://example.com/"))).isValid());
+
+    QVERIFY(Classroom::aliases(QStringLiteral("youtube.com")).contains(QStringLiteral("youtu.be")));
+    QVERIFY(Classroom::aliases(QStringLiteral("twitter.com")).contains(QStringLiteral("x.com")));
+    QVERIFY(Classroom::aliases(QStringLiteral("example.com")).isEmpty());
+
+    QVERIFY(Classroom::isBypassSite(QUrl(QStringLiteral("https://www.proxysite.com/"))));
+    QVERIFY(Classroom::isBypassSite(QUrl(QStringLiteral("https://archive.ph/abc"))));
+    QVERIFY(!Classroom::isBypassSite(QUrl(QStringLiteral("https://en.wikipedia.org/"))));
+
+    // A blocked site's other names are blocked with it.
+    const QList<BlockedSite> sites = {{QStringLiteral("youtube.com"), QString()}};
+    QVERIFY(Classroom::match(QUrl(QStringLiteral("https://youtu.be/abc")), sites));
+    QVERIFY(Classroom::match(QUrl(QStringLiteral("https://www.youtube-nocookie.com/embed/abc")), sites));
 }
 
 QTEST_GUILESS_MAIN(TestClassroom)
