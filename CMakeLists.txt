@@ -286,8 +286,15 @@ if(UNIX AND NOT APPLE)
     # AppArmor profile that lets Chromium's sandbox create user namespaces where
     # AppArmor restricts them (Ubuntu 23.10+). Lands in /etc/apparmor.d for a /usr
     # install; packages load it in their post-install script.
+    # The BSDs have no AppArmor.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(SPACEPENGUIN_APPARMOR_DEFAULT ON)
+    else()
+        set(SPACEPENGUIN_APPARMOR_DEFAULT OFF)
+    endif()
     option(SPACEPENGUIN_INSTALL_APPARMOR_PROFILE
-        "Install an AppArmor profile so Chromium's sandbox works on Ubuntu 23.10+" ON)
+        "Install an AppArmor profile so Chromium's sandbox works on Ubuntu 23.10+"
+        ${SPACEPENGUIN_APPARMOR_DEFAULT})
     if(SPACEPENGUIN_INSTALL_APPARMOR_PROFILE)
         set(SPACEPENGUIN_APPARMOR_BINARY "${CMAKE_INSTALL_FULL_BINDIR}/SpacePenguin")
         configure_file(packaging/linux/apparmor/spacepenguin.in

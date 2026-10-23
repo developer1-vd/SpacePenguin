@@ -208,7 +208,7 @@ Qt Test, one executable per area; run them with `ctest --test-dir build`.
 - `flake.nix`, `default.nix` — Nix builds.
 - `.github/workflows/build.yml` — CI:
   - builds and tests on Windows, macOS, Linux distributions, Nix, Flatpak, Android
-    and iOS;
+    and iOS, and FreeBSD in a VM;
   - publishes the nightly build from main;
   - publishes releases, from a `v*` tag or a manual run given a tag and a name.
 - `docs/` — the website.

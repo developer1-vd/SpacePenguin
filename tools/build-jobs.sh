@@ -18,6 +18,9 @@ mem_mib=""
 if [ -r /proc/meminfo ]; then
     mem_mib=$(sed -n 's/^MemAvailable: *\([0-9]*\) kB$/\1/p' /proc/meminfo)
     [ -n "${mem_mib}" ] && mem_mib=$((mem_mib / 1024))
+elif command -v sysctl >/dev/null 2>&1 && sysctl -n hw.physmem >/dev/null 2>&1; then
+    # FreeBSD, OpenBSD, NetBSD: physical memory; assume half of it is free.
+    mem_mib=$(( $(sysctl -n hw.physmem) / 1024 / 1024 / 2 ))
 elif command -v sysctl >/dev/null 2>&1 && sysctl -n hw.memsize >/dev/null 2>&1; then
     # macOS reports no "available" figure; assume half the memory is free.
     mem_mib=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 2 ))

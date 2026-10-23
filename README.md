@@ -330,6 +330,7 @@ never fetched from the network.
 | `about:about`     | The same index, with descriptions                          |
 | `about:version`   | Version, build, Qt, platform, theme, profile, blocking rules, extension count |
 | `about:license`   | SpacePenguin and Qt licensing                              |
+| `about:logins`    | Saved logins: search, add, edit, show, copy, delete        |
 | `about:blank`     | Handled by the rendering engine                            |
 | `about:penguin`   | 🐧                                                        |
 | `about:teapot`    | RFC 2324                                                   |
@@ -444,6 +445,7 @@ on each of them for every push.
 | Platform | Built with | Packages | Notes |
 | -------- | ---------- | -------- | ----- |
 | Linux (X11 and Wayland), any distribution, x86-64 and ARM64 | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
+| FreeBSD 14+, OpenBSD, NetBSD (X11 and Wayland) | Clang or GCC, the system's Qt 6.8+ from packages | build from source (`./install-deps.sh`, then CMake) | same desktop entry and icons as Linux; no AppArmor profile |
 | ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `install.sh` (or `packaging/chromeos/install.sh`) | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
 | Android 9+ (ARM64) | Qt Quick + QtWebView, Qt 6.8 | APK | a separate, smaller app on the phone's own web engine — see [Phones](#phones-android-and-ios) |
 | iOS and iPadOS 16+ | Qt Quick + QtWebView, Qt 6.8 | unsigned `.ipa` to sideload; signed `.ipa` with your Apple team | as Android |
@@ -452,7 +454,8 @@ on each of them for every push.
 
 Tested in CI on every push: Ubuntu 22.04 (AppImage), Ubuntu 24.04 and **Ubuntu
 26.04 LTS "Resolute Raccoon"** (native `.deb` against its Qt 6.10), Debian 13,
-Fedora, openSUSE Tumbleweed, Arch, Alpine, Void, Nix and Flatpak; **Windows 11**
+Fedora, openSUSE Tumbleweed, Arch, Alpine, Void, Nix and Flatpak; **FreeBSD 14**
+(in a VM); **Windows 11**
 (the Windows Server 2025 runner, which shares Windows 11 24H2's core) and Windows
 10 (Server 2022); **macOS 26 Tahoe** and macOS 14 Sonoma.
 
@@ -651,6 +654,10 @@ asks the package manager which Qt it has and:
 - otherwise downloads Qt from the official Qt mirrors (through `aqtinstall`) into
   `.qt/` in the repository. Nothing outside the repository changes, and CMake
   finds `.qt/` by itself.
+
+On **FreeBSD, OpenBSD and NetBSD** (install `bash` first) it installs Qt with
+QtWebEngine from the system's packages (`pkg`, `pkg_add`, `pkgin`); Qt publishes no
+BSD binaries. Then build as below and `sudo cmake --install build`.
 
 `--qt system` or `--qt bundled` forces either choice; `--dry-run` shows what would
 run; `--help` lists the rest. `install-deps.ps1` installs Visual Studio 2022 Build
