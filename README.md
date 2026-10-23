@@ -840,6 +840,9 @@ printed by default, since they come from the sites themselves; set
 
 ## Layout
 
+[`CODE_EXPLAIN.md`](CODE_EXPLAIN.md) walks through how the code fits together; the
+files in short:
+
 ```
 src/browserwindow.*   main window: tab strip, toolbar, omnibox, bookmarks bar, find bar, menus
 src/browserpage.*     QWebEnginePage subclass holding the security policy
