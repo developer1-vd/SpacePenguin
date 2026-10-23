@@ -10,8 +10,10 @@
 #include "historymanager.h"
 #include "icons.h"
 #include "preferences.h"
+#include "roles.h"
 #include "theme.h"
 #include "userextensions.h"
+#include "webapps.h"
 
 #include <QButtonGroup>
 #include <QCheckBox>
@@ -29,14 +31,19 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMap>
 #include <QMessageBox>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScrollArea>
 #include <QStackedWidget>
+#include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWebEngineProfile>
+
+#include <functional>
 
 namespace spacepenguin {
 namespace {
@@ -143,6 +150,8 @@ void SettingsDialog::setupTabs()
     addPage(Icons::icon(Icons::Penguin), tr("Appearance"), createAppearanceTab());
     addPage(Icons::icon(Icons::Shield), tr("Privacy & Security"), createPrivacyTab());
     addPage(Icons::icon(Icons::Download), tr("Downloads"), createDownloadsTab());
+    addPage(Icons::icon(Icons::Star), tr("Made for you"), createRolesTab());
+    addPage(Icons::icon(Icons::Globe), tr("Apps"), createAppsTab());
     addPage(Icons::icon(Icons::Extensions), tr("Extensions"), createExtensionsTab());
     addPage(Icons::icon(Icons::Info), tr("About"), createAboutTab());
 
@@ -760,6 +769,248 @@ QWidget *SettingsDialog::createAboutTab()
     layout->addWidget(links);
     layout->addWidget(mutedLabel(tr("Type about:about in the address bar for every internal "
                                     "page, and about:version for build details.")));
+    layout->addStretch(1);
+    return page;
+}
+
+namespace {
+
+/** A list edited one entry a line, saved a moment after the typing stops. */
+QPlainTextEdit *lineListEdit(const QStringList &lines, const QString &placeholder, QObject *owner,
+                             std::function<void(const QStringList &)> save)
+{
+    auto *edit = new QPlainTextEdit(lines.join(QLatin1Char('\n')));
+    edit->setPlaceholderText(placeholder);
+    edit->setFixedHeight(110);
+    edit->setTabChangesFocus(true);
+    auto *timer = new QTimer(edit);
+    timer->setSingleShot(true);
+    timer->setInterval(500);
+    QObject::connect(edit, &QPlainTextEdit::textChanged, timer, qOverload<>(&QTimer::start));
+    QObject::connect(timer, &QTimer::timeout, owner, [edit, save] {
+        QStringList entries;
+        for (const QString &line : edit->toPlainText().split(QLatin1Char('\n'))) {
+            if (!line.trimmed().isEmpty())
+                entries.append(line.trimmed());
+        }
+        save(entries);
+    });
+    return edit;
+}
+
+} // namespace
+
+QWidget *SettingsDialog::createRolesTab()
+{
+    QVBoxLayout *layout = nullptr;
+    QWidget *page = pageShell(tr("Made for you"),
+                              tr("Tell SpacePenguin what you use it for, and it adds the settings and tools "
+                                 "for that. Pick as many as fit; everything else stays the same."),
+                              &layout);
+    Preferences *preferences = Preferences::instance();
+
+    layout->addWidget(sectionTitle(tr("I use SpacePenguin as a…")));
+    QMap<Roles::Role, QCheckBox *> boxes;
+    for (const Roles::Role role : Roles::all()) {
+        auto *box = new QCheckBox(Roles::label(role));
+        box->setChecked(preferences->hasRole(Roles::key(role)));
+        layout->addWidget(box);
+        auto *description = mutedLabel(Roles::description(role));
+        description->setContentsMargins(26, 0, 0, 4);
+        layout->addWidget(description);
+        boxes.insert(role, box);
+    }
+
+    // Each role's settings, shown while it is picked.
+    const auto panel = [layout](const QString &title, QVBoxLayout **box) {
+        auto *widget = new QWidget;
+        *box = new QVBoxLayout(widget);
+        (*box)->setContentsMargins(0, 8, 0, 0);
+        (*box)->setSpacing(8);
+        (*box)->addWidget(sectionTitle(title));
+        layout->addWidget(widget);
+        return widget;
+    };
+
+    QVBoxLayout *developerLayout = nullptr;
+    QWidget *developer = panel(tr("Developer"), &developerLayout);
+    auto *noCache = new QCheckBox(tr("Load every page fresh, without the cache"));
+    noCache->setChecked(preferences->bypassCache());
+    connect(noCache, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setBypassCache(on); });
+    developerLayout->addWidget(noCache);
+    auto *userAgent = new QLineEdit(preferences->userAgent());
+    userAgent->setPlaceholderText(tr("User agent (empty: the browser's own)"));
+    userAgent->setClearButtonEnabled(true);
+    connect(userAgent, &QLineEdit::editingFinished, this,
+            [userAgent] { Preferences::instance()->setUserAgent(userAgent->text()); });
+    developerLayout->addWidget(userAgent);
+    developerLayout->addWidget(mutedLabel(tr("F12 or Ctrl+Shift+I opens the developer tools for the page; "
+                                             "Ctrl+U shows its source. Both are in the menu too.")));
+
+    QVBoxLayout *gamerLayout = nullptr;
+    QWidget *gamer = panel(tr("Gamer"), &gamerLayout);
+    auto *pointer = new QCheckBox(tr("Let games lock the mouse pointer without asking"));
+    pointer->setChecked(preferences->allowPointerLock());
+    connect(pointer, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setAllowPointerLock(on); });
+    gamerLayout->addWidget(pointer);
+    gamerLayout->addWidget(mutedLabel(tr("Esc always gives the pointer back.")));
+    auto *mute = new QCheckBox(tr("Mute the other tabs while a game is full screen"));
+    mute->setChecked(preferences->muteOthersInFullScreen());
+    connect(mute, &QCheckBox::toggled, this,
+            [](bool on) { Preferences::instance()->setMuteOthersInFullScreen(on); });
+    gamerLayout->addWidget(mute);
+
+    QVBoxLayout *focusLayout = nullptr;
+    QWidget *focus = panel(tr("Focus mode"), &focusLayout);
+    auto *focusOn = new QCheckBox(tr("Focus mode is on"));
+    focusOn->setChecked(preferences->focusMode());
+    connect(focusOn, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setFocusMode(on); });
+    focusLayout->addWidget(focusOn);
+    focusLayout->addWidget(mutedLabel(tr("While it is on, these sites show a reminder instead of the page. "
+                                         "One site a line; its subdomains count too. Turn it on and off "
+                                         "from the menu.")));
+    focusLayout->addWidget(lineListEdit(preferences->focusSites(), QStringLiteral("youtube.com"), this,
+                                        [](const QStringList &sites) {
+                                            QStringList clean;
+                                            for (const QString &site : sites) {
+                                                const QString normal = Roles::normalizeSite(site);
+                                                if (!normal.isEmpty() && !clean.contains(normal))
+                                                    clean.append(normal);
+                                            }
+                                            Preferences::instance()->setFocusSites(clean);
+                                        }));
+
+    QVBoxLayout *studentLayout = nullptr;
+    QWidget *student = panel(tr("Student"), &studentLayout);
+    studentLayout->addWidget(mutedLabel(tr("Copy Citation (Ctrl+Alt+C, or in the menu) puts a reference "
+                                           "to the page on the clipboard: its title, site, address and "
+                                           "today's date.")));
+
+    QVBoxLayout *workerLayout = nullptr;
+    QWidget *worker = panel(tr("Worker"), &workerLayout);
+    workerLayout->addWidget(mutedLabel(tr("Your work pages, one address a line. Open Work Pages in the menu "
+                                          "opens them all.")));
+    workerLayout->addWidget(lineListEdit(preferences->workPages(), QStringLiteral("https://mail.example.com"),
+                                         this, [](const QStringList &pages) {
+                                             Preferences::instance()->setWorkPages(pages);
+                                         }));
+    auto *onStart = new QCheckBox(tr("Open them when SpacePenguin starts"));
+    onStart->setChecked(preferences->openWorkPagesOnStart());
+    connect(onStart, &QCheckBox::toggled, this,
+            [](bool on) { Preferences::instance()->setOpenWorkPagesOnStart(on); });
+    workerLayout->addWidget(onStart);
+
+    QVBoxLayout *teacherLayout = nullptr;
+    QWidget *teacher = panel(tr("Teacher"), &teacherLayout);
+    auto *zoomRow = new QHBoxLayout;
+    zoomRow->addWidget(new QLabel(tr("Pages open at")));
+    auto *zoom = new QComboBox;
+    for (const int percent : {100, 110, 125, 150, 175, 200})
+        zoom->addItem(QStringLiteral("%1%").arg(percent), percent);
+    zoom->setCurrentIndex(qMax(0, zoom->findData(preferences->pageZoom())));
+    connect(zoom, &QComboBox::currentIndexChanged, this, [zoom] {
+        Preferences::instance()->setPageZoom(zoom->currentData().toInt());
+    });
+    zoomRow->addWidget(zoom);
+    zoomRow->addStretch(1);
+    teacherLayout->addLayout(zoomRow);
+    teacherLayout->addWidget(mutedLabel(tr("A larger size reads well on a projector; Ctrl+0 goes back to it.")));
+
+    const auto sync = [boxes, developer, gamer, focus, student, worker, teacher] {
+        QStringList roles;
+        for (auto it = boxes.cbegin(); it != boxes.cend(); ++it) {
+            if (it.value()->isChecked())
+                roles.append(Roles::key(it.key()));
+        }
+        // In the order of Roles::all(), whatever order they were ticked in.
+        QStringList ordered;
+        for (const Roles::Role role : Roles::all()) {
+            if (roles.contains(Roles::key(role)))
+                ordered.append(Roles::key(role));
+        }
+        developer->setVisible(ordered.contains(Roles::key(Roles::Role::Developer)));
+        gamer->setVisible(ordered.contains(Roles::key(Roles::Role::Gamer)));
+        focus->setVisible(Roles::hasFocusMode(ordered));
+        student->setVisible(ordered.contains(Roles::key(Roles::Role::Student)));
+        worker->setVisible(ordered.contains(Roles::key(Roles::Role::Worker)));
+        teacher->setVisible(ordered.contains(Roles::key(Roles::Role::Teacher)));
+        return ordered;
+    };
+    for (QCheckBox *box : boxes)
+        connect(box, &QCheckBox::toggled, this, [sync] { Preferences::instance()->setRoles(sync()); });
+    sync();
+
+    layout->addStretch(1);
+    return page;
+}
+
+QWidget *SettingsDialog::createAppsTab()
+{
+    QVBoxLayout *layout = nullptr;
+    QWidget *page = pageShell(tr("Apps"),
+                              tr("Sites installed as apps, each in a window of its own with its own icon. "
+                                 "To add one, open the site and choose Install as App in the menu."),
+                              &layout);
+
+    auto *list = new QListWidget;
+    list->setIconSize(QSize(32, 32));
+    list->setMinimumHeight(220);
+    layout->addWidget(list);
+
+    auto *buttons = new QHBoxLayout;
+    auto *openButton = new QPushButton(tr("Open"));
+    auto *removeButton = new QPushButton(Icons::icon(Icons::Trash), tr("Remove"));
+    buttons->addWidget(openButton);
+    buttons->addWidget(removeButton);
+    buttons->addStretch(1);
+    layout->addLayout(buttons);
+    layout->addWidget(mutedLabel(tr("Removing an app takes away its window and launcher; the site's "
+                                    "sign-ins and data stay, as they are the browser's.")));
+
+    const auto rebuild = [list, openButton, removeButton] {
+        list->clear();
+        const QList<WebApp> apps = WebApps::instance()->apps();
+        for (const WebApp &app : apps) {
+            const QImage icon = WebApps::instance()->icon(app.id);
+            auto *item = new QListWidgetItem(
+                icon.isNull() ? Icons::icon(Icons::Globe) : QIcon(QPixmap::fromImage(icon)),
+                QStringLiteral("%1\n%2").arg(app.name, app.startUrl.host()), list);
+            item->setData(Qt::UserRole, app.id);
+        }
+        if (apps.isEmpty()) {
+            auto *empty = new QListWidgetItem(tr("No apps yet."), list);
+            empty->setFlags(Qt::NoItemFlags);
+        }
+        openButton->setEnabled(!apps.isEmpty());
+        removeButton->setEnabled(!apps.isEmpty());
+        if (!apps.isEmpty())
+            list->setCurrentRow(0);
+    };
+    rebuild();
+    connect(WebApps::instance(), &WebApps::changed, list, rebuild);
+
+    const auto selected = [list] {
+        const QListWidgetItem *item = list->currentItem();
+        return item ? item->data(Qt::UserRole).toString() : QString();
+    };
+    connect(openButton, &QPushButton::clicked, this, [this, selected] {
+        if (!selected().isEmpty())
+            emit appOpenRequested(selected());
+    });
+    connect(list, &QListWidget::itemActivated, this, [this](QListWidgetItem *item) {
+        const QString id = item->data(Qt::UserRole).toString();
+        if (!id.isEmpty())
+            emit appOpenRequested(id);
+    });
+    connect(removeButton, &QPushButton::clicked, this, [this, selected] {
+        const QString id = selected();
+        if (id.isEmpty())
+            return;
+        const WebApp app = WebApps::instance()->app(id);
+        if (confirm(this, tr("Remove App"), tr("Remove “%1” and its launcher?").arg(app.name)))
+            WebApps::instance()->remove(id);
+    });
+
     layout->addStretch(1);
     return page;
 }

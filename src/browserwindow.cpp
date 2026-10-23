@@ -5,6 +5,7 @@
 
 #include "aboutpages.h"
 #include "adblocker.h"
+#include "appwindow.h"
 #include "bookmarkmanager.h"
 #include "bookmarksdialog.h"
 #include "chromeextensions.h"
@@ -20,6 +21,7 @@
 #include "notifications.h"
 #include "icons.h"
 #include "preferences.h"
+#include "roles.h"
 #include "devicetuning.h"
 #include "sandbox.h"
 #include "settingsdialog.h"
@@ -38,6 +40,7 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QCompleter>
+#include <QClipboard>
 #include <QCursor>
 #include <QDataStream>
 #include <QDateTime>
@@ -51,6 +54,7 @@
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -61,6 +65,10 @@
 #include <QLocale>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
+#include <QNetworkRequest>
+#include <QPixmap>
+#include <QSignalBlocker>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QNetworkAccessManager>
@@ -91,6 +99,7 @@
 #include <QWebEngineSettings>
 #include <QWidgetAction>
 
+#include <algorithm>
 #include <memory>
 
 namespace spacepenguin {
@@ -289,6 +298,15 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
     rebuildBookmarksBar();
     restoreSession();
 
+    // Worker: the work pages open with the browser, once.
+    static bool workPagesOpened = false;
+    if (!m_isPrivate && !workPagesOpened) {
+        workPagesOpened = true;
+        const Preferences *preferences = Preferences::instance();
+        if (preferences->hasRole(Roles::key(Roles::Role::Worker)) && preferences->openWorkPagesOnStart())
+            openWorkPages();
+    }
+
     // A new release, for those who asked to hear of one.
     if (!m_isPrivate) {
         connect(UpdateChecker::instance(), &UpdateChecker::updateAvailable, this,
@@ -440,7 +458,7 @@ void BrowserWindow::createActions()
             [this] { setZoom(currentZoom() - kZoomStep); });
 
     m_zoomResetAction = makeAction(tr("Reset Zoom"), Shortcuts::keys(Shortcuts::ZoomReset));
-    connect(m_zoomResetAction, &QAction::triggered, this, [this] { setZoom(1.0); });
+    connect(m_zoomResetAction, &QAction::triggered, this, [this] { setZoom(defaultZoom()); });
 
     m_exitFullScreenShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     m_exitFullScreenShortcut->setEnabled(false);
@@ -503,6 +521,39 @@ void BrowserWindow::createActions()
     connect(m_aboutAction, &QAction::triggered, this, [this] {
         newTab(QUrl(QStringLiteral("about:about")));
     });
+
+    m_installAppAction = makeAction(tr("Install as App…"), {}, Icons::icon(Icons::Download));
+    connect(m_installAppAction, &QAction::triggered, this, &BrowserWindow::installCurrentPageAsApp);
+
+    // Made for you: each role's tools, shown when the role is picked (applyRoles).
+#ifdef Q_OS_MACOS
+    m_devToolsAction = makeAction(tr("Developer Tools"),
+                                  {QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_I), QKeySequence(Qt::Key_F12)});
+#else
+    m_devToolsAction = makeAction(tr("Developer Tools"),
+                                  {QKeySequence(Qt::Key_F12), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I)});
+#endif
+    connect(m_devToolsAction, &QAction::triggered, this, &BrowserWindow::openDevTools);
+    m_viewSourceAction = makeAction(tr("View Page Source"), {QKeySequence(Qt::CTRL | Qt::Key_U)});
+    connect(m_viewSourceAction, &QAction::triggered, this, [this] {
+        if (WebView *view = currentView(); view && !view->url().isEmpty())
+            newTab(QUrl(QStringLiteral("view-source:") + view->url().toString()));
+    });
+    m_focusModeAction = makeAction(tr("Focus Mode"));
+    m_focusModeAction->setCheckable(true);
+    connect(m_focusModeAction, &QAction::toggled, this, [this](bool on) {
+        if (on == Preferences::instance()->focusMode())
+            return;
+        Preferences::instance()->setFocusMode(on);
+        showToast(on ? tr("Focus mode is on: %n distracting site(s) are kept away.", nullptr,
+                          int(Preferences::instance()->focusSites().size()))
+                     : tr("Focus mode is off."),
+                  3000);
+    });
+    m_citationAction = makeAction(tr("Copy Citation"), {QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C)});
+    connect(m_citationAction, &QAction::triggered, this, &BrowserWindow::copyCitation);
+    m_workPagesAction = makeAction(tr("Open Work Pages"));
+    connect(m_workPagesAction, &QAction::triggered, this, &BrowserWindow::openWorkPages);
 }
 
 void BrowserWindow::createChrome()
@@ -794,7 +845,7 @@ QWidget *BrowserWindow::createNavigationBar()
     m_zoomButton->setFocusPolicy(Qt::NoFocus);
     m_zoomButton->setToolTip(tr("Reset zoom"));
     m_zoomButton->hide();
-    connect(m_zoomButton, &QToolButton::clicked, this, [this] { setZoom(1.0); });
+    connect(m_zoomButton, &QToolButton::clicked, this, [this] { setZoom(defaultZoom()); });
     layout->addWidget(m_zoomButton);
 
     m_blockingButton = new QToolButton;
@@ -923,6 +974,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_readerAction);
     menu->addAction(m_historyAction);
     menu->addAction(m_downloadsAction);
+    menu->addAction(m_installAppAction);
     menu->addSeparator();
 
     // Zoom controls in one row, the way most browsers lay them out.
@@ -964,6 +1016,12 @@ QMenu *BrowserWindow::createAppMenu()
 
     menu->addAction(m_findAction);
     menu->addSeparator();
+    menu->addAction(m_focusModeAction);
+    menu->addAction(m_workPagesAction);
+    menu->addAction(m_citationAction);
+    menu->addAction(m_devToolsAction);
+    menu->addAction(m_viewSourceAction);
+    menu->addSeparator();
 
     QMenu *themeMenu = menu->addMenu(tr("Theme"));
     m_themeGroup = new QActionGroup(this);
@@ -993,6 +1051,16 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_quitAction);
 
     connect(menu, &QMenu::aboutToShow, this, &BrowserWindow::updateZoomIndicator);
+    connect(menu, &QMenu::aboutToShow, this, [this] {
+        const WebView *view = currentView();
+        const QUrl url = view ? view->url() : QUrl();
+        const bool web = url.scheme() == QLatin1String("https") || url.scheme() == QLatin1String("http");
+        QString site = url.host();
+        if (site.startsWith(QLatin1String("www.")))
+            site.remove(0, 4);
+        m_installAppAction->setText(web ? tr("Install %1 as App…").arg(site) : tr("Install as App…"));
+        m_installAppAction->setEnabled(web && !m_isPrivate);
+    });
     return menu;
 }
 
@@ -1044,6 +1112,13 @@ void BrowserWindow::createMenus()
     toolsMenu->addAction(m_historyAction);
     toolsMenu->addAction(m_downloadsAction);
     toolsMenu->addAction(m_extensionsAction);
+    toolsMenu->addAction(m_installAppAction);
+    toolsMenu->addSeparator();
+    toolsMenu->addAction(m_focusModeAction);
+    toolsMenu->addAction(m_workPagesAction);
+    toolsMenu->addAction(m_citationAction);
+    toolsMenu->addAction(m_devToolsAction);
+    toolsMenu->addAction(m_viewSourceAction);
     toolsMenu->addSeparator();
     QAction *blockingAction = toolsMenu->addAction(Icons::icon(Icons::Shield), tr("Ad Blocking"));
     connect(blockingAction, &QAction::triggered, this, [this] { m_blockingButton->showMenu(); });
@@ -1097,6 +1172,8 @@ void BrowserWindow::applyPreferences()
     m_frame->setCustomTitleBar(!preferences->useSystemTitleBar());
     setTabsOnSide(preferences->sideTabs());
     m_sideTabs->setCollapsed(preferences->sideTabsCollapsed());
+
+    applyRoles();
 
     syncThemeMenu();
     // The groups' colours follow the theme.
@@ -1166,6 +1243,7 @@ void BrowserWindow::showSettings()
     connect(&dialog, &SettingsDialog::savedLoginsRequested, this, &BrowserWindow::showSavedLogins);
     connect(&dialog, &SettingsDialog::sitePermissionsRequested, this,
             &BrowserWindow::showSitePermissions);
+    connect(&dialog, &SettingsDialog::appOpenRequested, this, &BrowserWindow::openApp);
     dialog.exec();
 }
 
@@ -1671,7 +1749,7 @@ int BrowserWindow::indexOfView(const QWebEngineView *view) const
 WebView *BrowserWindow::addTab(bool background)
 {
     auto *view = new WebView(m_services.profile);
-    view->setZoomFactor(1.0);
+    view->setZoomFactor(defaultZoom());
     applyDataSaver(view);
     connectView(view);
     m_stack->addWidget(view);
@@ -2834,7 +2912,7 @@ qreal BrowserWindow::currentZoom() const
 void BrowserWindow::updateZoomIndicator()
 {
     const qreal zoom = currentZoom();
-    const bool zoomed = qAbs(zoom - 1.0) > 0.001;
+    const bool zoomed = qAbs(zoom - defaultZoom()) > 0.001;
     m_zoomButton->setText(formatPercent(zoom));
     m_zoomButton->setVisible(zoomed);
     if (m_zoomMenuLabel)
@@ -3087,6 +3165,24 @@ void BrowserWindow::connectView(WebView *view)
                 }
                 request.accept();
                 m_fullScreenView = request.toggleOn() ? view : nullptr;
+                // Gamer: the other tabs go quiet while a game fills the screen.
+                const Preferences *preferences = Preferences::instance();
+                if (request.toggleOn() && preferences->hasRole(Roles::key(Roles::Role::Gamer))
+                    && preferences->muteOthersInFullScreen()) {
+                    for (int i = 0; i < m_tabBar->count(); ++i) {
+                        WebView *other = viewAt(i);
+                        if (other && other != view && !other->page()->isAudioMuted()) {
+                            other->page()->setAudioMuted(true);
+                            m_mutedForFullScreen.append(other);
+                        }
+                    }
+                } else if (!request.toggleOn()) {
+                    for (const QPointer<WebView> &other : std::as_const(m_mutedForFullScreen)) {
+                        if (other)
+                            other->page()->setAudioMuted(false);
+                    }
+                    m_mutedForFullScreen.clear();
+                }
                 setPageFullScreen(request.toggleOn());
             });
     connect(view->page(), &QWebEnginePage::windowCloseRequested, this,
@@ -3096,6 +3192,13 @@ void BrowserWindow::connectView(WebView *view)
 
     connect(view->page(), &QWebEnginePage::permissionRequested, this,
             [this, view](QWebEnginePermission permission) {
+                // Gamer: games take the mouse pointer without asking (Esc gives it back).
+                const Preferences *preferences = Preferences::instance();
+                if (permission.permissionType() == QWebEnginePermission::PermissionType::MouseLock
+                    && preferences->hasRole(Roles::key(Roles::Role::Gamer)) && preferences->allowPointerLock()) {
+                    permission.grant();
+                    return;
+                }
                 const QString site = SitePermissions::siteName(permission.origin());
                 Prompt prompt;
                 prompt.key = QStringLiteral("permission:%1:%2")
@@ -3290,6 +3393,319 @@ void BrowserWindow::syncOmnibox(const QUrl &url)
     m_omnibox->setText(isStartPage(url) ? QString() : url.toDisplayString());
     m_omnibox->setCursorPosition(0);
     m_omniboxEdited = false;
+}
+
+// ---- Made for you and installed apps ---------------------------------------
+
+void BrowserWindow::applyRoles()
+{
+    const Preferences *preferences = Preferences::instance();
+    const QStringList roles = preferences->roles();
+    const bool developer = roles.contains(Roles::key(Roles::Role::Developer));
+    const auto show = [](QAction *action, bool on) {
+        // A hidden action's shortcut does nothing either.
+        action->setVisible(on);
+        action->setEnabled(on);
+    };
+    show(m_devToolsAction, developer);
+    show(m_viewSourceAction, developer);
+    show(m_focusModeAction, Roles::hasFocusMode(roles));
+    show(m_citationAction, roles.contains(Roles::key(Roles::Role::Student)));
+    show(m_workPagesAction, roles.contains(Roles::key(Roles::Role::Worker)));
+    {
+        const QSignalBlocker blocker(m_focusModeAction);
+        m_focusModeAction->setChecked(preferences->focusMode());
+    }
+
+    // Developer: the user agent and the cache belong to the profile, which every
+    // window of it shares; the browser's own are remembered to go back to.
+    QWebEngineProfile *profile = m_services.profile;
+    if (!profile)
+        return;
+    static QHash<const QWebEngineProfile *, QString> ownUserAgents;
+    static QHash<const QWebEngineProfile *, QWebEngineProfile::HttpCacheType> ownCaches;
+    if (!ownUserAgents.contains(profile)) {
+        ownUserAgents.insert(profile, profile->httpUserAgent());
+        ownCaches.insert(profile, profile->httpCacheType());
+    }
+    const QString userAgent = developer && !preferences->userAgent().isEmpty() ? preferences->userAgent()
+                                                                              : ownUserAgents.value(profile);
+    if (profile->httpUserAgent() != userAgent)
+        profile->setHttpUserAgent(userAgent);
+    if (!profile->isOffTheRecord()) {
+        const QWebEngineProfile::HttpCacheType cache =
+            developer && preferences->bypassCache() ? QWebEngineProfile::NoCache : ownCaches.value(profile);
+        if (profile->httpCacheType() != cache)
+            profile->setHttpCacheType(cache);
+    }
+}
+
+qreal BrowserWindow::defaultZoom() const
+{
+    // Teacher: pages open larger, for the projector.
+    const Preferences *preferences = Preferences::instance();
+    return preferences->hasRole(Roles::key(Roles::Role::Teacher)) ? preferences->pageZoom() / 100.0 : 1.0;
+}
+
+void BrowserWindow::openDevTools()
+{
+    WebView *view = currentView();
+    if (!view)
+        return;
+    if (QWebEnginePage *open = view->page()->devToolsPage()) {
+        if (QWebEngineView *tools = QWebEngineView::forPage(open)) {
+            tools->window()->show();
+            tools->window()->raise();
+            tools->window()->activateWindow();
+            return;
+        }
+    }
+    auto *tools = new QWebEngineView;
+    tools->setAttribute(Qt::WA_DeleteOnClose);
+    auto *page = new QWebEnginePage(m_services.profile, tools);
+    tools->setPage(page);
+    page->setInspectedPage(view->page());
+    const QString site = view->url().host().isEmpty() ? view->title() : view->url().host();
+    tools->setWindowTitle(tr("Developer Tools — %1").arg(site));
+    tools->resize(960, 680);
+    tools->show();
+    connect(view, &QObject::destroyed, tools, &QWidget::close);
+}
+
+void BrowserWindow::copyCitation()
+{
+    const WebView *view = currentView();
+    if (!view || view->url().isEmpty())
+        return;
+    const QString citation = Roles::citation(view->title(), view->url(), QDate::currentDate());
+    QGuiApplication::clipboard()->setText(citation);
+    showToast(tr("Copied: %1").arg(citation), 4000);
+}
+
+void BrowserWindow::openWorkPages()
+{
+    const QStringList pages = Preferences::instance()->workPages();
+    if (pages.isEmpty()) {
+        showToast(tr("Add your work pages in Settings › Made for you."), 4000);
+        return;
+    }
+    for (const QString &page : pages)
+        openInNewTab(page);
+}
+
+void BrowserWindow::installCurrentPageAsApp()
+{
+    WebView *view = currentView();
+    if (!view || m_isPrivate)
+        return;
+    const QUrl pageUrl = view->url();
+    if (pageUrl.scheme() != QLatin1String("https") && pageUrl.scheme() != QLatin1String("http"))
+        return;
+
+    // What the page says about itself: its web app manifest, name, colour and icons.
+    static const QString script = QStringLiteral(R"js((function () {
+  var manifest = document.querySelector('link[rel~="manifest"]');
+  var theme = document.querySelector('meta[name="theme-color"]');
+  var name = document.querySelector('meta[name="application-name"], meta[name="apple-mobile-web-app-title"], meta[property="og:site_name"]');
+  var icons = Array.prototype.map.call(
+    document.querySelectorAll('link[rel~="icon"], link[rel~="apple-touch-icon"]'), function (link) {
+      var size = 0;
+      (link.getAttribute('sizes') || '').split(' ').forEach(function (entry) {
+        size = Math.max(size, parseInt(entry, 10) || 0);
+      });
+      if (!size && /apple-touch-icon/.test(link.rel)) size = 180;
+      return {href: link.href, size: size};
+    });
+  return JSON.stringify({manifest: manifest ? manifest.href : '', theme: theme ? theme.content : '',
+                         name: name ? (name.getAttribute('content') || '') : '', icons: icons});
+})())js");
+
+    const QPointer<WebView> guard(view);
+    view->page()->runJavaScript(script, QWebEngineScript::ApplicationWorld,
+                                [this, guard, pageUrl](const QVariant &result) {
+        if (!guard)
+            return;
+        const QJsonObject info = QJsonDocument::fromJson(result.toString().toUtf8()).object();
+        WebApp app;
+        app.startUrl = pageUrl;
+        app.name = info.value(QStringLiteral("name")).toString().trimmed();
+        if (app.name.isEmpty())
+            app.name = guard->title().section(QStringLiteral(" - "), 0, 0).section(QStringLiteral(" | "), 0, 0).trimmed();
+        app.themeColor = info.value(QStringLiteral("theme")).toString();
+        app.id = WebApps::idFor(app.startUrl);
+
+        QList<std::pair<int, QUrl>> sized;
+        for (const QJsonValue &value : info.value(QStringLiteral("icons")).toArray()) {
+            const QJsonObject icon = value.toObject();
+            sized.append({icon.value(QStringLiteral("size")).toInt(),
+                          QUrl(icon.value(QStringLiteral("href")).toString())});
+        }
+        std::stable_sort(sized.begin(), sized.end(),
+                         [](const auto &a, const auto &b) { return a.first > b.first; });
+        QList<QUrl> pageIcons;
+        for (const auto &entry : sized)
+            pageIcons.append(entry.second);
+
+        const QUrl manifestUrl(info.value(QStringLiteral("manifest")).toString());
+        if (manifestUrl.scheme() != QLatin1String("https") && manifestUrl.scheme() != QLatin1String("http")) {
+            finishAppInstall(guard, app, QUrl(), pageIcons);
+            return;
+        }
+        if (!m_network)
+            m_network = new QNetworkAccessManager(this);
+        QNetworkRequest request(manifestUrl);
+        request.setTransferTimeout(15000);
+        request.setHeader(QNetworkRequest::UserAgentHeader, m_services.profile->httpUserAgent());
+        QNetworkReply *reply = m_network->get(request);
+        connect(reply, &QNetworkReply::finished, this, [this, reply, guard, app, manifestUrl, pageUrl, pageIcons] {
+            reply->deleteLater();
+            if (!guard)
+                return;
+            WebApp described = app;
+            QUrl iconUrl;
+            if (reply->error() == QNetworkReply::NoError) {
+                described = WebApps::fromManifest(reply->readAll(), manifestUrl, pageUrl, &iconUrl);
+                if (described.name.isEmpty())
+                    described.name = app.name;
+                if (described.themeColor.isEmpty())
+                    described.themeColor = app.themeColor;
+            }
+            finishAppInstall(guard, described, iconUrl, pageIcons);
+        });
+    });
+}
+
+void BrowserWindow::finishAppInstall(WebView *view, WebApp app, const QUrl &iconUrl, const QList<QUrl> &pageIcons)
+{
+    // The icon: the manifest's, else the biggest the page names, else the tab's.
+    QList<QUrl> candidates;
+    if (iconUrl.isValid())
+        candidates.append(iconUrl);
+    candidates.append(pageIcons);
+    const QImage fallback = view ? view->icon().pixmap(128, 128).toImage() : QImage();
+    if (!m_network)
+        m_network = new QNetworkAccessManager(this);
+
+    auto tryNext = std::make_shared<std::function<void(int)>>();
+    *tryNext = [this, candidates, fallback, app, tryNext](int index) {
+        if (index >= candidates.size()) {
+            confirmAppInstall(app, fallback);
+            return;
+        }
+        QNetworkRequest request(candidates.at(index));
+        request.setTransferTimeout(15000);
+        QNetworkReply *reply = m_network->get(request);
+        connect(reply, &QNetworkReply::finished, this, [this, reply, index, tryNext, app] {
+            reply->deleteLater();
+            const QImage image = reply->error() == QNetworkReply::NoError ? QImage::fromData(reply->readAll())
+                                                                         : QImage();
+            if (image.isNull())
+                (*tryNext)(index + 1);
+            else
+                confirmAppInstall(app, image);
+        });
+    };
+    (*tryNext)(0);
+}
+
+void BrowserWindow::confirmAppInstall(const WebApp &app, const QImage &icon)
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Install App"));
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *top = new QHBoxLayout;
+    auto *iconLabel = new QLabel;
+    if (!icon.isNull())
+        iconLabel->setPixmap(QPixmap::fromImage(icon.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    iconLabel->setFixedSize(68, 68);
+    iconLabel->setAlignment(Qt::AlignCenter);
+    top->addWidget(iconLabel);
+    auto *fields = new QVBoxLayout;
+    auto *nameEdit = new QLineEdit(app.name);
+    nameEdit->setPlaceholderText(app.startUrl.host());
+    fields->addWidget(nameEdit);
+    auto *site = new QLabel(app.startUrl.host());
+    site->setProperty("muted", true);
+    fields->addWidget(site);
+    top->addLayout(fields, 1);
+    layout->addLayout(top);
+#if defined(Q_OS_WIN)
+    const QString where = tr("the Start menu");
+#elif defined(Q_OS_MACOS)
+    const QString where = tr("Applications");
+#else
+    const QString where = tr("your app menu");
+#endif
+    auto *about = new QLabel(tr("It opens in a window of its own, without tabs or an address bar, and "
+                                "appears in %1. Links to other sites open here in the browser.")
+                                 .arg(where));
+    about->setWordWrap(true);
+    layout->addWidget(about);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
+    buttons->addButton(tr("Install"), QDialogButtonBox::AcceptRole)->setDefault(true);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    dialog.resize(440, dialog.sizeHint().height());
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    WebApp installed = app;
+    if (!nameEdit->text().trimmed().isEmpty())
+        installed.name = nameEdit->text().trimmed();
+    QString error;
+    if (!WebApps::instance()->install(installed, icon, &error)) {
+        QMessageBox::warning(this, tr("Install App"),
+                             tr("“%1” was saved, but its launcher could not be added: %2")
+                                 .arg(installed.name, error));
+    } else {
+        showToast(tr("Installed “%1”. Find it in %2.").arg(installed.name, where), 5000);
+    }
+    openApp(installed.id);
+}
+
+void BrowserWindow::openApp(const QString &id)
+{
+    QWebEngineProfile *profile = registry().normal.profile;
+    if (!profile && !m_isPrivate)
+        profile = m_services.profile;
+    if (!AppWindow::open(id, profile, [](bool background) { return BrowserWindow::tabForOutside(background); }))
+        showToast(tr("That app is not installed any more."), 4000);
+}
+
+void BrowserWindow::registerServices(const ProfileServices &services)
+{
+    ServiceRegistry &shared = registry();
+    if (!shared.normal.profile && services.profile && !services.profile->isOffTheRecord())
+        shared.normal = services;
+}
+
+BrowserWindow *BrowserWindow::frontWindow()
+{
+    if (auto *active = qobject_cast<BrowserWindow *>(QApplication::activeWindow()); active && !active->isPrivate())
+        return active;
+    for (QWidget *widget : QApplication::topLevelWidgets()) {
+        auto *candidate = qobject_cast<BrowserWindow *>(widget);
+        if (candidate && candidate->isVisible() && !candidate->isPrivate())
+            return candidate;
+    }
+    ServiceRegistry &shared = registry();
+    auto *window = new BrowserWindow(shared.normal.profile ? shared.normal : createProfileServices(qApp, false));
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    window->show();
+    return window;
+}
+
+WebView *BrowserWindow::tabForOutside(bool background)
+{
+    BrowserWindow *target = frontWindow();
+    WebView *view = target->addTab(background);
+    if (target->isMinimized())
+        target->showNormal();
+    target->show();
+    target->raise();
+    target->activateWindow();
+    return view;
 }
 
 }

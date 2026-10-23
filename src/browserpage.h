@@ -3,6 +3,8 @@
 #include <QElapsedTimer>
 #include <QWebEnginePage>
 
+#include <functional>
+
 namespace spacepenguin {
 
 class BrowserPage : public QWebEnginePage
@@ -11,6 +13,11 @@ class BrowserPage : public QWebEnginePage
 
 public:
     explicit BrowserPage(QWebEngineProfile *profile, QObject *parent = nullptr);
+
+    /** Decides about each page the main frame is about to load; false stops it. An
+     *  installed app's window uses it to send other sites to the browser. */
+    using NavigationFilter = std::function<bool(const QUrl &url, NavigationType type)>;
+    void setNavigationFilter(NavigationFilter filter) { m_navigationFilter = std::move(filter); }
 
 signals:
     /**
@@ -35,6 +42,7 @@ protected:
     static bool isAboutPage(const QUrl &url);
 
 private:
+    NavigationFilter m_navigationFilter;
     QUrl m_hoveredLink;
     QElapsedTimer m_hoverEnded;
 };

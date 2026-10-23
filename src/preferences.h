@@ -3,6 +3,7 @@
 #include <QList>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 
 namespace spacepenguin {
 
@@ -73,6 +74,42 @@ public:
     bool checkForUpdates() const;
     void setCheckForUpdates(bool check);
     void setStripTracking(bool strip);
+
+    // Made for you (see roles.h): what this person uses the browser for, and the
+    // settings each role brings.
+    QStringList roles() const;
+    void setRoles(const QStringList &roles);
+    bool hasRole(const QString &role) const;
+
+    /** Developer: load every page fresh, without the HTTP cache. */
+    bool bypassCache() const;
+    void setBypassCache(bool bypass);
+    /** Developer: the user agent sent to sites; empty means the browser's own. */
+    QString userAgent() const;
+    void setUserAgent(const QString &userAgent);
+
+    /** Gamer: games may hide and lock the mouse pointer without asking. */
+    bool allowPointerLock() const;
+    void setAllowPointerLock(bool allow);
+    /** Gamer: while a page is full screen, the other tabs are muted. */
+    bool muteOthersInFullScreen() const;
+    void setMuteOthersInFullScreen(bool mute);
+
+    /** Student, worker, teacher: Focus mode is on, and the sites it keeps away. */
+    bool focusMode() const;
+    void setFocusMode(bool on);
+    QStringList focusSites() const;
+    void setFocusSites(const QStringList &sites);
+
+    /** Worker: the pages opened by Open Work Pages, and whether they open at start-up. */
+    QStringList workPages() const;
+    void setWorkPages(const QStringList &pages);
+    bool openWorkPagesOnStart() const;
+    void setOpenWorkPagesOnStart(bool open);
+
+    /** Teacher: the size new pages open at, in percent (100 is normal). */
+    int pageZoom() const;
+    void setPageZoom(int percent);
 
     /** Announces a change made outside the setters, such as the theme. */
     void notifyChanged();

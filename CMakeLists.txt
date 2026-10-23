@@ -177,6 +177,12 @@ qt_add_executable(spacepenguin
     src/extensionsdialog.h
     src/systemscheme.cpp
     src/systemscheme.h
+    src/appwindow.cpp
+    src/appwindow.h
+    src/roles.cpp
+    src/roles.h
+    src/webapps.cpp
+    src/webapps.h
     src/theme.cpp
     src/theme.h
     src/userextensions.cpp
@@ -220,7 +226,7 @@ if(WIN32)
     # and embed the icon and version information Explorer shows.
     set_target_properties(spacepenguin PROPERTIES WIN32_EXECUTABLE TRUE)
     # DwmSetWindowAttribute, for Windows 11's rounded corners on our own frame.
-    target_link_libraries(spacepenguin PRIVATE dwmapi crypt32)
+    target_link_libraries(spacepenguin PRIVATE dwmapi crypt32 ole32 uuid)
     set(SPACEPENGUIN_ICO "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/spacepenguin.ico")
     file(TO_CMAKE_PATH "${SPACEPENGUIN_ICO}" SPACEPENGUIN_ICO)
     configure_file(packaging/windows/spacepenguin.rc.in
@@ -357,6 +363,20 @@ if(SPACEPENGUIN_BUILD_TESTS)
         endif()
         target_include_directories(tst_importer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME importer COMMAND tst_importer)
+
+        qt_add_executable(tst_roles
+            tests/tst_roles.cpp
+            src/roles.cpp
+            src/roles.h
+            src/webapps.cpp
+            src/webapps.h
+        )
+        target_include_directories(tst_roles PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_link_libraries(tst_roles PRIVATE Qt6::Test Qt6::Gui)
+        if(WIN32)
+            target_link_libraries(tst_roles PRIVATE ole32 uuid)
+        endif()
+        add_test(NAME roles COMMAND tst_roles)
 
         qt_add_executable(tst_userextensions
             tests/tst_userextensions.cpp

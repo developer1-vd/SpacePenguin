@@ -99,6 +99,26 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
   directly, or any browser's exported bookmarks file (Firefox, Safari); saved
   logins import from a passwords CSV
 - **Reader view** — `F9` shows a page's article alone, in clean type
+- **Made for you** — *Settings › Made for you* asks what you use SpacePenguin for, and
+  each role you pick adds its own settings and tools (pick as many as fit):
+  - *Developer*: developer tools (`F12`, `Ctrl`+`Shift`+`I`), page source
+    (`Ctrl`+`U`), browsing without the cache, a user agent of your own
+  - *Gamer*: games lock the mouse pointer without asking (`Esc` gives it back), and
+    the other tabs go quiet while a game is full screen
+  - *Student*: Focus mode, and *Copy Citation* (`Ctrl`+`Alt`+`C`): the page's title,
+    site, address and today's date on the clipboard
+  - *Worker*: Focus mode, and your work pages opened together, from the menu or at
+    start-up
+  - *Teacher*: Focus mode, and pages that open larger (up to 200%) for a projector
+
+  Focus mode (in the menu) shows a reminder instead of the sites on its list —
+  YouTube, TikTok, Instagram and the like to begin with; edit the list in Settings
+- **Install sites as apps** — *Install … as App* in the menu turns a site into an app
+  on your computer: SpacePenguin reads its web app manifest (progressive web apps)
+  for the name, icon, start page and scope, and adds a launcher to your app menu
+  (Linux), the Start menu (Windows) or ~/Applications (macOS). The app opens in a
+  window of its own, without tabs or an address bar; links to other sites open in the
+  browser. *Settings › Apps* opens and removes them
 - **Cookies by site** — *Settings › Privacy › Cookies by site* lists and removes
   cookies one site or one cookie at a time; the address bar's site menu removes the
   current site's
@@ -350,6 +370,9 @@ the desktop — macOS gets the binding Safari and Chrome use there instead.
 | Full screen           | `F11`                           | `⌃⌘F`                         |
 | Reader view           | `F9`                            | `F9`                          |
 | Mute tab              | `Ctrl+M`                        | `⌃M`                          |
+| Developer tools ¹     | `F12`, `Ctrl+Shift+I`           | `⌥⌘I`, `F12`                  |
+| Page source ¹         | `Ctrl+U`                        | `⌘U`                          |
+| Copy citation ²       | `Ctrl+Alt+C`                    | `⌥⌘C`                         |
 | Open file             | `Ctrl+O`                        | `⌘O`                          |
 | Bookmark this page    | `Ctrl+D`                        | `⌘D`                          |
 | Show bookmarks bar    | `Ctrl+Shift+B`                  | `⇧⌘B`                         |
@@ -360,6 +383,11 @@ the desktop — macOS gets the binding Safari and Chrome use there instead.
 | Extensions            | `Ctrl+Shift+E`                  | `⇧⌘E`                         |
 | Settings              | `Ctrl+,`                        | `⌘,`                          |
 | Keyboard shortcuts    | `F1`                            | `⌘?`                          |
+
+¹ With the Developer role picked in *Settings › Made for you*. ² With the Student role.
+
+An installed app's window has its own: `Alt+Left` / `Alt+Right` back and forward,
+`F5` reload, `Ctrl+Shift+B` open the page in the browser, `F11` full screen.
 
 The start page and the `about:` pages show the bindings for the platform you are
 on.
@@ -779,6 +807,9 @@ src/browserpage.*     QWebEnginePage subclass holding the security policy
 src/webview.*         per-tab view: load state, links opened as new tabs
 src/icons.*           painted icon set that follows the theme
 src/preferences.*     QSettings-backed preferences shared by every window
+src/roles.*           Made for you: the roles, Focus mode's site matching, citations
+src/webapps.*         installed web apps: manifests, launchers for each system
+src/appwindow.*       an installed web app's own window
 src/shortcuts.*       per-platform keyboard bindings
 src/singleinstance.*  hands a second launch's pages to the running browser
 src/settingsdialog.*  settings window

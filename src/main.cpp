@@ -6,8 +6,11 @@
 #include <QLoggingCategory>
 #include <QTimer>
 #include <QWebEngineProfile>
+
+#include <algorithm>
 #include <QWebEngineUrlScheme>
 
+#include "appwindow.h"
 #include "browserwindow.h"
 #include "devicetuning.h"
 #include "icons.h"
@@ -85,6 +88,12 @@ int main(int argc, char *argv[])
         QStringLiteral("file"));
     parser.addOption(filterListOption);
 
+    const QCommandLineOption appOption(
+        QStringList{QStringLiteral("app")},
+        QStringLiteral("Open the installed web app <id> in its own window (see Install as App)."),
+        QStringLiteral("id"));
+    parser.addOption(appOption);
+
     parser.addPositionalArgument(QStringLiteral("urls"),
                                  QStringLiteral("Addresses or searches to open in new tabs."),
                                  QStringLiteral("[urls...]"));
@@ -93,6 +102,7 @@ int main(int argc, char *argv[])
 
     const bool isPrivate = parser.isSet(privateModeOption);
     const QStringList urls = parser.positionalArguments();
+    const QString appId = parser.value(appOption);
 
     // One process per profile: a second launch hands its pages to the first one.
     const QString dataDirectory = parser.isSet(userDataOption)
@@ -102,6 +112,8 @@ int main(int argc, char *argv[])
     QStringList handOff = urls;
     if (isPrivate)
         handOff.prepend(QStringLiteral("--private"));
+    if (!appId.isEmpty())
+        handOff = {QStringLiteral("--app=") + appId};
     if (instance.sendToRunningInstance(handOff))
         return 0;
 
@@ -117,30 +129,37 @@ int main(int argc, char *argv[])
         services.profile->setCachePath(dataDirectory + QStringLiteral("/cache"));
     }
 
-    spacepenguin::BrowserWindow window(std::move(services));
-    spacepenguin::StartupTrace::mark("window built");
-    window.show();
-    QTimer::singleShot(0, [] { spacepenguin::StartupTrace::mark("window shown"); });
-
-    for (const QString &url : urls)
-        window.openInNewTab(url);
+    // An installed app on its own opens only its window; the browser's comes when
+    // a page leaves the app, or when the browser itself is started.
+    spacepenguin::BrowserWindow::registerServices(services);
+    QWebEngineProfile *appProfile = services.profile;
+    const auto tabForOutside = [](bool background) {
+        return spacepenguin::BrowserWindow::tabForOutside(background);
+    };
+    if (appId.isEmpty() || isPrivate
+        || !spacepenguin::AppWindow::open(appId, appProfile, tabForOutside)) {
+        auto *window = new spacepenguin::BrowserWindow(std::move(services));
+        window->setAttribute(Qt::WA_DeleteOnClose);
+        spacepenguin::StartupTrace::mark("window built");
+        window->show();
+        QTimer::singleShot(0, [] { spacepenguin::StartupTrace::mark("window shown"); });
+        for (const QString &url : urls)
+            window->openInNewTab(url);
+    }
 
     // Pages that arrive from outside go to the window in front, the way they do
     // in every other browser.
-    const auto frontWindow = [&window]() -> spacepenguin::BrowserWindow * {
-        if (auto *active = qobject_cast<spacepenguin::BrowserWindow *>(QApplication::activeWindow());
-            active && !active->isPrivate()) {
-            return active;
+    const auto frontWindow = [] { return spacepenguin::BrowserWindow::frontWindow(); };
+    const auto openFromOutside = [&frontWindow, appProfile, tabForOutside](QStringList texts) {
+        // An installed app's launcher, while SpacePenguin is already running.
+        for (const QString &text : std::as_const(texts)) {
+            if (text.startsWith(QLatin1String("--app="))
+                && spacepenguin::AppWindow::open(text.mid(6), appProfile, tabForOutside))
+                return;
         }
-        const auto widgets = QApplication::topLevelWidgets();
-        for (QWidget *widget : widgets) {
-            auto *candidate = qobject_cast<spacepenguin::BrowserWindow *>(widget);
-            if (candidate && candidate->isVisible() && !candidate->isPrivate())
-                return candidate;
-        }
-        return &window;
-    };
-    const auto openFromOutside = [&frontWindow](QStringList texts) {
+        texts.erase(std::remove_if(texts.begin(), texts.end(),
+                                   [](const QString &text) { return text.startsWith(QLatin1String("--app=")); }),
+                    texts.end());
         spacepenguin::BrowserWindow *target = frontWindow();
         if (texts.removeAll(QStringLiteral("--private")) > 0) {
             target = target->openWindow(true, texts);
