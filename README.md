@@ -105,14 +105,25 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
     (`Ctrl`+`U`), browsing without the cache, a user agent of your own
   - *Gamer*: games lock the mouse pointer without asking (`Esc` gives it back), and
     the other tabs go quiet while a game is full screen
-  - *Student*: Focus mode, and *Copy Citation* (`Ctrl`+`Alt`+`C`): the page's title,
-    site, address and today's date on the clipboard
+  - *Teacher mode*: runs a class on the school network. Block up to 100 sites for the
+    students who join, each with a reason they see; answer their requests to unblock
+    (for that student, for everyone, or not) from a bar above the page. The teacher's
+    own browsing isn't restricted. Pages can also open larger (up to 200%) for a
+    projector
+  - *Student mode*: pairs with Teacher mode. Join with the class code your teacher
+    shows (or `code@address` on networks that keep devices apart): the teacher's
+    blocked sites show their reason and an *Ask to unblock* box with a note, and the
+    answer pops up — an allowed site loads by itself. The last list keeps applying
+    while the teacher's computer is away. Also Focus mode, and *Copy Citation*
+    (`Ctrl`+`Alt`+`C`): the page's title, site, address and today's date
   - *Worker*: Focus mode, and your work pages opened together, from the menu or at
     start-up
-  - *Teacher*: Focus mode, and pages that open larger (up to 200%) for a projector
 
   Focus mode (in the menu) shows a reminder instead of the sites on its list —
-  YouTube, TikTok, Instagram and the like to begin with; edit the list in Settings
+  YouTube, TikTok, Instagram and the like to begin with; edit the list in Settings.
+  Classes stay on the local network (TCP 47800, UDP 47801), with nothing on the
+  internet; it is a classroom tool, not device management — students can leave a
+  class, and the teacher sees who is in it
 - **Search engines** — DuckDuckGo, Startpage, Brave Search, Ecosia, Google, Bing,
   Qwant, Mojeek, Kagi, Yahoo and Wikipedia built in; add any other in *Settings ›
   General* (*Add…*: a name and its results address with `%s` where the words go).
@@ -821,6 +832,7 @@ src/webview.*         per-tab view: load state, links opened as new tabs
 src/icons.*           painted icon set that follows the theme
 src/preferences.*     QSettings-backed preferences shared by every window
 src/tor.*             Tor windows: finding or starting Tor, the Tor process's proxy
+src/classroom.*       Teacher and Student mode: the class on the local network
 src/roles.*           Made for you: the roles, Focus mode's site matching, citations
 src/webapps.*         installed web apps: manifests, launchers for each system
 src/appwindow.*       an installed web app's own window

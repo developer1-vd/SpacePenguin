@@ -1,5 +1,6 @@
 #include "browserpage.h"
 
+#include "classroom.h"
 #include "logins.h"
 #include "preferences.h"
 #include "roles.h"
@@ -8,8 +9,11 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTimer>
+#include <QUrlQuery>
 
 #include <QWebEngineSettings>
+
+#include <memory>
 
 namespace spacepenguin {
 namespace {
@@ -87,7 +91,33 @@ bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, 
     if (!isMainFrame)
         return true;
 
-    // Focus mode (student, worker, teacher) keeps its sites away, with a page that says so.
+    // Student mode: "Ask to unblock" on a class's blocked page goes to the teacher.
+    if (url.scheme() == QLatin1String("sp") && url.host() == QLatin1String("classroom")
+        && url.path() == QLatin1String("/ask")) {
+        const QUrlQuery query(url);
+        const QString site = query.queryItemValue(QStringLiteral("site"), QUrl::FullyDecoded);
+        const QString note = query.queryItemValue(QStringLiteral("note"), QUrl::FullyDecoded).replace(QLatin1Char('+'), QLatin1Char(' '));
+        // The page keeps the blocked site's address, so an allowed site loads in its place.
+        const QUrl blocked = this->url();
+        auto connection = std::make_shared<QMetaObject::Connection>();
+        *connection = connect(Classroom::instance(), &Classroom::askFinished, this,
+                              [this, site, blocked, connection](bool ok) {
+                                  disconnect(*connection);
+                                  setHtml(Classroom::askedPage(site, ok), blocked);
+                              });
+        Classroom::instance()->ask(site, note);
+        return false;
+    }
+    // Student mode: the class's blocked sites, with the teacher's reason.
+    QString classSite, classReason;
+    if (Classroom::instance()->blocks(url, &classSite, &classReason)) {
+        const QString className = Classroom::instance()->joinedClassName();
+        QTimer::singleShot(0, this, [this, url, classSite, classReason, className] {
+            setHtml(Classroom::blockedPage(url, classSite, classReason, className), url);
+        });
+        return false;
+    }
+    // Focus mode (student, worker) keeps its sites away, with a page that says so.
     const Preferences *preferences = Preferences::instance();
     if (preferences->focusMode() && Roles::hasFocusMode(preferences->roles())
         && Roles::isBlocked(url, preferences->focusSites())) {

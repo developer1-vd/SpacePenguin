@@ -9,6 +9,7 @@
 #include "bookmarkmanager.h"
 #include "bookmarksdialog.h"
 #include "chromeextensions.h"
+#include "classroom.h"
 #include "browserpage.h"
 #include "cookiemanager.h"
 #include "datasavermanager.h"
@@ -307,6 +308,42 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
         if (preferences->hasRole(Roles::key(Roles::Role::Worker)) && preferences->openWorkPagesOnStart())
             openWorkPages();
     }
+
+    // Teacher mode: a student's request to unblock a site, answered from the bar above
+    // the page in the window in front.
+    connect(Classroom::instance(), &Classroom::requestReceived, this, [this](const UnblockRequest &request) {
+        const QWidget *active = QApplication::activeWindow();
+        if (active ? active != this : frontWindow() != this)
+            return;
+        Prompt prompt;
+        prompt.key = QStringLiteral("class:") + request.id;
+        prompt.icon = Icons::Info;
+        prompt.text = request.note.isEmpty()
+            ? tr("<b>%1</b> asks to unblock <b>%2</b>.").arg(request.student.toHtmlEscaped(), request.site.toHtmlEscaped())
+            : tr("<b>%1</b> asks to unblock <b>%2</b>: “%3”")
+                  .arg(request.student.toHtmlEscaped(), request.site.toHtmlEscaped(), request.note.toHtmlEscaped());
+        const QString id = request.id;
+        prompt.buttons = {
+            {tr("Allow for %1").arg(request.student), [id] { Classroom::instance()->answer(id, Classroom::Answer::AllowStudent); }},
+            {tr("Allow for everyone"), [id] { Classroom::instance()->answer(id, Classroom::Answer::AllowEveryone); }},
+            {tr("Decline"), [id] { Classroom::instance()->answer(id, Classroom::Answer::Decline); }},
+        };
+        addPrompt(currentView(), prompt);
+        QApplication::alert(this);
+    });
+    // Student mode: the teacher's answer; an allowed site's blocked tabs load again.
+    connect(Classroom::instance(), &Classroom::answerReceived, this, [this](const QString &site, bool allowed) {
+        if (isActiveWindow() || (!QApplication::activeWindow() && frontWindow() == this))
+            showToast(allowed ? tr("Your teacher allowed %1.").arg(site) : tr("Your teacher kept %1 blocked.").arg(site),
+                      5000);
+        if (!allowed)
+            return;
+        for (int i = 0; i < m_tabBar->count(); ++i) {
+            WebView *view = viewAt(i);
+            if (view && Roles::isBlocked(view->url(), {site}))
+                view->load(view->url());
+        }
+    });
 
     if (Tor::isActive()) {
         QTimer::singleShot(800, this, [this] {

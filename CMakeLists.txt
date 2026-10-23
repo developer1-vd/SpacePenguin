@@ -183,6 +183,8 @@ qt_add_executable(spacepenguin
     src/roles.h
     src/tor.cpp
     src/tor.h
+    src/classroom.cpp
+    src/classroom.h
     src/webapps.cpp
     src/webapps.h
     src/theme.cpp
@@ -385,6 +387,21 @@ if(SPACEPENGUIN_BUILD_TESTS)
             target_link_libraries(tst_roles PRIVATE ole32 uuid)
         endif()
         add_test(NAME roles COMMAND tst_roles)
+
+        qt_add_executable(tst_classroom
+            tests/tst_classroom.cpp
+            src/classroom.cpp
+            src/classroom.h
+            src/preferences.cpp
+            src/preferences.h
+            src/roles.cpp
+            src/roles.h
+            src/urlresolver.cpp
+            src/urlresolver.h
+        )
+        target_include_directories(tst_classroom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_link_libraries(tst_classroom PRIVATE Qt6::Test Qt6::Network)
+        add_test(NAME classroom COMMAND tst_classroom)
 
         qt_add_executable(tst_userextensions
             tests/tst_userextensions.cpp

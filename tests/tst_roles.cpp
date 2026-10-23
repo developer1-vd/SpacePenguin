@@ -29,8 +29,10 @@ private slots:
 void TestRoles::focusModeComesWithSomeRoles()
 {
     QVERIFY(Roles::hasFocusMode({QStringLiteral("student")}));
-    QVERIFY(Roles::hasFocusMode({QStringLiteral("gamer"), QStringLiteral("teacher")}));
+    QVERIFY(Roles::hasFocusMode({QStringLiteral("gamer"), QStringLiteral("worker")}));
     QVERIFY(!Roles::hasFocusMode({QStringLiteral("developer"), QStringLiteral("gamer")}));
+    // A teacher's own browsing is not restricted.
+    QVERIFY(!Roles::hasFocusMode({QStringLiteral("teacher")}));
     QVERIFY(!Roles::hasFocusMode({}));
 }
 

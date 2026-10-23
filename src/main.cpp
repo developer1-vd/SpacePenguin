@@ -13,6 +13,7 @@
 
 #include "appwindow.h"
 #include "browserwindow.h"
+#include "classroom.h"
 #include "devicetuning.h"
 #include "icons.h"
 #include "profiles.h"
@@ -134,6 +135,9 @@ int main(int argc, char *argv[])
     }
 
     spacepenguin::StartupTrace::mark("single-instance check done");
+    // Teacher and student mode talk over the school network; the Tor process never does.
+    if (!torMode)
+        spacepenguin::Classroom::instance()->start();
     spacepenguin::watchSystemScheme();
     spacepenguin::ProfileServices services = spacepenguin::createProfileServices(
         &app, isPrivate, parser.value(filterListOption));
