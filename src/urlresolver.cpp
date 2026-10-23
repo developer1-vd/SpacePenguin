@@ -154,6 +154,11 @@ QUrl UrlResolver::resolve(const QString &input) const
     if (text.startsWith(QLatin1String("//")))
         return QUrl(QStringLiteral("https:") + text);
 
+    // Onion sites are encrypted by Tor itself and mostly serve plain http.
+    const QString host = text.section(QLatin1Char('/'), 0, 0).section(QLatin1Char(':'), 0, 0);
+    if (host.endsWith(QLatin1String(".onion"), Qt::CaseInsensitive))
+        return QUrl(QStringLiteral("http://") + text);
+
     return QUrl(QStringLiteral("https://") + text);
 }
 

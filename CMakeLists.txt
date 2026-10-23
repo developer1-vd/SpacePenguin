@@ -181,6 +181,8 @@ qt_add_executable(spacepenguin
     src/appwindow.h
     src/roles.cpp
     src/roles.h
+    src/tor.cpp
+    src/tor.h
     src/webapps.cpp
     src/webapps.h
     src/theme.cpp
@@ -370,9 +372,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/roles.h
             src/webapps.cpp
             src/webapps.h
+            src/preferences.cpp
+            src/preferences.h
+            src/urlresolver.cpp
+            src/urlresolver.h
+            src/tor.cpp
+            src/tor.h
         )
         target_include_directories(tst_roles PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-        target_link_libraries(tst_roles PRIVATE Qt6::Test Qt6::Gui)
+        target_link_libraries(tst_roles PRIVATE Qt6::Test Qt6::Widgets Qt6::Network)
         if(WIN32)
             target_link_libraries(tst_roles PRIVATE ole32 uuid)
         endif()

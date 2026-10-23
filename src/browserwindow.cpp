@@ -30,6 +30,7 @@
 #include "sitepermissions.h"
 #include "startuptrace.h"
 #include "tabgroups.h"
+#include "tor.h"
 #include "userextensions.h"
 #include "webview.h"
 #include "windowframe.h"
@@ -307,6 +308,14 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
             openWorkPages();
     }
 
+    if (Tor::isActive()) {
+        QTimer::singleShot(800, this, [this] {
+            showToast(tr("Private and through Tor: sites don't see your address, and .onion sites open. "
+                         "Nothing is kept after you close it."),
+                      6000);
+        });
+    }
+
     // A new release, for those who asked to hear of one.
     if (!m_isPrivate) {
         connect(UpdateChecker::instance(), &UpdateChecker::updateAvailable, this,
@@ -389,6 +398,22 @@ void BrowserWindow::createActions()
                                           Shortcuts::keys(Shortcuts::NewPrivateWindow),
                                           Icons::icon(Icons::Private));
     connect(m_newPrivateWindowAction, &QAction::triggered, this, [this] { newWindow(true); });
+
+    // Tor windows run in a process of their own (see tor.h); in it, every window is one.
+    m_newTorWindowAction = makeAction(tr("New Tor Window"), {QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_N)},
+                                      Icons::icon(Icons::Private));
+    m_newTorWindowAction->setToolTip(tr("A private window that goes through Tor and opens .onion sites"));
+    connect(m_newTorWindowAction, &QAction::triggered, this, [this] {
+        if (Tor::isActive()) {
+            newWindow(true);
+            return;
+        }
+        QString error;
+        if (Tor::openWindow({}, &error))
+            showToast(tr("Opening a Tor window…"), 3000);
+        else
+            showToast(error, 5000);
+    });
 
     m_closeTabAction = makeAction(tr("Close Tab"), Shortcuts::keys(Shortcuts::CloseTab));
     connect(m_closeTabAction, &QAction::triggered, this,
@@ -677,9 +702,11 @@ QWidget *BrowserWindow::createTabStrip()
     if (m_isPrivate) {
         auto *badgeIcon = new QLabel;
         badgeIcon->setPixmap(Icons::icon(Icons::Private).pixmap(18, 18));
-        auto *badge = new QLabel(tr("Private"));
+        auto *badge = new QLabel(Tor::isActive() ? tr("Private · Tor") : tr("Private"));
         badge->setObjectName(QStringLiteral("privateBadge"));
-        badge->setToolTip(tr("Nothing from this window is written to disk"));
+        badge->setToolTip(Tor::isActive() ? tr("Nothing from this window is written to disk, and it all goes "
+                                               "through Tor")
+                                          : tr("Nothing from this window is written to disk"));
         layout->addSpacing(8);
         layout->addWidget(badgeIcon);
         layout->addWidget(badge);
@@ -956,6 +983,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_newTabAction);
     menu->addAction(m_newWindowAction);
     menu->addAction(m_newPrivateWindowAction);
+    menu->addAction(m_newTorWindowAction);
     menu->addAction(m_openFileAction);
     menu->addSeparator();
 
@@ -1035,6 +1063,23 @@ QMenu *BrowserWindow::createAppMenu()
     }
     syncThemeMenu();
 
+    // The search engine, switched from here as well as in Settings › General.
+    QMenu *searchMenu = menu->addMenu(Icons::icon(Icons::Search), tr("Search With"));
+    connect(searchMenu, &QMenu::aboutToShow, this, [searchMenu] {
+        searchMenu->clear();
+        const QString current = Preferences::instance()->searchTemplate();
+        for (const SearchEngine &engine : Preferences::searchEngines()) {
+            QAction *action = searchMenu->addAction(engine.name);
+            action->setCheckable(true);
+            action->setChecked(engine.searchTemplate == current);
+            const QString searchTemplate = engine.searchTemplate;
+            connect(action, &QAction::triggered, searchMenu,
+                    [searchTemplate] { Preferences::instance()->setSearchTemplate(searchTemplate); });
+        }
+    });
+    // Filled when shown; a placeholder lets the submenu arrow show.
+    searchMenu->addAction(QString());
+
     menu->addAction(m_extensionsAction);
     menu->addAction(m_settingsAction);
     menu->addSeparator();
@@ -1070,6 +1115,7 @@ void BrowserWindow::createMenus()
     fileMenu->addAction(m_newTabAction);
     fileMenu->addAction(m_newWindowAction);
     fileMenu->addAction(m_newPrivateWindowAction);
+    fileMenu->addAction(m_newTorWindowAction);
     fileMenu->addAction(m_reopenTabAction);
     fileMenu->addAction(m_openFileAction);
     fileMenu->addSeparator();
@@ -1149,7 +1195,9 @@ void BrowserWindow::createTabShortcuts()
 void BrowserWindow::applyPreferences()
 {
     Preferences *preferences = Preferences::instance();
-    m_resolver = UrlResolver(preferences->searchTemplate(), preferences->homePage());
+    m_resolver = UrlResolver(Tor::isActive() ? Tor::searchTemplate(preferences->searchTemplate())
+                                             : preferences->searchTemplate(),
+                             preferences->homePage());
 
     QString engine = tr("the web");
     for (const SearchEngine &candidate : Preferences::searchEngines()) {
@@ -1813,6 +1861,10 @@ BrowserWindow *BrowserWindow::openWindow(bool isPrivate, const QStringList &text
 
 BrowserWindow *BrowserWindow::newWindow(bool isPrivate)
 {
+    // A Tor process has no normal windows: its profile would go through Tor and
+    // share the main process's files.
+    if (Tor::isActive())
+        isPrivate = true;
     ServiceRegistry &shared = registry();
     const QString filterList = m_services.adBlocker ? m_services.adBlocker->listPath() : QString();
 
@@ -3219,6 +3271,19 @@ void BrowserWindow::connectView(WebView *view)
     connect(view, &QWebEngineView::titleChanged, this, [this, view] { offerWebStoreExtension(view); });
     connect(view->browserPage(), &BrowserPage::userScriptRequested, this,
             [this, view](const QUrl &url) { offerUserScript(view, url, false); });
+    connect(view->browserPage(), &BrowserPage::onionRequested, this, [this, view](const QUrl &url) {
+        Prompt prompt;
+        prompt.key = QStringLiteral("onion");
+        prompt.icon = Icons::Private;
+        prompt.text = tr("<b>%1</b> is an onion site: it opens only through Tor, in a Tor window.")
+                          .arg(url.host().toHtmlEscaped());
+        prompt.buttons = {{tr("Open in a Tor window"), [this, url] {
+                               QString error;
+                               if (!Tor::openWindow({url.toString()}, &error))
+                                   showToast(error, 5000);
+                           }}};
+        addPrompt(view, prompt);
+    });
     connect(view->browserPage(), &BrowserPage::loginSubmitted, this,
             [this, view](const QString &username, const QString &password) {
                 offerToSaveLogin(view, username, password);
@@ -3350,7 +3415,9 @@ void BrowserWindow::updateWindowTitle()
 
     QString title = pageTitle.isEmpty() ? QStringLiteral("SpacePenguin")
                                         : pageTitle + QStringLiteral(" — SpacePenguin");
-    if (m_isPrivate)
+    if (Tor::isActive())
+        title += tr(" (Private, Tor)");
+    else if (m_isPrivate)
         title += tr(" (Private)");
 
     setWindowTitle(title);
@@ -3365,6 +3432,10 @@ void BrowserWindow::updateSecurityIndicator()
     if (view && view->lastLoadFailed() && !view->isLoading() && isWebScheme(url)) {
         m_securityAction->setIcon(Icons::icon(Icons::Warning));
         m_securityAction->setToolTip(tr("This page failed to load"));
+    } else if (Tor::isOnion(url)) {
+        // Tor encrypts the whole way to an onion site, http or not.
+        m_securityAction->setIcon(Icons::icon(Icons::Lock));
+        m_securityAction->setToolTip(tr("Onion site: the connection to %1 is encrypted by Tor").arg(url.host()));
     } else if (scheme == QLatin1String("https")) {
         m_securityAction->setIcon(Icons::icon(Icons::Lock));
         m_securityAction->setToolTip(tr("Connection to %1 is secure").arg(url.host()));

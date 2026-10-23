@@ -54,23 +54,6 @@ QString execArgument(QString argument)
     return QLatin1Char('"') + argument + QLatin1Char('"');
 }
 
-/** The program and the arguments that start this SpacePenguin from a launcher. */
-QStringList launcherCommand()
-{
-    const QString flatpak = qEnvironmentVariable("FLATPAK_ID");
-    if (!flatpak.isEmpty())
-        return {QStringLiteral("flatpak"), QStringLiteral("run"), flatpak};
-    // An AppImage runs from a temporary mount; the launcher must name the file.
-    const QString appImage = qEnvironmentVariable("APPIMAGE");
-    if (!appImage.isEmpty())
-        return {appImage};
-    // An unpacked AppImage (install.sh) starts through its AppRun, which sets it up.
-    const QString appDir = qEnvironmentVariable("APPDIR");
-    if (!appDir.isEmpty() && QFileInfo::exists(appDir + QStringLiteral("/AppRun")))
-        return {appDir + QStringLiteral("/AppRun")};
-    return {QCoreApplication::applicationFilePath()};
-}
-
 int iconScore(const QJsonObject &icon)
 {
     const QString source = icon.value(QStringLiteral("src")).toString();
@@ -258,10 +241,22 @@ WebApp WebApps::fromManifest(const QByteArray &json, const QUrl &manifestUrl, co
     return app;
 }
 
-QString WebApps::launcherProgram()
+QStringList WebApps::launcherCommand()
 {
-    return launcherCommand().join(QLatin1Char(' '));
+    const QString flatpak = qEnvironmentVariable("FLATPAK_ID");
+    if (!flatpak.isEmpty())
+        return {QStringLiteral("flatpak"), QStringLiteral("run"), flatpak};
+    // An AppImage runs from a temporary mount; the launcher must name the file.
+    const QString appImage = qEnvironmentVariable("APPIMAGE");
+    if (!appImage.isEmpty())
+        return {appImage};
+    // An unpacked AppImage (install.sh) starts through its AppRun, which sets it up.
+    const QString appDir = qEnvironmentVariable("APPDIR");
+    if (!appDir.isEmpty() && QFileInfo::exists(appDir + QStringLiteral("/AppRun")))
+        return {appDir + QStringLiteral("/AppRun")};
+    return {QCoreApplication::applicationFilePath()};
 }
+
 
 QString WebApps::desktopEntry(const WebApp &app, const QString &program, const QString &iconPath)
 {

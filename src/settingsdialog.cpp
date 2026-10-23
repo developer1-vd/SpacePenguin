@@ -12,6 +12,7 @@
 #include "preferences.h"
 #include "roles.h"
 #include "theme.h"
+#include "tor.h"
 #include "userextensions.h"
 #include "webapps.h"
 
@@ -37,6 +38,7 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QTimer>
 #include <QUrl>
@@ -239,60 +241,85 @@ QWidget *SettingsDialog::createGeneralTab()
     layout->addWidget(mutedLabel(tr("Opened by the Home button and in every new tab.")));
 
     layout->addWidget(sectionTitle(tr("Search engine")));
+    auto *engineRow = new QHBoxLayout;
     auto *engineCombo = new QComboBox;
-    const QString currentTemplate = preferences->searchTemplate();
-    int currentIndex = -1;
-    for (const SearchEngine &engine : Preferences::searchEngines()) {
-        engineCombo->addItem(engine.name, engine.searchTemplate);
-        if (engine.searchTemplate == currentTemplate)
-            currentIndex = engineCombo->count() - 1;
-    }
-    engineCombo->addItem(tr("Custom…"), QString());
-    const int customIndex = engineCombo->count() - 1;
+    auto *addEngine = new QPushButton(Icons::icon(Icons::Plus), tr("Add…"));
+    auto *removeEngine = new QPushButton(Icons::icon(Icons::Trash), tr("Remove"));
+    engineRow->addWidget(engineCombo, 1);
+    engineRow->addWidget(addEngine);
+    engineRow->addWidget(removeEngine);
+    layout->addLayout(engineRow);
 
-    auto *customEdit = new QLineEdit;
-    customEdit->setPlaceholderText(QStringLiteral("https://example.com/search?q={query}"));
-    customEdit->setVisible(currentIndex < 0);
-    if (currentIndex < 0) {
-        customEdit->setText(currentTemplate);
-        currentIndex = customIndex;
-    }
-    engineCombo->setCurrentIndex(currentIndex);
-
-    auto *customHint = mutedLabel(tr("Use {query} where the search terms go."));
-    customHint->setVisible(customEdit->isVisible());
-
-    connect(engineCombo, &QComboBox::currentIndexChanged, this,
-            [engineCombo, customEdit, customHint, customIndex](int index) {
-                const bool custom = index == customIndex;
-                customEdit->setVisible(custom);
-                customHint->setVisible(custom);
-                if (!custom)
-                    Preferences::instance()->setSearchTemplate(
-                        engineCombo->itemData(index).toString());
-                else
-                    customEdit->setFocus();
-            });
-    connect(customEdit, &QLineEdit::editingFinished, this, [this, customEdit] {
-        const QString text = customEdit->text().trimmed();
-        if (text.isEmpty())
-            return;
-        const QUrl url(text);
-        if (!text.contains(QLatin1String("{query}"))
-            || (url.scheme() != QLatin1String("https") && url.scheme() != QLatin1String("http"))) {
-            QMessageBox::warning(this, tr("Search engine"),
-                                 tr("A custom search address must start with https:// and "
-                                    "contain {query}."));
-            return;
+    // The list: built-in engines, then added ones (data: template, and whether added).
+    const auto fillEngines = [engineCombo, removeEngine] {
+        const QSignalBlocker blocker(engineCombo);
+        engineCombo->clear();
+        const QString current = Preferences::instance()->searchTemplate();
+        for (const SearchEngine &engine : Preferences::builtInSearchEngines())
+            engineCombo->addItem(engine.name, engine.searchTemplate);
+        const QList<SearchEngine> added = Preferences::addedSearchEngines();
+        if (!added.isEmpty())
+            engineCombo->insertSeparator(engineCombo->count());
+        for (const SearchEngine &engine : added)
+            engineCombo->addItem(engine.name, engine.searchTemplate);
+        int index = engineCombo->findData(current);
+        if (index < 0) {
+            // An address typed in an earlier version: shown under its site's name.
+            engineCombo->addItem(QUrl(current).host(), current);
+            index = engineCombo->count() - 1;
         }
-        Preferences::instance()->setSearchTemplate(text);
+        engineCombo->setCurrentIndex(index);
+        bool isAdded = false;
+        for (const SearchEngine &engine : added)
+            isAdded = isAdded || engine.searchTemplate == current;
+        removeEngine->setEnabled(isAdded);
+    };
+    fillEngines();
+    connect(engineCombo, &QComboBox::currentIndexChanged, this, [engineCombo, fillEngines](int index) {
+        Preferences::instance()->setSearchTemplate(engineCombo->itemData(index).toString());
+        // Refilled once the combo box is done announcing the change.
+        QTimer::singleShot(0, engineCombo, fillEngines);
+    });
+    connect(addEngine, &QPushButton::clicked, this, [this, fillEngines] {
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Add Search Engine"));
+        auto *form = new QFormLayout(&dialog);
+        auto *name = new QLineEdit;
+        name->setPlaceholderText(tr("Example Search"));
+        auto *address = new QLineEdit;
+        address->setPlaceholderText(QStringLiteral("https://example.com/search?q=%s"));
+        address->setMinimumWidth(360);
+        form->addRow(tr("Name"), name);
+        form->addRow(tr("Address"), address);
+        form->addRow(QString(), mutedLabel(tr("Search the site for anything, then copy the address of the "
+                                              "results and put %s (or {query}) where your words were.")));
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
+        buttons->addButton(tr("Add"), QDialogButtonBox::AcceptRole);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, [&dialog, name, address] {
+            const QString searchTemplate = Preferences::normalizeSearchTemplate(address->text());
+            if (searchTemplate.isEmpty()) {
+                QMessageBox::warning(&dialog, tr("Add Search Engine"),
+                                     tr("The address must start with https:// and contain %s or {query}."));
+                return;
+            }
+            const QString title = name->text().trimmed().isEmpty() ? QUrl(searchTemplate).host()
+                                                                    : name->text().trimmed();
+            Preferences::instance()->addSearchEngine(title, searchTemplate);
+            Preferences::instance()->setSearchTemplate(searchTemplate);
+            dialog.accept();
+        });
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        form->addRow(buttons);
+        dialog.exec();
+        fillEngines();
+    });
+    connect(removeEngine, &QPushButton::clicked, this, [fillEngines] {
+        Preferences::instance()->removeSearchEngine(Preferences::instance()->searchTemplate());
+        fillEngines();
     });
 
-    layout->addWidget(engineCombo);
-    layout->addWidget(customEdit);
-    layout->addWidget(customHint);
     layout->addWidget(mutedLabel(tr("Anything typed in the address bar that is not an "
-                                    "address is sent here.")));
+                                    "address is sent here. Switch quickly from the menu (Search With).")));
     layout->addStretch(1);
     return page;
 }
@@ -613,6 +640,26 @@ QWidget *SettingsDialog::createPrivacyTab()
     dataButtons->addWidget(clearCache);
     dataButtons->addStretch(1);
     layout->addLayout(dataButtons);
+
+    layout->addWidget(sectionTitle(tr("Tor windows")));
+    layout->addWidget(mutedLabel(
+        tr("A Tor window is a private window whose pages all go through the Tor network: sites don't see "
+           "your address, and .onion sites open. Normal and private windows never use Tor. It is not Tor "
+           "Browser: sites can still tell this browser apart, so it keeps your address, not your identity, "
+           "to yourself. Searches with DuckDuckGo use its onion site.")));
+    layout->addWidget(mutedLabel(tr("It uses the Tor already running on this computer, or starts the tor "
+                                    "program. %1")
+                                     .arg(Tor::installHint())));
+    auto *torButton = new QPushButton(Icons::icon(Icons::Private), tr("Open a Tor Window"));
+    connect(torButton, &QPushButton::clicked, this, [this] {
+        QString error;
+        if (!Tor::openWindow({}, &error))
+            QMessageBox::warning(this, tr("Tor windows"), error);
+    });
+    auto *torRow = new QHBoxLayout;
+    torRow->addWidget(torButton);
+    torRow->addStretch(1);
+    layout->addLayout(torRow);
 
     layout->addWidget(sectionTitle(tr("Built-in protections")));
     layout->addWidget(mutedLabel(

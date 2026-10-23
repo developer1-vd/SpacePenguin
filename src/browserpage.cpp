@@ -3,6 +3,7 @@
 #include "logins.h"
 #include "preferences.h"
 #include "roles.h"
+#include "tor.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -29,6 +30,9 @@ BrowserPage::BrowserPage(QWebEngineProfile *profile, QObject *parent)
     // PDFs open in Chromium's own viewer, which Qt counts as a plugin.
     settings()->setAttribute(QWebEngineSettings::PluginsEnabled, true);
     settings()->setAttribute(QWebEngineSettings::PdfViewerEnabled, true);
+    // Through Tor, WebRTC may not tell sites the addresses of this computer.
+    if (Tor::isActive())
+        settings()->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, true);
 
     // Remember the internal link last under the pointer. The hover is cleared just
     // before a click navigates, so keep it for a moment afterwards.
@@ -92,6 +96,11 @@ bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, 
     }
     if (m_navigationFilter && !m_navigationFilter(url, type))
         return false;
+    // Onion sites exist only on the Tor network, which only Tor windows reach.
+    if (!Tor::isActive() && Tor::isOnion(url)) {
+        emit onionRequested(url);
+        return false;
+    }
 
     const bool userInitiated = type == NavigationTypeLinkClicked
         || type == NavigationTypeFormSubmitted || type == NavigationTypeTyped;

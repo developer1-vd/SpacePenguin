@@ -113,6 +113,18 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
 
   Focus mode (in the menu) shows a reminder instead of the sites on its list —
   YouTube, TikTok, Instagram and the like to begin with; edit the list in Settings
+- **Search engines** — DuckDuckGo, Startpage, Brave Search, Ecosia, Google, Bing,
+  Qwant, Mojeek, Kagi, Yahoo and Wikipedia built in; add any other in *Settings ›
+  General* (*Add…*: a name and its results address with `%s` where the words go).
+  Switch from the menu (*Search With*)
+- **Tor windows** — *New Tor Window* (`Ctrl`+`Alt`+`N`) opens a private window whose
+  pages all go through Tor: sites don't see your address, and `.onion` sites open
+  (an onion link in a normal window offers to open it there). Normal and private
+  windows never use Tor. It needs Tor: the tor service (`sudo apt install tor`,
+  `brew install tor`) or a running Tor Browser, whose connection it uses; with only
+  the tor program installed, SpacePenguin starts it while the window is open. Tor
+  windows run in a process of their own, as Chromium takes one proxy per process. It
+  is not Tor Browser: it hides your address, not the browser's fingerprint
 - **Install sites as apps** — *Install … as App* in the menu turns a site into an app
   on your computer: SpacePenguin reads its web app manifest (progressive web apps)
   for the name, icon, start page and scope, and adds a launcher to your app menu
@@ -358,6 +370,7 @@ the desktop — macOS gets the binding Safari and Chrome use there instead.
 | Go to tab 1–8 / last  | `Ctrl+1` … `Ctrl+8` / `Ctrl+9`  | `⌘1` … `⌘8` / `⌘9`            |
 | New window            | `Ctrl+N`                        | `⌘N`                          |
 | New private window    | `Ctrl+Shift+N`                  | `⇧⌘N`                         |
+| New Tor window        | `Ctrl+Alt+N`                    | `⌥⌘N`                         |
 | Close window          | `Ctrl+Shift+W`                  | `⇧⌘W`                         |
 | Quit                  | `Ctrl+Q`                        | `⌘Q`                          |
 | Back / forward        | `Alt+Left` / `Alt+Right`        | `⌘[` / `⌘]`                   |
@@ -807,6 +820,7 @@ src/browserpage.*     QWebEnginePage subclass holding the security policy
 src/webview.*         per-tab view: load state, links opened as new tabs
 src/icons.*           painted icon set that follows the theme
 src/preferences.*     QSettings-backed preferences shared by every window
+src/tor.*             Tor windows: finding or starting Tor, the Tor process's proxy
 src/roles.*           Made for you: the roles, Focus mode's site matching, citations
 src/webapps.*         installed web apps: manifests, launchers for each system
 src/appwindow.*       an installed web app's own window

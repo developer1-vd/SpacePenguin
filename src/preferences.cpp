@@ -5,12 +5,14 @@
 #include <QCoreApplication>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QUrl>
 
 namespace spacepenguin {
 namespace {
 
 const QString kHome = QStringLiteral("browser/home");
 const QString kSearch = QStringLiteral("browser/search");
+const QString kAddedEngines = QStringLiteral("browser/addedSearchEngines");
 const QString kRestore = QStringLiteral("browser/restoreSession");
 const QString kHomeButton = QStringLiteral("appearance/showHomeButton");
 const QString kBookmarksBar = QStringLiteral("appearance/showBookmarksBar");
@@ -50,6 +52,62 @@ Preferences *Preferences::instance()
 
 QList<SearchEngine> Preferences::searchEngines()
 {
+    return builtInSearchEngines() + addedSearchEngines();
+}
+
+QList<SearchEngine> Preferences::addedSearchEngines()
+{
+    QList<SearchEngine> engines;
+    for (const QString &entry : QSettings().value(kAddedEngines).toStringList()) {
+        const QString name = entry.section(QLatin1Char('\t'), 0, 0);
+        const QString searchTemplate = entry.section(QLatin1Char('\t'), 1);
+        if (!name.isEmpty() && searchTemplate.contains(QLatin1String("{query}")))
+            engines.append({name, searchTemplate});
+    }
+    return engines;
+}
+
+QString Preferences::normalizeSearchTemplate(QString searchTemplate)
+{
+    searchTemplate = searchTemplate.trimmed();
+    searchTemplate.replace(QLatin1String("%s"), QLatin1String("{query}"));
+    const QUrl url(searchTemplate);
+    if (!searchTemplate.contains(QLatin1String("{query}")) || url.host().isEmpty()
+        || (url.scheme() != QLatin1String("https") && url.scheme() != QLatin1String("http")))
+        return QString();
+    return searchTemplate;
+}
+
+bool Preferences::addSearchEngine(const QString &name, QString searchTemplate)
+{
+    searchTemplate = normalizeSearchTemplate(searchTemplate);
+    const QString cleanName = name.simplified();
+    if (searchTemplate.isEmpty() || cleanName.isEmpty())
+        return false;
+    QStringList entries;
+    for (const SearchEngine &engine : addedSearchEngines()) {
+        if (engine.searchTemplate != searchTemplate)
+            entries.append(engine.name + QLatin1Char('\t') + engine.searchTemplate);
+    }
+    entries.append(cleanName + QLatin1Char('\t') + searchTemplate);
+    write(kAddedEngines, entries);
+    return true;
+}
+
+void Preferences::removeSearchEngine(const QString &searchTemplate)
+{
+    QStringList entries;
+    for (const SearchEngine &engine : addedSearchEngines()) {
+        if (engine.searchTemplate != searchTemplate)
+            entries.append(engine.name + QLatin1Char('\t') + engine.searchTemplate);
+    }
+    write(kAddedEngines, entries);
+    if (this->searchTemplate() == searchTemplate)
+        setSearchTemplate(QString());
+}
+
+QList<SearchEngine> Preferences::builtInSearchEngines()
+{
     return {
         {QStringLiteral("DuckDuckGo"), QStringLiteral("https://duckduckgo.com/?q={query}")},
         {QStringLiteral("Startpage"), QStringLiteral("https://www.startpage.com/sp/search?q={query}")},
@@ -57,6 +115,11 @@ QList<SearchEngine> Preferences::searchEngines()
         {QStringLiteral("Ecosia"), QStringLiteral("https://www.ecosia.org/search?q={query}")},
         {QStringLiteral("Google"), QStringLiteral("https://www.google.com/search?q={query}")},
         {QStringLiteral("Bing"), QStringLiteral("https://www.bing.com/search?q={query}")},
+        {QStringLiteral("Qwant"), QStringLiteral("https://www.qwant.com/?q={query}")},
+        {QStringLiteral("Mojeek"), QStringLiteral("https://www.mojeek.com/search?q={query}")},
+        {QStringLiteral("Kagi"), QStringLiteral("https://kagi.com/search?q={query}")},
+        {QStringLiteral("Yahoo"), QStringLiteral("https://search.yahoo.com/search?p={query}")},
+        {QStringLiteral("Wikipedia"), QStringLiteral("https://en.wikipedia.org/w/index.php?search={query}")},
     };
 }
 

@@ -327,6 +327,7 @@ private:
     QAction *m_shortcutsAction = nullptr;
     QAction *m_aboutAction = nullptr;
     QAction *m_installAppAction = nullptr;
+    QAction *m_newTorWindowAction = nullptr;
     QAction *m_devToolsAction = nullptr;
     QAction *m_viewSourceAction = nullptr;
     QAction *m_focusModeAction = nullptr;

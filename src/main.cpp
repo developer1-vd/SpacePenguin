@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileOpenEvent>
 #include <QLoggingCategory>
+#include <QMessageBox>
 #include <QTimer>
 #include <QWebEngineProfile>
 
@@ -19,6 +20,7 @@
 #include "singleinstance.h"
 #include "startuptrace.h"
 #include "systemscheme.h"
+#include "tor.h"
 #include "theme.h"
 
 #include <functional>
@@ -94,13 +96,19 @@ int main(int argc, char *argv[])
         QStringLiteral("id"));
     parser.addOption(appOption);
 
+    const QCommandLineOption torOption(
+        QStringList{QStringLiteral("tor")},
+        QStringLiteral("Open a private window that goes through Tor (and opens .onion sites)."));
+    parser.addOption(torOption);
+
     parser.addPositionalArgument(QStringLiteral("urls"),
                                  QStringLiteral("Addresses or searches to open in new tabs."),
                                  QStringLiteral("[urls...]"));
 
     parser.process(app);
 
-    const bool isPrivate = parser.isSet(privateModeOption);
+    const bool torMode = parser.isSet(torOption);
+    const bool isPrivate = parser.isSet(privateModeOption) || torMode;
     const QStringList urls = parser.positionalArguments();
     const QString appId = parser.value(appOption);
 
@@ -114,8 +122,16 @@ int main(int argc, char *argv[])
         handOff.prepend(QStringLiteral("--private"));
     if (!appId.isEmpty())
         handOff = {QStringLiteral("--app=") + appId};
-    if (instance.sendToRunningInstance(handOff))
+    // A Tor window is a process of its own, whatever else is open (see tor.h).
+    if (!torMode && instance.sendToRunningInstance(handOff))
         return 0;
+    if (torMode) {
+        QString error;
+        if (!spacepenguin::Tor::start(&error)) {
+            QMessageBox::warning(nullptr, QStringLiteral("SpacePenguin"), error);
+            return 1;
+        }
+    }
 
     spacepenguin::StartupTrace::mark("single-instance check done");
     spacepenguin::watchSystemScheme();
