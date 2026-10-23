@@ -1,15 +1,11 @@
 #pragma once
 
 #include <QDateTime>
-#include <QDialog>
 #include <QList>
 #include <QObject>
 #include <QSet>
 #include <QString>
 #include <QUrl>
-
-class QLineEdit;
-class QTreeWidget;
 
 namespace spacepenguin {
 
@@ -80,22 +76,6 @@ private:
     QString m_path;
     QList<Login> m_logins;
     QSet<QString> m_never;
-};
-
-/** Settings › Saved logins: see, copy and delete them. */
-class LoginsDialog : public QDialog
-{
-    Q_OBJECT
-
-public:
-    explicit LoginsDialog(LoginStore *store, QWidget *parent = nullptr);
-
-private:
-    void rebuild();
-
-    LoginStore *m_store;
-    QLineEdit *m_search = nullptr;
-    QTreeWidget *m_list = nullptr;
 };
 
 }

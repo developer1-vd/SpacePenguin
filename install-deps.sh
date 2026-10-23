@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Install everything needed to build, test and package SpacePenguin on Linux or
-# macOS. On Windows use install-deps.ps1; on NixOS use `nix-shell` (shell.nix).
+# Install everything needed to build, test and package SpacePenguin on Linux,
+# macOS, FreeBSD, OpenBSD or NetBSD. On Windows use install-deps.ps1; on NixOS use `nix-shell` (shell.nix).
 # Needs bash: on Alpine run `apk add bash` and on Void `xbps-install bash` first.
 #
 #   ./install-deps.sh              compiler, CMake, libraries and Qt
@@ -46,8 +46,9 @@ Usage: ./install-deps.sh [options]
 Package managers: apt (Debian, Ubuntu, Mint, Pop!_OS, elementary, Kali, …),
 dnf/yum (Fedora, RHEL, CentOS Stream, Rocky, AlmaLinux, Nobara, …), pacman (Arch,
 Manjaro, EndeavourOS, CachyOS, …), zypper (openSUSE Tumbleweed/Leap, SLE), apk
-(Alpine, postmarketOS), xbps (Void), emerge (Gentoo, Funtoo), and Homebrew on
-macOS. NixOS: run nix-shell in the repository instead.
+(Alpine, postmarketOS), xbps (Void), emerge (Gentoo, Funtoo), Homebrew on
+macOS, and pkg (FreeBSD, GhostBSD), pkg_add (OpenBSD) and pkgin (NetBSD), which
+always use the system's Qt. NixOS: run nix-shell in the repository instead.
 EOF
 }
 
@@ -329,6 +330,24 @@ install_emerge() {
     run ${SUDO[@]+"${SUDO[@]}"} emerge --ask=n --noreplace --verbose "${PKGS[@]}"
 }
 
+# The BSDs: Qt publishes no binaries for them, so Qt always comes from packages.
+install_pkg() {
+    # FreeBSD
+    PKGS=(cmake ninja git curl python3 pkgconf qt6-base qt6-webengine qt6-tools
+          qt6-wayland dbus)
+    run ${SUDO[@]+"${SUDO[@]}"} env ASSUME_ALWAYS_YES=yes pkg install -y "${PKGS[@]}"
+}
+install_pkg_add() {
+    # OpenBSD
+    PKGS=(cmake ninja git curl python%3 qt6-qtbase qt6-qtwebengine qt6-qttools)
+    run ${SUDO[@]+"${SUDO[@]}"} pkg_add -I "${PKGS[@]}"
+}
+install_pkgin() {
+    # NetBSD
+    PKGS=(cmake ninja-build git curl python312 qt6-qtbase qt6-qtwebengine qt6-qttools)
+    run ${SUDO[@]+"${SUDO[@]}"} pkgin -y install "${PKGS[@]}"
+}
+
 install_macos() {
     if ! xcode-select -p >/dev/null 2>&1; then
         step "Installing the Xcode command line tools"
@@ -351,6 +370,9 @@ system_qt_version_brew() {
 case "${OS}" in
     Linux) detect_linux ;;
     Darwin) MANAGER=brew; DISTRO_NAME="macOS $(sw_vers -productVersion 2>/dev/null || true)" ;;
+    FreeBSD) MANAGER=pkg; DISTRO_NAME="FreeBSD $(uname -r)" ;;
+    OpenBSD) MANAGER=pkg_add; DISTRO_NAME="OpenBSD $(uname -r)" ;;
+    NetBSD) MANAGER=pkgin; DISTRO_NAME="NetBSD $(uname -r)" ;;
     *) die "unsupported system ${OS}; on Windows run install-deps.ps1" ;;
 esac
 
@@ -368,6 +390,8 @@ BUNDLED_POSSIBLE=1
 BUNDLED_REASON=""
 if [[ ${IS_MUSL} -eq 1 ]]; then
     BUNDLED_POSSIBLE=0; BUNDLED_REASON="Qt's prebuilt binaries need glibc and this system uses musl"
+elif [[ "${OS}" == *BSD ]]; then
+    BUNDLED_POSSIBLE=0; BUNDLED_REASON="Qt publishes no prebuilt binaries for ${OS}"
 elif [[ "${OS}" == Linux && "${ARCH}" != x86_64 && "${ARCH}" != aarch64 ]]; then
     BUNDLED_POSSIBLE=0; BUNDLED_REASON="Qt publishes no prebuilt binaries for ${ARCH}"
 fi
@@ -426,7 +450,8 @@ if [[ ${QT_FROM_SYSTEM} -eq 1 ]]; then
     step "Checking the system Qt"
     QTPATHS=""
     for candidate in qtpaths6 qtpaths /usr/lib/qt6/bin/qtpaths /usr/lib64/qt6/bin/qtpaths \
-                     /usr/lib/qt6/bin/qtpaths6 "$( [[ "${OS}" == Darwin ]] && brew --prefix qt 2>/dev/null)/bin/qtpaths"; do
+                     /usr/lib/qt6/bin/qtpaths6 /usr/local/lib/qt6/bin/qtpaths /usr/local/bin/qtpaths6 \
+                     /usr/pkg/qt6/bin/qtpaths "$( [[ "${OS}" == Darwin ]] && brew --prefix qt 2>/dev/null)/bin/qtpaths"; do
         if command -v "${candidate}" >/dev/null 2>&1; then QTPATHS="$(command -v "${candidate}")"; break; fi
     done
     if [[ ${DRY_RUN} -eq 0 ]]; then

@@ -28,6 +28,7 @@ class QProgressBar;
 class QShortcut;
 class QSplitter;
 class QStackedWidget;
+class QTimer;
 class QStandardItemModel;
 class QToolBar;
 class QToolButton;
@@ -140,7 +141,11 @@ private:
 
     // Session.
     void restoreSession();
+    /** Opens the tabs and groups saved under @p group ("session" or a copy); false if none. */
+    bool restoreTabs(const QString &group = QStringLiteral("session"));
     void saveSession() const;
+    /** Saves the session a moment after a change, so a crash loses little. */
+    void scheduleSessionSave();
 
     // Tabs.
     WebView *currentView() const;
@@ -345,6 +350,7 @@ private:
     // Gamer: the tabs this window muted while a page was full screen.
     QList<QPointer<WebView>> m_mutedForFullScreen;
     QList<QPointer<WebView>> m_pausedForFullScreen;
+    QTimer *m_sessionTimer = nullptr;
 };
 
 }

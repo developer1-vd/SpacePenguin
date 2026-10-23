@@ -55,6 +55,8 @@ const PageDefinition kPages[] = {
       "View your browsing history.", false },
     { "about:extensions", "Extensions",
       "Manage your user scripts and extensions.", false },
+    { "about:logins", "Saved Logins",
+      "Search, add, edit and delete saved usernames and passwords.", false },
     { "about:settings", "Settings",
       "Configure SpacePenguin.", false },
     { "about:tatooine", "Tatooine",
@@ -625,6 +627,10 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
         return htmlShell(pageTitle(id), extensionsBody(context));
     if (normalized == QLatin1String("about:settings"))
         return htmlShell(pageTitle(id), settingsBody(context));
+    // The window opens about:logins as sp://logins; this is only its signpost.
+    if (normalized == QLatin1String("about:logins"))
+        return htmlShell(pageTitle(id), QStringLiteral("<h1>Saved Logins</h1>"
+                                                       "<p><a href=\"sp://logins/\">Open saved logins</a></p>"));
     if (isStarWarsPage(normalized))
         return htmlShell(pageTitle(id), starWarsBody(id));
 

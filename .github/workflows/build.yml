@@ -260,6 +260,28 @@ jobs:
             dist/*.rpm
             dist/*.pkg.tar.zst
 
+  bsd:
+    name: FreeBSD
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install, build, test, launch (in a FreeBSD VM)
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14.3"
+          usesh: true
+          mem: 12288
+          prepare: pkg install -y bash
+          run: |
+            set -e
+            bash ./install-deps.sh --yes --no-packaging
+            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+            cmake --build build --parallel "$(sh tools/build-jobs.sh)"
+            QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+            QT_QPA_PLATFORM=offscreen HOME="$(mktemp -d)" ./build/SpacePenguin --version
+            cmake --install build --prefix "$(mktemp -d)"
+
   nix:
     name: Nix (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

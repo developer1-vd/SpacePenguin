@@ -140,6 +140,9 @@ if [[ ${UNINSTALL} -eq 1 ]]; then
     exit 0
 fi
 
+case "$(uname -s)" in
+    *BSD) die "there is no prebuilt BSD version; build it instead: ./install-deps.sh, then cmake -B build && cmake --build build && sudo cmake --install build" ;;
+esac
 [[ "$(uname -s)" == Linux ]] || die "this installs the Linux version; use the .dmg or the Windows installer instead"
 [[ "$(id -u)" -ne 0 ]] || echo "Note: installing for root. Run this as yourself to install it for your account."
 ARCH="$(uname -m)"

@@ -5,6 +5,8 @@
 #include <QString>
 #include <QWebEngineUrlSchemeHandler>
 
+#include <QHash>
+
 #include <functional>
 
 namespace spacepenguin {
@@ -34,6 +36,9 @@ public:
     void setTileProvider(TileProvider provider) { m_tiles = std::move(provider); }
     /** sp://store is the store's; every other sp:// address is the start page. */
     void setStore(Store *store) { m_store = store; }
+    /** Hands sp://<host> to @p handler (sp://logins is about:logins). */
+    using HostHandler = std::function<void(QWebEngineUrlRequestJob *)>;
+    void setHostHandler(const QString &host, HostHandler handler) { m_hosts.insert(host, std::move(handler)); }
 
     void requestStarted(QWebEngineUrlRequestJob *job) override;
 
@@ -46,6 +51,7 @@ private:
     TileProvider m_tiles;
     bool m_isPrivate = false;
     Store *m_store = nullptr;
+    QHash<QString, HostHandler> m_hosts;
 };
 
 }

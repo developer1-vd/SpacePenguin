@@ -32,6 +32,9 @@ public:
     int loadProgress() const { return m_progress; }
     bool lastLoadFailed() const { return m_failed; }
 
+    /** The page shown in a tab whose page process died, with a Reload link to @p url. */
+    static QString crashedPage(const QUrl &url, bool outOfMemory);
+
 signals:
     /** Developer mode: Inspect was chosen in the page's context menu. */
     void inspectRequested();

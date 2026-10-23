@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saved logins</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --card-hover: #eef0f4; --text: #1b1e25; --muted: #5f6675;
+    --line: #e1e4ea; --accent: #2f5fe0; --on-accent: #ffffff; --chip: #eceff4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      --bg: #121317; --card: #1b1d23; --card-hover: #23262d; --text: #e9ebf1; --muted: #9aa1b1;
+      --line: #2a2d35; --accent: #82a0ff; --on-accent: #10142a; --chip: #23262d;
+    }
+  }
+  :root.dark {
+    color-scheme: dark;
+    --bg: #121317; --card: #1b1d23; --card-hover: #23262d; --text: #e9ebf1; --muted: #9aa1b1;
+    --line: #2a2d35; --accent: #82a0ff; --on-accent: #10142a; --chip: #23262d;
+  }
+  :root.light { color-scheme: light; }
+  /*SP_ACCENT*/
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 56rem; margin: 0 auto; padding: 2.5rem 1.5rem 3rem; }
+  header { display: flex; align-items: center; gap: .75rem; }
+  header svg { width: 44px; height: 44px; }
+  h1 { font-size: 1.6rem; margin: 0; letter-spacing: -.02em; }
+  h2 { font-size: 1.05rem; margin: 2rem 0 .6rem; }
+  .lede { color: var(--muted); margin: .4rem 0 1.5rem; }
+  .bar { display: flex; gap: .5rem; margin-bottom: 1rem; }
+  input { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--card);
+          border: 1px solid var(--line); border-radius: 10px; padding: .55rem .8rem; outline: none; }
+  input:focus { border-color: var(--accent); }
+  .bar input { border-radius: 999px; padding: .6rem 1rem; }
+  .button { border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
+            font: 600 .9rem system-ui, sans-serif; border-radius: 999px; padding: .5rem 1rem;
+            cursor: pointer; white-space: nowrap; }
+  .button.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+  .button.small { padding: .25rem .7rem; font-size: .8rem; }
+  .button.danger { color: #d33; }
+  .list { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .item { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+          gap: .75rem; align-items: center; padding: .7rem 1rem; border-top: 1px solid var(--line); }
+  .item:first-child { border-top: 0; }
+  .item:hover { background: var(--card-hover); }
+  .site { font-weight: 600; overflow-wrap: anywhere; }
+  .site small, .meta { display: block; color: var(--muted); font-weight: 400; font-size: .78rem; }
+  .user, .pass { overflow-wrap: anywhere; }
+  .pass { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .05em; }
+  .actions { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: flex-end; }
+  .status { color: var(--muted); padding: 1.5rem; text-align: center; }
+  form.edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .5rem;
+              background: var(--card); border: 1px solid var(--accent); border-radius: 14px;
+              padding: 1rem; margin-bottom: 1rem; }
+  form.edit .row { display: flex; gap: .5rem; justify-content: flex-end; grid-column: 1 / -1; align-items: center; }
+  .error { color: #d33; margin-right: auto; font-size: .85rem; }
+  .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--text);
+           color: var(--bg); border-radius: 999px; padding: .45rem 1rem; font-size: .85rem; }
+  .note { color: var(--muted); font-size: .85rem; margin-top: 2rem; }
+  @media (max-width: 40rem) {
+    .item { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .actions { grid-column: 1 / -1; justify-content: flex-start; }
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+        <clipPath id="sp-globe"><circle cx="50" cy="72" r="20"/></clipPath>
+        <g transform="translate(50 50) scale(.92) translate(-50 -53.25)">
+          <path d="M25.5 54V35a24.5 24.5 0 0 1 49 0v19" fill="none" stroke="#ff7a1a" stroke-width="7"/>
+          <path d="M32 47V35a18 18 0 0 1 36 0v12h1a14 14 0 0 1 14 14v22a14 14 0 0 1-14 14H31a14 14 0 0 1-14-14V61a14 14 0 0 1 14-14z" fill="#16171d" stroke="#fff" stroke-width="5" stroke-linejoin="round" paint-order="stroke"/>
+          <path d="M37 47V36a13 13 0 0 1 26 0v11z" fill="#fff"/>
+          <circle cx="45" cy="34" r="2.6" fill="#16171d"/>
+          <circle cx="55" cy="34" r="2.6" fill="#16171d"/>
+          <path d="M47 38.5h6l-3 4z" fill="#ffb21f" stroke="#ffb21f" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="50" cy="72" r="20" fill="#6a4fe0"/>
+          <path d="M33 64c4-3 10-3 13 0 2 3-1 5-1 8 0 4 4 6 3 10-1 5-6 7-9 5-3-2-2-7-5-10-3-3-6-6-5-9 1-2 2-3 4-4zM56 61c5-1 11 1 13 5 1 3-1 5-4 5-3 1-3 4-2 7 2 4 1 8-3 10-4 1-5-3-6-7-1-5-4-8-4-13 0-4 2-6 6-7z" fill="#2fb7a3" clip-path="url(#sp-globe)"/>
+        </g>
+      </svg>
+    <h1>Saved logins</h1>
+  </header>
+  <p class="lede">The usernames and passwords SpacePenguin fills in for you. They stay on this computer.</p>
+  <div class="bar">
+    <input id="q" type="search" placeholder="Search logins" aria-label="Search logins" autocomplete="off">
+    <button class="button" id="add" type="button">Add login</button>
+  </div>
+  <form class="edit" id="form" hidden autocomplete="off">
+    <input id="f-site" placeholder="Website, such as example.com" aria-label="Website" required>
+    <input id="f-user" placeholder="Username or email" aria-label="Username">
+    <input id="f-pass" type="password" placeholder="Password" aria-label="Password" required>
+    <div class="row">
+      <span class="error" id="f-error"></span>
+      <button class="button ghost" type="button" id="f-show">Show</button>
+      <button class="button ghost" type="button" id="f-cancel">Cancel</button>
+      <button class="button" type="submit">Save</button>
+    </div>
+  </form>
+  <div class="list" id="list"><div class="status">Loading…</div></div>
+  <section id="never-section" hidden>
+    <h2>Never saved</h2>
+    <p class="meta">SpacePenguin won't offer to save logins on these sites.</p>
+    <div class="list" id="never"></div>
+  </section>
+  <p class="note">Logins are saved when you sign in to a site and choose Save. Private windows can fill from them but never add to them.</p>
+</main>
+<div class="toast" id="toast" hidden></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let logins = [];
+let editing = null;
+const shown = new Set();
+
+function el(tag, props, ...children) {
+  const node = document.createElement(tag);
+  Object.assign(node, props || {});
+  for (const child of children) node.append(child);
+  return node;
+}
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => { t.hidden = true; }, 1800);
+}
+async function api(path, data) {
+  const response = await fetch('/api/' + path, data === undefined ? {} : {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('The request was refused.');
+  return response.json();
+}
+function key(login) { return login.origin + '\n' + login.username; }
+
+function render() {
+  const query = $('q').value.trim().toLowerCase();
+  const list = $('list');
+  list.textContent = '';
+  const matches = logins.filter(l => !query || l.site.toLowerCase().includes(query)
+                                   || l.username.toLowerCase().includes(query));
+  if (!matches.length) {
+    list.append(el('div', { className: 'status', textContent: logins.length
+      ? 'No saved logins match “' + $('q').value.trim() + '”.'
+      : 'No saved logins yet. Sign in to a site and choose Save, or add one here.' }));
+    return;
+  }
+  for (const login of matches) {
+    const visible = shown.has(key(login));
+    const used = login.lastUsed ? 'Last used ' + new Date(login.lastUsed).toLocaleDateString() : login.origin;
+    const reveal = el('button', { className: 'button ghost small', type: 'button', textContent: visible ? 'Hide' : 'Show' });
+    reveal.onclick = () => { visible ? shown.delete(key(login)) : shown.add(key(login)); render(); };
+    const copy = el('button', { className: 'button ghost small', type: 'button', textContent: 'Copy' });
+    copy.onclick = () => navigator.clipboard.writeText(login.password)
+      .then(() => toast('Password copied'), () => toast('Could not copy'));
+    const edit = el('button', { className: 'button ghost small', type: 'button', textContent: 'Edit' });
+    edit.onclick = () => openForm(login);
+    const remove = el('button', { className: 'button ghost small danger', type: 'button', textContent: 'Delete' });
+    remove.onclick = async () => {
+      if (!confirm('Delete the login for ' + (login.username || 'this site') + ' on ' + login.site + '?')) return;
+      await api('remove', { origin: login.origin, username: login.username });
+      toast('Login deleted');
+      load();
+    };
+    const site = el('div', { className: 'site', textContent: login.site }, el('small', { textContent: used }));
+    list.append(el('div', { className: 'item' }, site,
+      el('div', { className: 'user', textContent: login.username || '(no username)' }),
+      el('div', { className: 'pass', textContent: visible ? login.password : '••••••••' }),
+      el('div', { className: 'actions' }, reveal, copy, edit, remove)));
+  }
+}
+
+async function load() {
+  try {
+    logins = await api('list');
+    logins.sort((a, b) => a.site.localeCompare(b.site) || a.username.localeCompare(b.username));
+    render();
+    const never = await api('never');
+    const box = $('never');
+    box.textContent = '';
+    $('never-section').hidden = !never.length;
+    for (const origin of never) {
+      const allow = el('button', { className: 'button ghost small', type: 'button', textContent: 'Allow' });
+      allow.onclick = async () => { await api('allow', { origin }); load(); };
+      box.append(el('div', { className: 'item' }, el('div', { className: 'site', textContent: origin }),
+        el('div'), el('div'), el('div', { className: 'actions' }, allow)));
+    }
+  } catch (e) {
+    $('list').textContent = '';
+    $('list').append(el('div', { className: 'status', textContent: e.message }));
+  }
+}
+
+function openForm(login) {
+  editing = login || null;
+  $('f-site').value = login ? login.origin : '';
+  $('f-user').value = login ? login.username : '';
+  $('f-pass').value = login ? login.password : '';
+  $('f-pass').type = 'password';
+  $('f-show').textContent = 'Show';
+  $('f-error').textContent = '';
+  $('form').hidden = false;
+  (login ? $('f-pass') : $('f-site')).focus();
+}
+$('add').onclick = () => openForm(null);
+$('f-cancel').onclick = () => { $('form').hidden = true; editing = null; };
+$('f-show').onclick = () => {
+  const hidden = $('f-pass').type === 'password';
+  $('f-pass').type = hidden ? 'text' : 'password';
+  $('f-show').textContent = hidden ? 'Hide' : 'Show';
+};
+$('form').onsubmit = async event => {
+  event.preventDefault();
+  const data = { site: $('f-site').value, username: $('f-user').value, password: $('f-pass').value };
+  if (editing) { data.oldOrigin = editing.origin; data.oldUsername = editing.username; }
+  try {
+    const result = await api('save', data);
+    if (result.error) { $('f-error').textContent = result.error; return; }
+    $('form').hidden = true;
+    editing = null;
+    toast('Login saved');
+    load();
+  } catch (e) { $('f-error').textContent = e.message; }
+};
+$('q').oninput = render;
+load();
+</script>
+</body>
+</html>

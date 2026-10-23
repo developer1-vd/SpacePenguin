@@ -2,6 +2,7 @@
 
 #include "bookmarkmanager.h"
 #include "importer.h"
+#include "loginspage.h"
 
 using namespace spacepenguin;
 
@@ -16,6 +17,7 @@ private slots:
     void loginsCsv();
     void importKeepsFoldersAndSkipsDuplicates();
     void removingAFolderRemovesWhatItHolds();
+    void loginsPageAnswersOnlyItself();
 };
 
 void TestImporter::init()
@@ -113,6 +115,17 @@ void TestImporter::removingAFolderRemovesWhatItHolds()
     QCOMPARE(bookmarks.bookmarks().size(), 3);
     QVERIFY(bookmarks.removeBookmark(folder));
     QVERIFY(bookmarks.bookmarks().isEmpty());
+}
+
+void TestImporter::loginsPageAnswersOnlyItself()
+{
+    // Websites must never read or change the saved logins through sp://logins/api.
+    QVERIFY(LoginsPage::isAllowedCaller(QUrl(QStringLiteral("sp://logins/"))));
+    QVERIFY(!LoginsPage::isAllowedCaller(QUrl(QStringLiteral("https://example.com/"))));
+    QVERIFY(!LoginsPage::isAllowedCaller(QUrl(QStringLiteral("sp://start/"))));
+    QVERIFY(!LoginsPage::isAllowedCaller(QUrl(QStringLiteral("sp://store/"))));
+    QVERIFY(!LoginsPage::isAllowedCaller(QUrl()));
+    QVERIFY(!LoginsPage::isAllowedCaller(QUrl(QStringLiteral("http://logins/"))));
 }
 
 int main(int argc, char **argv)
