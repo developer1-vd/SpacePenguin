@@ -13,6 +13,8 @@
 #include <QJsonObject>
 #include <QSettings>
 
+#include <algorithm>
+
 namespace spacepenguin {
 namespace {
 
@@ -181,6 +183,47 @@ void BrowserBackend::removeBookmark(const QUrl &url)
 QVariantList BrowserBackend::history() const
 {
     return readList(kHistory);
+}
+
+QVariantList BrowserBackend::topSites(int limit) const
+{
+    struct Site {
+        QString host;
+        QString url;
+        int pages = 0;
+        int newest = 0; // position of its newest page; history is newest first
+    };
+    QList<Site> sites;
+    const QVariantList entries = history();
+    for (int i = 0; i < entries.size(); ++i) {
+        const QUrl url(entries.at(i).toMap().value(QStringLiteral("url")).toString());
+        QString host = url.host();
+        if (host.isEmpty())
+            continue;
+        if (host.startsWith(QLatin1String("www.")))
+            host.remove(0, 4);
+        auto site = std::find_if(sites.begin(), sites.end(), [&host](const Site &s) { return s.host == host; });
+        if (site == sites.end()) {
+            const QUrl home = url.adjusted(QUrl::RemovePath | QUrl::RemoveQuery | QUrl::RemoveFragment
+                                            | QUrl::RemoveUserInfo);
+            sites.append(Site{host, home.toString() + QLatin1Char('/'), 0, i});
+            site = sites.end() - 1;
+        }
+        ++site->pages;
+    }
+    std::stable_sort(sites.begin(), sites.end(), [](const Site &a, const Site &b) {
+        return a.pages != b.pages ? a.pages > b.pages : a.newest < b.newest;
+    });
+
+    QVariantList result;
+    for (const Site &site : std::as_const(sites)) {
+        if (result.size() >= limit)
+            break;
+        result.append(QVariantMap{{QStringLiteral("title"), site.host},
+                                  {QStringLiteral("url"), site.url},
+                                  {QStringLiteral("letter"), site.host.left(1).toUpper()}});
+    }
+    return result;
 }
 
 void BrowserBackend::saveSession(const QVariantMap &session)

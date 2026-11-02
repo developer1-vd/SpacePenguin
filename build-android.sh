@@ -155,6 +155,30 @@ apk="$(find "${BUILD_DIR}/android-build" -name '*.apk' -path '*release*' | head 
 mkdir -p "${OUTPUT_DIR}"
 OUTPUT="${OUTPUT_DIR}/SpacePenguin-${VERSION}-android-arm64.apk"
 cp "${apk}" "${OUTPUT}"
+
+# A release build without your key comes out unsigned, and Android refuses to
+# install an unsigned APK. Sign it with the debug key: the one in
+# ANDROID_DEBUG_KEYSTORE, else ~/.android/debug.keystore, made if missing. An
+# update installs over the app only when signed with the same key. The debug
+# key's password is the well-known "android", so it is for your own phone; APKs
+# you hand out should use --release and a key you keep private.
+if [[ ${RELEASE} -eq 0 ]]; then
+    step "Signing with the debug key"
+    KEYSTORE="${ANDROID_DEBUG_KEYSTORE:-${HOME}/.android/debug.keystore}"
+    if [[ ! -f "${KEYSTORE}" ]]; then
+        KEYTOOL="keytool"
+        [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/keytool" ]] && KEYTOOL="${JAVA_HOME}/bin/keytool"
+        mkdir -p "$(dirname "${KEYSTORE}")"
+        "${KEYTOOL}" -genkeypair -keystore "${KEYSTORE}" -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" >/dev/null
+    fi
+    APKSIGNER="${SDK}/build-tools/${BUILD_TOOLS}/apksigner"
+    "${APKSIGNER}" sign --ks "${KEYSTORE}" --ks-pass pass:android --key-pass pass:android \
+        --ks-key-alias androiddebugkey "${OUTPUT}"
+    rm -f "${OUTPUT}.idsig"
+fi
+"${SDK}/build-tools/${BUILD_TOOLS}/apksigner" verify "${OUTPUT}" || die "${OUTPUT} is not signed"
 (cd "${OUTPUT_DIR}" && sha256sum "$(basename "${OUTPUT}")" > "$(basename "${OUTPUT}").sha256")
 
 step "Created ${OUTPUT} ($(du -h "${OUTPUT}" | cut -f1))"

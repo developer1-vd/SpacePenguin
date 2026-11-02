@@ -359,6 +359,10 @@ jobs:
           QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           QT_ANDROID_KEYSTORE_KEY_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
+          # Without your key, a throwaway key made for this run signs the APK, so it
+          # installs. It is never kept: a stored key could be read by other
+          # workflows and used to sign fake updates.
+          export ANDROID_DEBUG_KEYSTORE="${RUNNER_TEMP}/throwaway.keystore"
           if [ -n "${ANDROID_KEYSTORE_BASE64}" ] && [ "${RUNNER_OS}" = Linux ]; then
             export QT_ANDROID_KEYSTORE_PATH="${RUNNER_TEMP}/release.keystore"
             echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "${QT_ANDROID_KEYSTORE_PATH}"

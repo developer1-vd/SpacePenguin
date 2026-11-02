@@ -31,6 +31,7 @@ class BrowserBackend : public QObject
     Q_PROPERTY(bool skipSponsors READ skipSponsors WRITE setSkipSponsors NOTIFY settingsChanged)
     Q_PROPERTY(QVariantList bookmarks READ bookmarks NOTIFY bookmarksChanged)
     Q_PROPERTY(QVariantList history READ history NOTIFY historyChanged)
+    Q_PROPERTY(QVariantList topSites READ topSites NOTIFY historyChanged)
     Q_PROPERTY(QString version READ version CONSTANT)
 
 public:
@@ -58,6 +59,11 @@ public:
     Q_INVOKABLE void removeBookmark(const QUrl &url);
 
     QVariantList history() const;
+    /**
+     * The new-tab page's shortcuts: the sites with the most pages in history,
+     * most first, each as {title, url, letter}. At most @p limit of them.
+     */
+    QVariantList topSites(int limit = 8) const;
     Q_INVOKABLE void recordVisit(const QString &title, const QUrl &url);
     Q_INVOKABLE void clearHistory();
 
