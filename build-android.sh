@@ -158,8 +158,10 @@ cp "${apk}" "${OUTPUT}"
 
 # A release build without your key comes out unsigned, and Android refuses to
 # install an unsigned APK. Sign it with the debug key: the one in
-# ANDROID_DEBUG_KEYSTORE, else ~/.android/debug.keystore, made if missing. Keep
-# that file: an update installs over the app only when signed with the same key.
+# ANDROID_DEBUG_KEYSTORE, else ~/.android/debug.keystore, made if missing. An
+# update installs over the app only when signed with the same key. The debug
+# key's password is the well-known "android", so it is for your own phone; APKs
+# you hand out should use --release and a key you keep private.
 if [[ ${RELEASE} -eq 0 ]]; then
     step "Signing with the debug key"
     KEYSTORE="${ANDROID_DEBUG_KEYSTORE:-${HOME}/.android/debug.keystore}"

@@ -600,7 +600,9 @@ on an iPhone with [Sideloadly](https://sideloadly.io) or
 expire after 7 days and are signed again from the same tool). To have CI sign the
 APK with your own key, add the repository secrets `ANDROID_KEYSTORE_BASE64`
 (`base64 -w0 release.keystore`), `ANDROID_KEYSTORE_ALIAS` and
-`ANDROID_KEYSTORE_PASSWORD`.
+`ANDROID_KEYSTORE_PASSWORD`. Without them, each CI APK is signed with a key made
+for that run alone, so it installs but not over an earlier one: uninstall the app
+first. With your key, every new APK updates the app in place.
 
 Both fetch what they need on first use (Qt for the phone and QtWebView into
 `.qt/`; for Android the SDK and NDK into `.cache/android-sdk`; Android also needs
