@@ -563,7 +563,7 @@ YouTube/SponsorBlock code with the desktop app (`src/sponsorblock.*`,
 
 It has tabs with tab groups (touch and hold a tab on the tabs screen to group it;
 tap a group's header to collapse it, ⋮ to rename, recolour, add a tab, ungroup
-or close it), a start page with your bookmarks, bookmarks and history, a bottom
+or close it), a new-tab page with your most visited sites, bookmarks and latest pages, bookmarks and history, a bottom
 toolbar within thumb reach, light and dark, and the choice of search engine.
 Android's Back button closes what is open, then goes back. Tabs and groups are
 reopened when the app starts again (their addresses; the phone's web view cannot
@@ -585,6 +585,8 @@ Sponsor segments are skipped as on the desktop.
 
 ```sh
 ./build-android.sh          # dist/SpacePenguin-<version>-android-arm64.apk (debug key)
+                            # the key is ~/.android/debug.keystore, made if missing;
+                            # keep it, or later APKs won't install over this one
 ./build-ios.sh              # macOS + Xcode: a Simulator build
 ./build-ios.sh --team <ID>  # a signed .ipa for devices, with your Apple Developer team
 ./build-ios.sh --unsigned   # an unsigned .ipa, to sideload with your own Apple ID
