@@ -115,6 +115,8 @@ qt_add_executable(spacepenguin
     src/loginspage.h
     src/secretstore.cpp
     src/secretstore.h
+    src/session.cpp
+    src/session.h
     src/notifications.cpp
     src/notifications.h
     src/sidetabs.cpp
@@ -505,6 +507,23 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_sponsorblock PRIVATE Qt6::Test Qt6::Network)
         target_include_directories(tst_sponsorblock PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME sponsorblock COMMAND tst_sponsorblock)
+
+        qt_add_executable(tst_userdata
+            tests/tst_userdata.cpp
+            src/session.cpp
+            src/session.h
+            src/filterlists.cpp
+            src/filterlists.h
+            src/adblocker.cpp
+            src/adblocker.h
+            src/cosmeticfilters.cpp
+            src/cosmeticfilters.h
+            src/sitepermissions.cpp
+            src/sitepermissions.h
+        )
+        target_link_libraries(tst_userdata PRIVATE Qt6::Test Qt6::Widgets Qt6::Network Qt6::WebEngineCore)
+        target_include_directories(tst_userdata PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME userdata COMMAND tst_userdata)
 
         # Tests never touch the real keyring (a test that does turns it back on).
         get_property(spacepenguin_tests DIRECTORY PROPERTY TESTS)

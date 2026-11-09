@@ -52,7 +52,8 @@ The largest file. `BrowserWindow` owns:
 - **Prompts:** the bar above the page that asks questions (site permissions, saving a
   login, a student's request to unblock) — `addPrompt()`.
 - **Session:** tabs and their back/forward history are saved a moment after every
-  change (`scheduleSessionSave()`) and restored on start. A `session/running` flag
+  change (`scheduleSessionSave()`) and restored on start; `session.cpp` reads and
+  writes them. A `session/running` flag
   left set means the last run crashed; the tabs are then restored, or offered back.
 - **Roles' tools** (developer tools, Focus mode, citations…) and installing sites as
   apps — see below.
@@ -187,9 +188,10 @@ Qt Test, one executable per area; run them with `ctest --test-dir build`.
 |---|---|
 | `tst_adblocker` | rule parsing and matching |
 | `tst_urlresolver` | turning typed text into an address or a search |
-| `tst_classroom` | runs a whole class over 127.0.0.1: join, block, ask, allow, leave |
-| `tst_roles` | Focus mode, citations, manifests, search templates, onions, gamer switches |
-| `tst_importer` | bookmark and login import; only about:logins may use its API |
+| `tst_classroom` | runs a whole class over 127.0.0.1: join, block, ask, allow, leave; refuses outsiders, forgeries and replays |
+| `tst_userdata` | the saved session and crash restore, filter list subscriptions, site permission names |
+| `tst_roles` | Focus mode, citations, web app manifests, installing and removing a web app, search templates, onions, finding Tor, gamer switches, the update check |
+| `tst_importer` | bookmark and login import; saved logins in a file and moving into the keyring; only about:logins may use its API |
 | `tst_userextensions` | user-script installation and injection |
 | `tst_aboutpages` | the `about:` pages |
 | `tst_startpage` | the start page |
