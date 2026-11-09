@@ -12,6 +12,7 @@
 #include <functional>
 
 class QNetworkAccessManager;
+class QNetworkReply;
 class QTcpServer;
 class QTimer;
 class QUdpSocket;
@@ -64,8 +65,22 @@ struct ClassStudent {
  *
  * The teacher's browser serves a small JSON API over HTTP on port 47800 (or the
  * next free one) and answers discovery on UDP port 47801:
- *   GET  /v1/class?code=…&id=…&name=…   the list, this student's allowed sites and answers
- *   POST /v1/request                     {code, id, name, site, note}
+ *   POST /v2/class      {id, name}                   the list, this student's allowed sites and answers
+ *   POST /v2/request    {id, name, site, note, kind}
+ *
+ * The class code is the shared secret, and it never crosses the network. Both
+ * sides stretch it into a key (classKey(): PBKDF2, so a recorded exchange cannot
+ * be tried against every code quickly) and sign with HMAC-SHA256:
+ *   - discovery: "SPCLASS2?<nonce>?<mac>" proves the student knows the code; the
+ *     teacher's "SPCLASS2!<port>!<mac>" proves it is the teacher;
+ *   - each request carries X-SP-Time, X-SP-Nonce and X-SP-Mac over the method,
+ *     path, time, nonce and body; the teacher refuses stale times and repeated
+ *     nonces;
+ *   - each answer carries X-SP-Mac over the request's nonce, its status and body,
+ *     so a student takes blocks and answers from the teacher alone.
+ * Anyone without the code can neither join nor pose as the teacher. Students
+ * share the code, so one student could pose as another; it is a classroom tool
+ * for a school network, and the README calls it a beta.
  */
 class Classroom : public QObject
 {
@@ -129,8 +144,11 @@ public:
 
     // ---- Shared, and exposed for testing ----------------------------------------
     /** Six letters and digits, without look-alikes (no 0/O, 1/I/L). */
+    /** Ten letters and digits, without look-alikes (0/O, 1/I/L). */
     static QString makeCode();
-    /** "ABC234", "abc234@10.0.0.5" or "ABC234@10.0.0.5:47802" → code, host and port. */
+    /** "ABCDE-FGH23", as people read and type it. */
+    static QString displayCode(const QString &code);
+    /** "ABCDE-FGH23", "abcdefgh23@10.0.0.5" or "…@10.0.0.5:47802" → code, host and port. */
     static bool parseJoinCode(const QString &text, QString *code, QString *host, quint16 *port);
     /** The page another address shows: view-source:, Google Translate and its .translate.goog
      *  proxy, the Wayback Machine, Google's cache. Invalid when @p url wraps nothing. */
@@ -148,7 +166,13 @@ public:
     static QString askedPage(const QString &site, bool sent);
     /** One HTTP request read from @p data: complete, or more is needed (or it is bad). */
     enum class Parse { Complete, Incomplete, Bad };
-    static Parse parseHttp(const QByteArray &data, QByteArray *method, QByteArray *target, QByteArray *body);
+    static Parse parseHttp(const QByteArray &data, QByteArray *method, QByteArray *target, QByteArray *body,
+                           QHash<QByteArray, QByteArray> *headers = nullptr);
+
+    /** The key both sides derive from a class code. Exposed for testing. */
+    static QByteArray classKey(const QString &code);
+    /** HMAC-SHA256 of @p message with @p key, in hex. */
+    static QByteArray sign(const QByteArray &key, const QByteArray &message);
 
 signals:
     void changed();
@@ -169,7 +193,15 @@ private:
     void stopServing();
     void handleConnection();
     QByteArray respond(const QByteArray &method, const QByteArray &target, const QByteArray &body,
-                       const QHostAddress &peer, int *status);
+                       const QHash<QByteArray, QByteArray> &headers, int *status, QByteArray *mac);
+    QByteArray respondSigned(const QByteArray &path, const QJsonObject &request, int *status);
+    bool verifyRequest(const QByteArray &method, const QByteArray &path, const QByteArray &body,
+                       const QHash<QByteArray, QByteArray> &headers, QByteArray *nonce);
+    /** Student: a signed POST to the teacher; @p nonce is what the answer is signed over. */
+    QNetworkReply *post(const QUrl &url, const QJsonObject &body, const QString &code, QByteArray *nonce);
+    /** Student: whether @p reply is the teacher's own answer, and its body. */
+    static bool verifiedAnswer(QNetworkReply *reply, const QString &code, const QByteArray &nonce,
+                               QByteArray *body);
     void handleDiscovery();
 
     void discover(const QString &code, std::function<void(QHostAddress, quint16)> found);
@@ -187,6 +219,7 @@ private:
     QHash<QString, ClassStudent> m_students;
     QHash<QString, QList<std::pair<QString, bool>>> m_answers; // per student, not yet delivered
     QSet<QString> m_released; // students the teacher let leave, told at their next visit
+    QHash<QByteArray, qint64> m_seenNonces; // requests already answered, against replays
     void postRequest(const QJsonObject &fields);
     void forceLeave(const QString &message);
 

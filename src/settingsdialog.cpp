@@ -865,7 +865,7 @@ void addStudentClass(QVBoxLayout *layout, QWidget *owner)
     name->setPlaceholderText(SettingsDialog::tr("Your name"));
     name->setMaxLength(40);
     auto *code = new QLineEdit;
-    code->setPlaceholderText(SettingsDialog::tr("Class code"));
+    code->setPlaceholderText(SettingsDialog::tr("Class code, like K7MP3-XQR9A"));
     auto *joinButton = new QPushButton(SettingsDialog::tr("Join Class"));
     join->addWidget(name, 1);
     join->addWidget(code, 1);
@@ -877,7 +877,8 @@ void addStudentClass(QVBoxLayout *layout, QWidget *owner)
     leaveRow->addStretch(1);
     layout->addLayout(leaveRow);
     auto *hint = mutedLabel(SettingsDialog::tr("Your teacher gives the code. If the class isn't found, they "
-                                               "can give it as code@address."));
+                                               "can give it as code@address. Classes are a beta: both "
+                                               "computers need this version of SpacePenguin."));
     layout->addWidget(hint);
 
     const auto update = [classroom, status, joinBox, leaveButton, hint] {
@@ -1089,12 +1090,12 @@ void addTeacherClass(QVBoxLayout *layout, QWidget *owner)
             where->clear();
         } else {
             codeLabel->setText(SettingsDialog::tr("Class code: <b style=\"font-size:16pt;letter-spacing:2px\">%1</b>")
-                                   .arg(classroom->code()));
+                                   .arg(Classroom::displayCode(classroom->code())));
             QStringList manual;
             for (const QString &address : Classroom::localAddresses())
                 manual.append(classroom->port() && classroom->port() != Classroom::kHttpPort
-                                  ? QStringLiteral("%1@%2:%3").arg(classroom->code(), address).arg(classroom->port())
-                                  : QStringLiteral("%1@%2").arg(classroom->code(), address));
+                                  ? QStringLiteral("%1@%2:%3").arg(Classroom::displayCode(classroom->code()), address).arg(classroom->port())
+                                  : QStringLiteral("%1@%2").arg(Classroom::displayCode(classroom->code()), address));
             where->setText(!classroom->serving()
                                ? SettingsDialog::tr("The class could not open on this computer's network ports.")
                                : manual.isEmpty() ? SettingsDialog::tr("This computer is not on a network.")

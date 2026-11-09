@@ -130,12 +130,12 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
     the game; GPU drawing even on graphics chips Chromium distrusts, an uncapped
     frame rate for fast screens and an FPS counter (from the next start; never where
     SpacePenguin had to turn the GPU off)
-  - *Teacher mode*: runs a class on the school network. Block up to 100 sites for the
+  - *Teacher mode* (beta): runs a class on the school network. Block up to 100 sites for the
     students who join, each with a reason they see; answer their requests to unblock
     (for that student, for everyone, or not) from a bar above the page. The teacher's
     own browsing isn't restricted. Pages can also open larger (up to 200%) for a
     projector
-  - *Student mode*: pairs with Teacher mode. Join with the class code your teacher
+  - *Student mode* (beta): pairs with Teacher mode. Join with the class code your teacher
     shows (or `code@address` on networks that keep devices apart): the teacher's
     blocked sites show their reason and an *Ask to unblock* box with a note, and the
     answer pops up — an allowed site loads by itself. The last list keeps applying
@@ -147,6 +147,13 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
     are let go when the teacher closes the class or makes a new code (or after two
     weeks without reaching the teacher's computer). Also Focus mode, and *Copy Citation*
     (`Ctrl`+`Alt`+`C`): the page's title, site, address and today's date
+  - *About the classroom's security*: the ten-character class code is the shared
+    secret and never crosses the network. Finding the class, every request and every
+    answer are signed with a key stretched from it, so someone on the network without
+    the code can't join, can't pose as the teacher to send students a list of its
+    own, and can't replay recorded requests. Students share the code, so one
+    could pose as another. It's a beta for a trusted school network, not device
+    management
   - *Worker*: Focus mode, and your work pages opened together, from the menu or at
     start-up
 

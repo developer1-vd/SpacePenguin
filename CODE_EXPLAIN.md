@@ -134,13 +134,17 @@ page load. In order, it handles:
 Teacher and student pair over the local network, with nothing on the internet:
 
 - **Teacher's side:** the teacher's SpacePenguin runs a small HTTP/JSON server
-  (`QTcpServer`, port 47800) and answers UDP broadcasts on port 47801 to its
-  six-character class code.
-- **Joining:** a student broadcasts the code to find the teacher, then polls
-  `GET /v1/class` every 15 s. The reply carries the blocked sites, each with the
+  (`QTcpServer`, port 47800) and answers UDP broadcasts on port 47801.
+- **The code is the secret, and never sent.** Both sides stretch the ten-character
+  class code into a key (`classKey()`, PBKDF2) and sign with HMAC-SHA256: the
+  discovery broadcast proves the student knows the code, the answer proves it's the
+  teacher; each request is signed with a time and a nonce (stale or repeated ones
+  are refused), and each answer is signed over the request's nonce.
+- **Joining:** a student broadcasts to find the teacher, then polls
+  `POST /v2/class` every 15 s. The reply carries the blocked sites, each with the
   teacher's reason, plus this student's exceptions and answers.
 - **Requests:** a student's request to unblock a site, or to leave, is a
-  `POST /v1/request`. It appears as a prompt in the teacher's window.
+  `POST /v2/request`. It appears as a prompt in the teacher's window.
 - **Enforcement:** `Classroom::blocks()` is called from `BrowserPage` for every page
   and frame. It also unwraps view-source, translation proxies and archives, knows a
   site's other addresses (youtu.be…), and blocks web proxies. While a student is in a
