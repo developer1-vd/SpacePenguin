@@ -25,6 +25,16 @@ once a version is tagged.
 | Android | *SpacePenguin-Android* | open the `.apk` on the phone (allow installing from your browser or files app) |
 | iPhone and iPad | *SpacePenguin-iOS* | install the `-ios-unsigned.ipa` with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) and your Apple ID |
 
+The Windows and macOS packages are not code-signed yet, so the first start needs
+one extra step:
+
+- **Windows:** if SmartScreen says "Windows protected your PC", click *More info*,
+  then *Run anyway*.
+- **macOS:** right-click (or Control-click) SpacePenguin in Applications, choose
+  *Open*, then *Open* again. On macOS 15 and later, if there is no *Open* button:
+  try to open it once, then go to *System Settings › Privacy & Security* and click
+  *Open Anyway*.
+
 On Linux, one command installs it for you, with an app-menu entry; run it again to
 update:
 
@@ -195,8 +205,9 @@ would be a lie in the UI.
 ## Extensions
 
 Chrome extensions need Qt 6.10's extension manager, which still crashes when an
-extension is switched on, so SpacePenguin keeps them off: a build against Qt 6.10+
-started with `SPACEPENGUIN_CHROME_EXTENSIONS=1` shows them, for testing only. What
+extension is switched on, so releases leave them out. For testing only, build
+against Qt 6.10+ with `-DSPACEPENGUIN_CHROME_EXTENSIONS=ON` and start it with
+`SPACEPENGUIN_CHROME_EXTENSIONS=1`. What
 it ships is
 **JavaScript user scripts**, installed as `QWebEngineScript` objects on the
 active profile.
@@ -335,24 +346,10 @@ never fetched from the network.
 | `about:penguin`   | 🐧                                                        |
 | `about:teapot`    | RFC 2324                                                   |
 | `about:pan`       | You have been panned                                       |
-| `about:force`     | Use the Force                                              |
-| `about:deathstar` | That's No Moon                                             |
-| `about:yoda`      | Wise, You Are                                              |
-| `about:hyperdrive`| Punch It                                                   |
-| `about:mozilla`   | Book of Mozilla (verses)                                   |
-| `about:firefox`   | Phoenix Rising                                             |
-| `about:servo`     | Fearless Concurrency                                       |
-| `about:rust`      | Empowering Everyone                                        |
 | `about:downloads` | Download manager                                           |
 | `about:history`   | Browsing history                                           |
 | `about:extensions`| User scripts and extensions                                |
 | `about:settings`  | Open the settings dialog                                   |
-| `about:tatooine`  | Tatooine                                                   |
-| `about:hoth`      | Hoth                                                       |
-| `about:dagobah`   | Dagobah                                                    |
-| `about:endor`     | Endor                                                      |
-| `about:naboo`     | Naboo                                                      |
-| `about:coruscant` | Coruscant                                                  |
 
 Any `about:` page not in the list above gets an internal "no such page" answer instead of a network error.
 
@@ -567,8 +564,8 @@ or close it), a new-tab page with your most visited sites, bookmarks and latest 
 toolbar within thumb reach, light and dark, and the choice of search engine.
 Android's Back button closes what is open, then goes back. Tabs and groups are
 reopened when the app starts again (their addresses; the phone's web view cannot
-hand over its history). *☰ › New private tab* opens a tab kept out of history and
-not reopened.
+hand over its history). *☰ › New tab without history* opens a tab kept out of history and
+not reopened. It is not called private, because it is not (below).
 
 What the phone engines do not allow, and so it does not do:
 
@@ -577,8 +574,8 @@ What the phone engines do not allow, and so it does not do:
   and YouTube ads that start are muted and skipped — but they are still downloaded.
 - **YouTube ad removal before playback.** That needs a script that runs before the
   page's own, which the phone web views do not offer; the desktop app does it.
-- **Separate cookies for private tabs.** All tabs share the web view's storage, so
-  a private tab is kept out of history but not out of cookies; *Settings › Clear
+- **Private tabs.** All tabs share the web view's storage, so a tab without
+  history is kept out of history but not out of cookies; *Settings › Clear
   history and cookies* is the way to forget.
 
 Sponsor segments are skipped as on the desktop.

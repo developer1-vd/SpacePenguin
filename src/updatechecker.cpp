@@ -36,8 +36,17 @@ bool UpdateChecker::isNewer(const QString &latest, const QString &current)
     QString tag = latest.trimmed();
     if (tag.startsWith(QLatin1Char('v'), Qt::CaseInsensitive))
         tag.remove(0, 1);
-    const QVersionNumber newest = QVersionNumber::fromString(tag);
-    return !newest.isNull() && newest > QVersionNumber::fromString(current);
+    qsizetype tagSuffix = 0;
+    qsizetype currentSuffix = 0;
+    const QVersionNumber newest = QVersionNumber::fromString(tag, &tagSuffix);
+    const QVersionNumber running = QVersionNumber::fromString(current.trimmed(), &currentSuffix);
+    if (newest.isNull())
+        return false;
+    if (newest != running)
+        return newest > running;
+    // Same numbers: a release is newer than its own candidates ("1.0.0" over
+    // "1.0.0-rc.1"), never the other way round.
+    return tagSuffix >= tag.size() && currentSuffix < current.trimmed().size();
 }
 
 void UpdateChecker::checkIfDue()

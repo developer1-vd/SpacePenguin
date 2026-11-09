@@ -6,7 +6,7 @@
 # From this checkout (no tag needed):
 #   SPACEPENGUIN_SOURCE="$(git -C ../.. rev-parse --show-toplevel)" makepkg -si
 pkgname=spacepenguin
-pkgver=0.1.0
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="A secure, lightweight, and usable browser written in Qt"
 arch=('x86_64' 'aarch64')

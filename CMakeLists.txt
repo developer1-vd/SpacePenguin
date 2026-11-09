@@ -4,14 +4,16 @@ cmake_minimum_required(VERSION 3.21)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 
 project(SpacePenguin
-    VERSION 0.1.0
+    VERSION 1.0.0
     DESCRIPTION "A secure, lightweight, and usable browser written in Qt"
     LANGUAGES CXX)
 
 # The version people see: the app's About page and --version, the download file
 # names and the release. Package formats, Windows file properties and Info.plist
-# need plain numbers and take VERSION above.
-set(SPACEPENGUIN_VERSION_NAME "0.1-A")
+# need plain numbers and take VERSION above. It is VERSION itself, or VERSION with
+# a pre-release suffix ("-rc.1") while a release is being tried out; the release
+# tag is "v" and this name.
+set(SPACEPENGUIN_VERSION_NAME "1.0.0-rc.1")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -205,6 +207,12 @@ qt_add_executable(spacepenguin
 )
 
 target_link_libraries(spacepenguin PRIVATE Qt6::Network Qt6::Widgets Qt6::WebEngineWidgets)
+# Chrome (Manifest V3) extensions: experimental, and left out of releases, because
+# QtWebEngine 6.10 and 6.11 crash when one is turned on (src/chromeextensions.cpp).
+option(SPACEPENGUIN_CHROME_EXTENSIONS "Build the experimental Chrome extension support (needs Qt 6.10+)" OFF)
+if(SPACEPENGUIN_CHROME_EXTENSIONS)
+    target_compile_definitions(spacepenguin PRIVATE SPACEPENGUIN_WITH_CHROME_EXTENSIONS)
+endif()
 # The desktop portal tells Linux desktops' light or dark style (src/systemscheme.cpp).
 if(UNIX AND NOT APPLE AND NOT ANDROID)
     find_package(Qt6 6.8 QUIET COMPONENTS DBus)
@@ -381,6 +389,8 @@ if(SPACEPENGUIN_BUILD_TESTS)
 
         qt_add_executable(tst_roles
             tests/tst_roles.cpp
+            src/updatechecker.cpp
+            src/updatechecker.h
             src/roles.cpp
             src/roles.h
             src/webapps.cpp

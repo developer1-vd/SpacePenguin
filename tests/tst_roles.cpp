@@ -3,6 +3,7 @@
 #include "preferences.h"
 #include "roles.h"
 #include "tor.h"
+#include "updatechecker.h"
 #include "webapps.h"
 
 using namespace spacepenguin;
@@ -12,6 +13,7 @@ class TestRoles : public QObject
     Q_OBJECT
 
 private slots:
+    void updateCheckOrdersVersions();
     void focusModeComesWithSomeRoles();
     void normalizeSite_data();
     void normalizeSite();
@@ -184,6 +186,18 @@ void TestRoles::gamerFlags()
     QVERIFY(all.contains(QStringLiteral("--disable-frame-rate-limit")));
     QVERIFY(all.contains(QStringLiteral("--show-fps-counter")));
     QVERIFY(!all.contains(QStringLiteral("--ignore-gpu-blocklist")));
+}
+
+void TestRoles::updateCheckOrdersVersions()
+{
+    QVERIFY(UpdateChecker::isNewer(QStringLiteral("v1.0.1"), QStringLiteral("1.0.0")));
+    QVERIFY(UpdateChecker::isNewer(QStringLiteral("v1.0.0"), QStringLiteral("0.1-A")));
+    // A release is newer than its own candidate, never the other way round.
+    QVERIFY(UpdateChecker::isNewer(QStringLiteral("v1.0.0"), QStringLiteral("1.0.0-rc.1")));
+    QVERIFY(!UpdateChecker::isNewer(QStringLiteral("v1.0.0-rc.2"), QStringLiteral("1.0.0")));
+    QVERIFY(!UpdateChecker::isNewer(QStringLiteral("v1.0.0"), QStringLiteral("1.0.0")));
+    QVERIFY(!UpdateChecker::isNewer(QStringLiteral("v0.1-A"), QStringLiteral("1.0.0-rc.1")));
+    QVERIFY(!UpdateChecker::isNewer(QStringLiteral("nightly"), QStringLiteral("1.0.0")));
 }
 
 QTEST_GUILESS_MAIN(TestRoles)

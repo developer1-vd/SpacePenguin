@@ -3,7 +3,7 @@
 ; build-windows.ps1 builds the app and then this installer. By hand, after
 ; `cmake --install <build> --config Release --prefix <absolute dist dir>`:
 ;
-;   makensis /DVERSION=0.1.0 /DSOURCE_DIR=<dist dir> [/DOUTPUT_DIR=<dir>] installer.nsi
+;   makensis /DVERSION=1.0.0 /DSOURCE_DIR=<dist dir> [/DOUTPUT_DIR=<dir>] installer.nsi
 ;
 ; SOURCE_DIR is the install prefix: SpacePenguin.exe with the Qt DLLs, plugins,
 ; QtWebEngineProcess.exe, its resources and the MSVC runtime beside it.
@@ -21,7 +21,7 @@ Unicode true
 ManifestDPIAware true
 
 !ifndef VERSION
-  !define VERSION "0.1.0"
+  !define VERSION "1.0.0"
 !endif
 !ifndef VERSION_QUAD
   !define VERSION_QUAD "${VERSION}.0"

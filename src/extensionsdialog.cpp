@@ -41,8 +41,9 @@ ExtensionsDialog::ExtensionsDialog(UserScripts *scripts, ChromeExtensions *chrom
     layout->addWidget(chromeTitle);
     QString chromeIntro;
     if (!ChromeExtensions::isAvailable())
-        chromeIntro = tr("Not yet: Chrome extensions need SpacePenguin built with Qt 6.10 or "
-                         "newer. The user scripts below work now.");
+        chromeIntro = tr("Not in this version: turning a Chrome extension on crashes the "
+                         "rendering engine SpacePenguin is built on (Qt 6.10 and 6.11), so they are "
+                         "left out until it is fixed. The user scripts below work now.");
     else if (!ChromeExtensions::isSupported())
         chromeIntro = tr("Not yet: in the Qt versions so far (6.10 and 6.11), turning a Chrome "
                          "extension on crashes the browser, so they are switched off until Qt fixes "

@@ -290,7 +290,7 @@ ApplicationWindow {
                 id: menuColumn
                 width: parent.width
                 MenuRow { width: parent.width; glyph: "plus"; label: qsTr("New tab"); onClicked: window.newTab("") }
-                MenuRow { width: parent.width; glyph: "shield"; label: qsTr("New private tab"); onClicked: window.newTab("", true) }
+                MenuRow { width: parent.width; glyph: "shield"; label: qsTr("New tab without history"); onClicked: window.newTab("", true) }
                 MenuRow { width: parent.width; glyph: "bookmarks"; label: qsTr("Bookmarks"); onClicked: window.sheet = "bookmarks" }
                 MenuRow { width: parent.width; glyph: "history"; label: qsTr("History"); onClicked: window.sheet = "history" }
                 MenuRow {
@@ -425,7 +425,7 @@ ApplicationWindow {
                                                 anchors.right: parent.right
                                                 anchors.bottom: parent.bottom
                                                 anchors.margins: 14
-                                                text: (cell.page && cell.page.isPrivate ? qsTr("Private · ") : "")
+                                                text: (cell.page && cell.page.isPrivate ? qsTr("No history · ") : "")
                                                       + (cell.page && !cell.page.onStartPage ? BrowserBackend.displayUrl(cell.page.url) : "")
                                                 color: Theme.muted
                                                 font.pixelSize: 12

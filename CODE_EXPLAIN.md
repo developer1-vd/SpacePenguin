@@ -90,7 +90,7 @@ page load. In order, it handles:
   OpenUserJS for user scripts).
 - `about:logins` — `html/logins.html`, served as `sp://logins` by `loginspage.cpp`.
   Its small JSON API answers only requests made from that page itself.
-- `about:` pages (`about:history`, `about:version`, `about:mozilla`…) —
+- `about:` pages (`about:history`, `about:version`, `about:penguin`…) —
   `aboutpages.cpp`.
 - Reader view — a script in `readerview.cpp` that redraws the page as its article.
 
@@ -112,7 +112,8 @@ page load. In order, it handles:
 - `userextensions.cpp` — user scripts (Tampermonkey-style), with the `GM_` functions
   they expect, injected per site.
 - `chromeextensions.cpp` — Chrome (Manifest V3) extensions through QtWebEngine's
-  extension support. Needs Qt 6.10; with an older Qt it reports itself unavailable.
+  extension support. Experimental and left out of releases (Qt 6.10's support crashes):
+  only built with `-DSPACEPENGUIN_CHROME_EXTENSIONS=ON` against Qt 6.10+.
 - `extensionsdialog.cpp` — manages both.
 
 ## Made for you: roles (`roles.cpp`)
