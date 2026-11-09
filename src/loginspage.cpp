@@ -81,6 +81,10 @@ void handle(QWebEngineUrlRequestJob *job, LoginStore *logins, const QByteArray &
         replyJson(job, list);
         return;
     }
+    if (path == QLatin1String("/api/info")) {
+        replyJson(job, QJsonObject{{QStringLiteral("storage"), logins->storageDescription()}});
+        return;
+    }
     if (path == QLatin1String("/api/never")) {
         replyJson(job, QJsonArray::fromStringList(logins->neverSaved()));
         return;

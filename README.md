@@ -71,8 +71,11 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
 - **Saved logins** — after you sign in, a bar offers to save the login; on the site
   again, the key in the address bar fills it in (only when you pick it, so a page
   never gets it unasked). `about:logins` (or *Settings › Privacy › Saved logins*)
-  lists them to search, add, edit, show, copy and delete; websites can't read it. On Windows they are encrypted with your Windows account; elsewhere
-  they are in a file only your account can read
+  lists them to search, add, edit, show, copy and delete; websites can't read it.
+  They are kept encrypted: on Windows with your Windows account, on macOS in the
+  Keychain, and on Linux and the BSDs in the desktop's keyring (GNOME Keyring,
+  KWallet or any Secret Service). Only without a keyring do they fall back to a
+  file only your account can read; `about:logins` says which
 - **Site permissions** — a site that wants your camera, microphone, location,
   notifications, clipboard or screen asks in a bar above the page; answers are kept
   per site (in private windows, until they close) and can be reset from the address

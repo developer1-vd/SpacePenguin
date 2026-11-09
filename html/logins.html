@@ -87,7 +87,8 @@
       </svg>
     <h1>Saved logins</h1>
   </header>
-  <p class="lede">The usernames and passwords SpacePenguin fills in for you. They stay on this computer.</p>
+  <p class="lede">The usernames and passwords SpacePenguin fills in for you. They stay on this computer.
+    <span id="storage"></span></p>
   <div class="bar">
     <input id="q" type="search" placeholder="Search logins" aria-label="Search logins" autocomplete="off">
     <button class="button" id="add" type="button">Add login</button>
@@ -229,6 +230,7 @@ $('form').onsubmit = async event => {
   } catch (e) { $('f-error').textContent = e.message; }
 };
 $('q').oninput = render;
+api('info').then(info => { $('storage').textContent = info.storage; }, () => {});
 load();
 </script>
 </body>

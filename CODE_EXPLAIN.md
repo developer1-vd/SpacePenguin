@@ -100,7 +100,7 @@ page load. In order, it handles:
 |---|---|
 | `historymanager.cpp` | visited pages, for the omnibox and `about:history` |
 | `bookmarkmanager.cpp` | bookmarks and folders (`bookmarksdialog.cpp` edits them) |
-| `logins.cpp` | saved logins, encrypted with DPAPI on Windows |
+| `logins.cpp`, `secretstore.cpp` | saved logins: DPAPI on Windows, the Keychain on macOS, the Secret Service on Linux |
 | `importer.cpp` | bringing bookmarks and logins in from Chrome, Edge, Firefox… |
 | `downloadmanager.cpp` | downloads (`downloadsdialog.cpp` shows them) |
 | `cookiemanager.cpp` | the profile's cookies, listed and removed per site |

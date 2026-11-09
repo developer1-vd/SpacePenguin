@@ -113,6 +113,8 @@ qt_add_executable(spacepenguin
     src/logins.h
     src/loginspage.cpp
     src/loginspage.h
+    src/secretstore.cpp
+    src/secretstore.h
     src/notifications.cpp
     src/notifications.h
     src/sidetabs.cpp
@@ -213,14 +215,21 @@ option(SPACEPENGUIN_CHROME_EXTENSIONS "Build the experimental Chrome extension s
 if(SPACEPENGUIN_CHROME_EXTENSIONS)
     target_compile_definitions(spacepenguin PRIVATE SPACEPENGUIN_WITH_CHROME_EXTENSIONS)
 endif()
-# The desktop portal tells Linux desktops' light or dark style (src/systemscheme.cpp).
+# The desktop portal tells Linux desktops' light or dark style (src/systemscheme.cpp),
+# and the Secret Service keeps saved logins (src/secretstore.cpp); both over D-Bus.
 if(UNIX AND NOT APPLE AND NOT ANDROID)
     find_package(Qt6 6.8 QUIET COMPONENTS DBus)
-    if(TARGET Qt6::DBus)
-        target_link_libraries(spacepenguin PRIVATE Qt6::DBus)
-        target_compile_definitions(spacepenguin PRIVATE SPACEPENGUIN_HAVE_DBUS)
-    endif()
 endif()
+# The keyring saved logins are kept in (src/secretstore.cpp).
+function(spacepenguin_link_keyring target)
+    if(APPLE)
+        target_link_libraries(${target} PRIVATE "-framework Security" "-framework CoreFoundation")
+    elseif(TARGET Qt6::DBus)
+        target_link_libraries(${target} PRIVATE Qt6::DBus)
+        target_compile_definitions(${target} PRIVATE SPACEPENGUIN_HAVE_DBUS)
+    endif()
+endfunction()
+spacepenguin_link_keyring(spacepenguin)
 target_compile_definitions(spacepenguin PRIVATE
     SPACEPENGUIN_VERSION="${SPACEPENGUIN_VERSION_NAME}"
     SPACEPENGUIN_BUILD_TYPE="$<CONFIG>")
@@ -374,12 +383,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/logins.h
             src/loginspage.cpp
             src/loginspage.h
+            src/secretstore.cpp
+            src/secretstore.h
             src/icons.cpp
             src/icons.h
             src/theme.cpp
             src/theme.h
         )
         target_link_libraries(tst_importer PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
+        spacepenguin_link_keyring(tst_importer)
         if(WIN32)
             # Saved logins are encrypted with the Windows account (logins.cpp).
             target_link_libraries(tst_importer PRIVATE crypt32)
@@ -493,6 +505,10 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_sponsorblock PRIVATE Qt6::Test Qt6::Network)
         target_include_directories(tst_sponsorblock PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME sponsorblock COMMAND tst_sponsorblock)
+
+        # Tests never touch the real keyring (a test that does turns it back on).
+        get_property(spacepenguin_tests DIRECTORY PROPERTY TESTS)
+        set_tests_properties(${spacepenguin_tests} PROPERTIES ENVIRONMENT "SPACEPENGUIN_NO_KEYRING=1")
     endif()
 endif()
 
