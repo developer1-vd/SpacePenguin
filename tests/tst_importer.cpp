@@ -163,6 +163,12 @@ void TestImporter::loginsMoveIntoTheKeyring()
     qunsetenv("SPACEPENGUIN_NO_KEYRING");
     if (!SecretStore::isAvailable())
         QSKIP("No keyring in this session");
+    // A keyring can be there and still refuse to store (a build sandbox's Keychain):
+    // the logins then stay in their file, which loginsKeptInAFileWithoutKeyring covers.
+    const QString probe = QStringLiteral("test-probe-%1").arg(QCoreApplication::applicationPid());
+    if (!SecretStore::write(probe, "probe", QStringLiteral("SpacePenguin test")))
+        QSKIP("The keyring refuses to store anything here");
+    SecretStore::remove(probe);
     QTemporaryDir dir;
     const QString file = QDir(dir.path()).filePath(QStringLiteral("logins.json"));
     // A file from before the keyring…
