@@ -25,6 +25,16 @@ once a version is tagged.
 | Android | *SpacePenguin-Android* | open the `.apk` on the phone (allow installing from your browser or files app) |
 | iPhone and iPad | *SpacePenguin-iOS* | install the `-ios-unsigned.ipa` with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) and your Apple ID |
 
+The Windows and macOS packages are not code-signed yet, so the first start needs
+one extra step:
+
+- **Windows:** if SmartScreen says "Windows protected your PC", click *More info*,
+  then *Run anyway*.
+- **macOS:** right-click (or Control-click) SpacePenguin in Applications, choose
+  *Open*, then *Open* again. On macOS 15 and later, if there is no *Open* button:
+  try to open it once, then go to *System Settings › Privacy & Security* and click
+  *Open Anyway*.
+
 On Linux, one command installs it for you, with an app-menu entry; run it again to
 update:
 
@@ -61,8 +71,11 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
 - **Saved logins** — after you sign in, a bar offers to save the login; on the site
   again, the key in the address bar fills it in (only when you pick it, so a page
   never gets it unasked). `about:logins` (or *Settings › Privacy › Saved logins*)
-  lists them to search, add, edit, show, copy and delete; websites can't read it. On Windows they are encrypted with your Windows account; elsewhere
-  they are in a file only your account can read
+  lists them to search, add, edit, show, copy and delete; websites can't read it.
+  They are kept encrypted: on Windows with your Windows account, on macOS in the
+  Keychain, and on Linux and the BSDs in the desktop's keyring (GNOME Keyring,
+  KWallet or any Secret Service). Only without a keyring do they fall back to a
+  file only your account can read; `about:logins` says which
 - **Site permissions** — a site that wants your camera, microphone, location,
   notifications, clipboard or screen asks in a bar above the page; answers are kept
   per site (in private windows, until they close) and can be reset from the address
@@ -117,12 +130,12 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
     the game; GPU drawing even on graphics chips Chromium distrusts, an uncapped
     frame rate for fast screens and an FPS counter (from the next start; never where
     SpacePenguin had to turn the GPU off)
-  - *Teacher mode*: runs a class on the school network. Block up to 100 sites for the
+  - *Teacher mode* (beta): runs a class on the school network. Block up to 100 sites for the
     students who join, each with a reason they see; answer their requests to unblock
     (for that student, for everyone, or not) from a bar above the page. The teacher's
     own browsing isn't restricted. Pages can also open larger (up to 200%) for a
     projector
-  - *Student mode*: pairs with Teacher mode. Join with the class code your teacher
+  - *Student mode* (beta): pairs with Teacher mode. Join with the class code your teacher
     shows (or `code@address` on networks that keep devices apart): the teacher's
     blocked sites show their reason and an *Ask to unblock* box with a note, and the
     answer pops up — an allowed site loads by itself. The last list keeps applying
@@ -134,6 +147,13 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
     are let go when the teacher closes the class or makes a new code (or after two
     weeks without reaching the teacher's computer). Also Focus mode, and *Copy Citation*
     (`Ctrl`+`Alt`+`C`): the page's title, site, address and today's date
+  - *About the classroom's security*: the ten-character class code is the shared
+    secret and never crosses the network. Finding the class, every request and every
+    answer are signed with a key stretched from it, so someone on the network without
+    the code can't join, can't pose as the teacher to send students a list of its
+    own, and can't replay recorded requests. Students share the code, so one
+    could pose as another. It's a beta for a trusted school network, not device
+    management
   - *Worker*: Focus mode, and your work pages opened together, from the menu or at
     start-up
 
@@ -195,8 +215,9 @@ would be a lie in the UI.
 ## Extensions
 
 Chrome extensions need Qt 6.10's extension manager, which still crashes when an
-extension is switched on, so SpacePenguin keeps them off: a build against Qt 6.10+
-started with `SPACEPENGUIN_CHROME_EXTENSIONS=1` shows them, for testing only. What
+extension is switched on, so releases leave them out. For testing only, build
+against Qt 6.10+ with `-DSPACEPENGUIN_CHROME_EXTENSIONS=ON` and start it with
+`SPACEPENGUIN_CHROME_EXTENSIONS=1`. What
 it ships is
 **JavaScript user scripts**, installed as `QWebEngineScript` objects on the
 active profile.
@@ -335,24 +356,10 @@ never fetched from the network.
 | `about:penguin`   | 🐧                                                        |
 | `about:teapot`    | RFC 2324                                                   |
 | `about:pan`       | You have been panned                                       |
-| `about:force`     | Use the Force                                              |
-| `about:deathstar` | That's No Moon                                             |
-| `about:yoda`      | Wise, You Are                                              |
-| `about:hyperdrive`| Punch It                                                   |
-| `about:mozilla`   | Book of Mozilla (verses)                                   |
-| `about:firefox`   | Phoenix Rising                                             |
-| `about:servo`     | Fearless Concurrency                                       |
-| `about:rust`      | Empowering Everyone                                        |
 | `about:downloads` | Download manager                                           |
 | `about:history`   | Browsing history                                           |
 | `about:extensions`| User scripts and extensions                                |
 | `about:settings`  | Open the settings dialog                                   |
-| `about:tatooine`  | Tatooine                                                   |
-| `about:hoth`      | Hoth                                                       |
-| `about:dagobah`   | Dagobah                                                    |
-| `about:endor`     | Endor                                                      |
-| `about:naboo`     | Naboo                                                      |
-| `about:coruscant` | Coruscant                                                  |
 
 Any `about:` page not in the list above gets an internal "no such page" answer instead of a network error.
 
@@ -457,7 +464,7 @@ Tested in CI on every push: Ubuntu 22.04 (AppImage), Ubuntu 24.04 and **Ubuntu
 Fedora, openSUSE Tumbleweed, Arch, Alpine, Void, Nix and Flatpak; **FreeBSD 14**
 (in a VM); **Windows 11**
 (the Windows Server 2025 runner, which shares Windows 11 24H2's core) and Windows
-10 (Server 2022); **macOS 26 Tahoe** and macOS 14 Sonoma.
+10 (Server 2022); **macOS 26 Tahoe** and macOS 15 Sequoia.
 
 What is handled per platform:
 
@@ -567,8 +574,8 @@ or close it), a new-tab page with your most visited sites, bookmarks and latest 
 toolbar within thumb reach, light and dark, and the choice of search engine.
 Android's Back button closes what is open, then goes back. Tabs and groups are
 reopened when the app starts again (their addresses; the phone's web view cannot
-hand over its history). *☰ › New private tab* opens a tab kept out of history and
-not reopened.
+hand over its history). *☰ › New tab without history* opens a tab kept out of history and
+not reopened. It is not called private, because it is not (below).
 
 What the phone engines do not allow, and so it does not do:
 
@@ -577,8 +584,8 @@ What the phone engines do not allow, and so it does not do:
   and YouTube ads that start are muted and skipped — but they are still downloaded.
 - **YouTube ad removal before playback.** That needs a script that runs before the
   page's own, which the phone web views do not offer; the desktop app does it.
-- **Separate cookies for private tabs.** All tabs share the web view's storage, so
-  a private tab is kept out of history but not out of cookies; *Settings › Clear
+- **Private tabs.** All tabs share the web view's storage, so a tab without
+  history is kept out of history but not out of cookies; *Settings › Clear
   history and cookies* is the way to forget.
 
 Sponsor segments are skipped as on the desktop.

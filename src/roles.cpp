@@ -47,7 +47,7 @@ QString description(Role role)
                      "a game is full screen.");
     case Role::Student:
         return QCoreApplication::translate(
-            "Roles", "Join your teacher's class with its code: sites they block show their reason, and "
+            "Roles", "Join your teacher's class with its code (beta): sites they block show their reason, and "
                      "you can ask to unblock one. Also Focus mode, and Copy Citation for a reference "
                      "to the page.");
     case Role::Worker:
@@ -55,7 +55,7 @@ QString description(Role role)
             "Roles", "Focus mode, and your work pages opened together, from the menu or at start-up.");
     case Role::Teacher:
         return QCoreApplication::translate(
-            "Roles", "Run a class on the school network: block up to 100 sites for the students who "
+            "Roles", "Run a class on the school network (beta): block up to 100 sites for the students who "
                      "join, each with your reason, and answer their requests to unblock. Your own "
                      "browsing is not restricted. Also a larger page size for the projector.");
     }

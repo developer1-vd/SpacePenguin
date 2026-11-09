@@ -3,6 +3,10 @@
 #include "classroom.h"
 #include "preferences.h"
 
+#include <QNetworkDatagram>
+#include <QTcpSocket>
+#include <QUdpSocket>
+
 using namespace spacepenguin;
 
 class TestClassroom : public QObject
@@ -17,6 +21,7 @@ private slots:
     void parsesHttp();
     void keepsAtMostAHundredSites();
     void teacherAndStudent();
+    void outsidersAreRefused();
     void bypasses();
     void cleanupTestCase();
 };
@@ -38,24 +43,28 @@ void TestClassroom::cleanupTestCase()
 void TestClassroom::codes()
 {
     const QString code = Classroom::makeCode();
-    QCOMPARE(code.size(), 6);
+    QCOMPARE(code.size(), 10);
     for (const QChar c : code)
         QVERIFY(!QStringLiteral("01OIL").contains(c));
+    QCOMPARE(Classroom::displayCode(QStringLiteral("K7MP3XQR9A")), QStringLiteral("K7MP3-XQR9A"));
+    // Both sides derive the same key, and a different code gives another.
+    QCOMPARE(Classroom::classKey(QStringLiteral("k7mp3xqr9a")), Classroom::classKey(QStringLiteral("K7MP3XQR9A")));
+    QVERIFY(Classroom::classKey(QStringLiteral("K7MP3XQR9A")) != Classroom::classKey(QStringLiteral("K7MP3XQR9B")));
 }
 
 void TestClassroom::joinCodes()
 {
     QString code, host;
     quint16 port = Classroom::kHttpPort;
-    QVERIFY(Classroom::parseJoinCode(QStringLiteral(" k7mp3x "), &code, &host, &port));
-    QCOMPARE(code, QStringLiteral("K7MP3X"));
+    QVERIFY(Classroom::parseJoinCode(QStringLiteral(" k7mp3-xqr9a "), &code, &host, &port));
+    QCOMPARE(code, QStringLiteral("K7MP3XQR9A"));
     QVERIFY(host.isEmpty());
-    QVERIFY(Classroom::parseJoinCode(QStringLiteral("K7MP3X@10.0.0.5:47803"), &code, &host, &port));
+    QVERIFY(Classroom::parseJoinCode(QStringLiteral("K7MP3-XQR9A@10.0.0.5:47803"), &code, &host, &port));
     QCOMPARE(host, QStringLiteral("10.0.0.5"));
     QCOMPARE(port, quint16(47803));
-    QVERIFY(!Classroom::parseJoinCode(QStringLiteral("K7MP"), &code, &host, &port));
-    QVERIFY(!Classroom::parseJoinCode(QStringLiteral("K7MP3X@not an address"), &code, &host, &port));
-    QVERIFY(!Classroom::parseJoinCode(QStringLiteral("K7MP3X@10.0.0.5:99999"), &code, &host, &port));
+    QVERIFY(!Classroom::parseJoinCode(QStringLiteral("K7MP3X"), &code, &host, &port)); // the old, short codes
+    QVERIFY(!Classroom::parseJoinCode(QStringLiteral("K7MP3XQR9A@not an address"), &code, &host, &port));
+    QVERIFY(!Classroom::parseJoinCode(QStringLiteral("K7MP3XQR9A@10.0.0.5:99999"), &code, &host, &port));
 }
 
 void TestClassroom::matching()
@@ -217,6 +226,88 @@ void TestClassroom::bypasses()
     const QList<BlockedSite> sites = {{QStringLiteral("youtube.com"), QString()}};
     QVERIFY(Classroom::match(QUrl(QStringLiteral("https://youtu.be/abc")), sites));
     QVERIFY(Classroom::match(QUrl(QStringLiteral("https://www.youtube-nocookie.com/embed/abc")), sites));
+}
+
+namespace {
+
+// The teacher answers in this same process, so wait with its event loop running.
+QByteArray exchange(quint16 port, const QByteArray &request)
+{
+    QTcpSocket socket;
+    socket.connectToHost(QHostAddress::LocalHost, port);
+    QByteArray response;
+    QObject::connect(&socket, &QTcpSocket::connected, &socket, [&socket, request] { socket.write(request); });
+    QObject::connect(&socket, &QTcpSocket::readyRead, &socket, [&socket, &response] { response += socket.readAll(); });
+    QElapsedTimer timer;
+    timer.start();
+    while (socket.state() != QAbstractSocket::UnconnectedState && timer.elapsed() < 3000)
+        QTest::qWait(10);
+    response += socket.readAll();
+    return response;
+}
+
+QByteArray signedPost(const QString &code, const QByteArray &path, const QByteArray &body, const QByteArray &nonce,
+                      qint64 time = QDateTime::currentSecsSinceEpoch())
+{
+    const QByteArray t = QByteArray::number(time);
+    const QByteArray mac = Classroom::sign(Classroom::classKey(code),
+                                           "POST\n" + path + '\n' + t + '\n' + nonce + '\n' + body);
+    return "POST " + path + " HTTP/1.1\r\nHost: x\r\nContent-Length: " + QByteArray::number(body.size())
+        + "\r\nX-SP-Time: " + t + "\r\nX-SP-Nonce: " + nonce + "\r\nX-SP-Mac: " + mac + "\r\n\r\n" + body;
+}
+
+QByteArray askDiscovery(const QByteArray &question)
+{
+    QUdpSocket socket;
+    socket.bind(QHostAddress::LocalHost, 0);
+    socket.writeDatagram(question, QHostAddress::LocalHost, Classroom::kDiscoveryPort);
+    QElapsedTimer timer;
+    timer.start();
+    while (!socket.hasPendingDatagrams() && timer.elapsed() < 1500)
+        QTest::qWait(10);
+    return socket.hasPendingDatagrams() ? socket.receiveDatagram(512).data() : QByteArray();
+}
+
+}
+
+void TestClassroom::outsidersAreRefused()
+{
+    Classroom *classroom = Classroom::instance();
+    Preferences::instance()->setRoles({QStringLiteral("teacher")});
+    classroom->start();
+    classroom->setClassOpen(true);
+    QVERIFY(classroom->serving());
+    const QString code = classroom->code();
+    const QByteArray key = Classroom::classKey(code);
+    const QByteArray body = R"({"id":"outsider","name":"Eve"})";
+
+    // Discovery: the code never travels; a wrong proof gets no answer.
+    const QByteArray nonce(32, 'a');
+    QVERIFY(askDiscovery("SPCLASS2?" + nonce + '?' + Classroom::sign(Classroom::classKey(QStringLiteral("AAAAAAAAAA")),
+                                                                   "discover\n" + nonce)).isEmpty());
+    QVERIFY(askDiscovery("SPCLASS?" + code.toUtf8()).isEmpty()); // the old protocol
+    const QByteArray found = askDiscovery("SPCLASS2?" + nonce + '?' + Classroom::sign(key, "discover\n" + nonce));
+    QVERIFY(found.startsWith("SPCLASS2!"));
+    QVERIFY(!found.contains(code.toUtf8()));
+
+    // Requests: unsigned, signed with another code, stale or replayed are refused.
+    const quint16 port = classroom->port();
+    QVERIFY(exchange(port, "POST /v2/class HTTP/1.1\r\nContent-Length: " + QByteArray::number(body.size())
+                               + "\r\n\r\n" + body).startsWith("HTTP/1.1 403"));
+    QVERIFY(exchange(port, signedPost(QStringLiteral("AAAAAAAAAA"), "/v2/class", body, QByteArray(32, 'b')))
+                .startsWith("HTTP/1.1 403"));
+    QVERIFY(exchange(port, signedPost(code, "/v2/class", body, QByteArray(32, 'c'),
+                                      QDateTime::currentSecsSinceEpoch() - 3600))
+                .startsWith("HTTP/1.1 403"));
+    const QByteArray good = signedPost(code, "/v2/class", body, QByteArray(32, 'd'));
+    const QByteArray answer = exchange(port, good);
+    QVERIFY2(answer.startsWith("HTTP/1.1 200"), answer.constData());
+    // The teacher signs its answer over the request's nonce.
+    const QByteArray answerBody = answer.mid(answer.indexOf("\r\n\r\n") + 4);
+    QVERIFY(answer.contains("X-SP-Mac: " + Classroom::sign(key, "answer\n" + QByteArray(32, 'd') + "\n200\n" + answerBody)));
+    QVERIFY(exchange(port, good).startsWith("HTTP/1.1 403")); // the same request again
+    QVERIFY(exchange(port, "GET /v1/class?code=" + code.toUtf8() + " HTTP/1.1\r\n\r\n").startsWith("HTTP/1.1 404"));
+    classroom->setClassOpen(false);
 }
 
 QTEST_GUILESS_MAIN(TestClassroom)

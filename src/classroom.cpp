@@ -4,7 +4,9 @@
 #include "roles.h"
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QJsonArray>
+#include <QMessageAuthenticationCode>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -13,6 +15,7 @@
 #include <QNetworkProxy>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPasswordDigestor>
 #include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QSettings>
@@ -37,6 +40,41 @@ constexpr int kMaxPendingPerStudent = 10;
 constexpr int kMaxNote = 300;
 constexpr int kMaxName = 40;
 constexpr qint64 kLeaveAloneAfterDays = 14;
+constexpr int kCodeLength = 10;
+// How far apart the teacher's and a student's clocks may be, and so how long a
+// request's nonce is remembered.
+constexpr qint64 kClockSkewSeconds = 10 * 60;
+const QByteArray kDiscoveryQuestion = "SPCLASS2?";
+const QByteArray kDiscoveryAnswer = "SPCLASS2!";
+
+QByteArray randomNonce()
+{
+    QByteArray bytes(16, Qt::Uninitialized);
+    QRandomGenerator::system()->fillRange(reinterpret_cast<quint32 *>(bytes.data()), bytes.size() / 4);
+    return bytes.toHex();
+}
+
+// Compares in the same time whatever the input, so timing tells nothing.
+bool sameMac(const QByteArray &a, const QByteArray &b)
+{
+    if (a.size() != b.size() || a.isEmpty())
+        return false;
+    char difference = 0;
+    for (qsizetype i = 0; i < a.size(); ++i)
+        difference |= a.at(i) ^ b.at(i);
+    return difference == 0;
+}
+
+QByteArray requestMessage(const QByteArray &method, const QByteArray &path, const QByteArray &time,
+                          const QByteArray &nonce, const QByteArray &body)
+{
+    return method + '\n' + path + '\n' + time + '\n' + nonce + '\n' + body;
+}
+
+QByteArray answerMessage(const QByteArray &nonce, int status, const QByteArray &body)
+{
+    return "answer\n" + nonce + '\n' + QByteArray::number(status) + '\n' + body;
+}
 
 // Ways around any block: web proxies, mirrors and paywall skippers, Tor gateways.
 const QStringList kBypassSites = {
@@ -96,13 +134,14 @@ QJsonArray sitesJson(const QList<BlockedSite> &sites)
     return array;
 }
 
-QByteArray httpResponse(int status, const QByteArray &body)
+QByteArray httpResponse(int status, const QByteArray &body, const QByteArray &mac = {})
 {
     const QByteArray reason = status == 200 ? "OK" : status == 403 ? "Forbidden" : status == 404 ? "Not Found"
                                                    : status == 429 ? "Too Many Requests" : "Bad Request";
     return "HTTP/1.1 " + QByteArray::number(status) + ' ' + reason
         + "\r\nContent-Type: application/json\r\nContent-Length: " + QByteArray::number(body.size())
-        + "\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n" + body;
+        + "\r\nConnection: close\r\nCache-Control: no-store\r\n"
+        + (mac.isEmpty() ? QByteArray() : "X-SP-Mac: " + mac + "\r\n") + "\r\n" + body;
 }
 
 QByteArray error(const char *message)
@@ -198,7 +237,14 @@ void Classroom::setClassName(const QString &name)
 
 QString Classroom::code() const
 {
-    return QSettings().value(kTeacher + QStringLiteral("code")).toString();
+    const QString stored = QSettings().value(kTeacher + QStringLiteral("code")).toString();
+    // A code from before version 2 of the protocol is too short to stay secret.
+    if (!stored.isEmpty() && stored.size() != kCodeLength) {
+        const QString fresh = makeCode();
+        QSettings().setValue(kTeacher + QStringLiteral("code"), fresh);
+        return fresh;
+    }
+    return stored;
 }
 
 void Classroom::newCode()
@@ -336,11 +382,18 @@ void Classroom::handleDiscovery()
     while (m_discovery && m_discovery->hasPendingDatagrams()) {
         const QNetworkDatagram datagram = m_discovery->receiveDatagram(512);
         const QByteArray data = datagram.data();
-        if (!data.startsWith("SPCLASS?") || !serving() || !classOpen())
+        if (!data.startsWith(kDiscoveryQuestion) || !serving() || !classOpen())
             continue;
-        if (QString::fromUtf8(data.mid(8)).trimmed().compare(code(), Qt::CaseInsensitive) != 0)
+        // "SPCLASS2?<nonce>?<mac>": the student shows it knows the code without
+        // sending it, and the answer shows this is the teacher.
+        const QList<QByteArray> parts = data.mid(kDiscoveryQuestion.size()).split('?');
+        if (parts.size() != 2 || parts.at(0).size() != 32)
             continue;
-        const QByteArray reply = "SPCLASS!" + QByteArray::number(m_port) + '!' + className().toUtf8();
+        const QByteArray key = classKey(code());
+        if (!sameMac(parts.at(1), sign(key, "discover\n" + parts.at(0))))
+            continue;
+        const QByteArray port = QByteArray::number(m_port);
+        const QByteArray reply = kDiscoveryAnswer + port + '!' + sign(key, "here\n" + parts.at(0) + '\n' + port);
         m_discovery->writeDatagram(reply, datagram.senderAddress(), quint16(datagram.senderPort()));
     }
 }
@@ -358,32 +411,68 @@ void Classroom::handleConnection()
                 return;
             }
             QByteArray method, target, body;
-            const Parse result = parseHttp(*buffer, &method, &target, &body);
+            QHash<QByteArray, QByteArray> headers;
+            const Parse result = parseHttp(*buffer, &method, &target, &body, &headers);
             if (result == Parse::Incomplete)
                 return;
             int status = 400;
+            QByteArray mac;
             const QByteArray json = result == Parse::Bad ? error("bad request")
-                                                        : respond(method, target, body, socket->peerAddress(), &status);
-            socket->write(httpResponse(result == Parse::Bad ? 400 : status, json));
+                                                        : respond(method, target, body, headers, &status, &mac);
+            socket->write(httpResponse(result == Parse::Bad ? 400 : status, json, mac));
             socket->disconnectFromHost();
         });
     }
 }
 
-QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target, const QByteArray &body,
-                              const QHostAddress &peer, int *status)
+bool Classroom::verifyRequest(const QByteArray &method, const QByteArray &path, const QByteArray &body,
+                              const QHash<QByteArray, QByteArray> &headers, QByteArray *nonce)
 {
-    Q_UNUSED(peer);
-    const QUrl url(QStringLiteral("http://teacher") + QString::fromUtf8(target));
-    const QUrlQuery query(url);
-    *status = 200;
+    const QByteArray time = headers.value("x-sp-time");
+    *nonce = headers.value("x-sp-nonce");
+    const QByteArray mac = headers.value("x-sp-mac");
+    if (code().isEmpty() || nonce->size() != 32 || mac.isEmpty())
+        return false;
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    bool ok = false;
+    const qint64 sent = time.toLongLong(&ok);
+    if (!ok || qAbs(now - sent) > kClockSkewSeconds)
+        return false;
+    if (!sameMac(mac, sign(classKey(code()), requestMessage(method, path, time, *nonce, body))))
+        return false;
+    // Each request once: a recorded one cannot be sent again.
+    for (auto it = m_seenNonces.begin(); it != m_seenNonces.end();)
+        it = now - it.value() > 2 * kClockSkewSeconds ? m_seenNonces.erase(it) : std::next(it);
+    if (m_seenNonces.contains(*nonce))
+        return false;
+    m_seenNonces.insert(*nonce, now);
+    return true;
+}
 
-    if (method == "GET" && url.path() == QLatin1String("/v1/class")) {
-        if (query.queryItemValue(QStringLiteral("code")).compare(code(), Qt::CaseInsensitive) != 0) {
-            *status = 403;
-            return error("wrong class code");
-        }
-        const QString id = clip(query.queryItemValue(QStringLiteral("id"), QUrl::FullyDecoded), 64);
+QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target, const QByteArray &body,
+                              const QHash<QByteArray, QByteArray> &headers, int *status, QByteArray *mac)
+{
+    const QByteArray path = target.left(target.indexOf('?') < 0 ? target.size() : target.indexOf('?'));
+    *status = 200;
+    if (method != "POST" || (path != "/v2/class" && path != "/v2/request")) {
+        *status = 404;
+        return error("not found");
+    }
+    QByteArray nonce;
+    if (!verifyRequest(method, path, body, headers, &nonce)) {
+        *status = 403;
+        return error("wrong class code");
+    }
+    const QJsonObject request = QJsonDocument::fromJson(body).object();
+    const QByteArray answer = respondSigned(path, request, status);
+    *mac = sign(classKey(code()), answerMessage(nonce, *status, answer));
+    return answer;
+}
+
+QByteArray Classroom::respondSigned(const QByteArray &path, const QJsonObject &request, int *status)
+{
+    if (path == "/v2/class") {
+        const QString id = clip(request.value(QStringLiteral("id")).toString(), 64);
         // A closed class, and a student the teacher let go, are told so; the student leaves.
         if (!classOpen() || m_released.remove(id)) {
             m_students.remove(id);
@@ -394,7 +483,7 @@ QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target
             ClassStudent &student = m_students[id];
             const bool isNew = student.id.isEmpty();
             student.id = id;
-            student.name = clip(query.queryItemValue(QStringLiteral("name"), QUrl::FullyDecoded), kMaxName);
+            student.name = clip(request.value(QStringLiteral("name")).toString(), kMaxName);
             student.lastSeen = QDateTime::currentDateTime();
             if (isNew)
                 emit changed();
@@ -412,12 +501,7 @@ QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target
         return QJsonDocument(reply).toJson(QJsonDocument::Compact);
     }
 
-    if (method == "POST" && url.path() == QLatin1String("/v1/request")) {
-        const QJsonObject request = QJsonDocument::fromJson(body).object();
-        if (request.value(QStringLiteral("code")).toString().compare(code(), Qt::CaseInsensitive) != 0) {
-            *status = 403;
-            return error("wrong class code");
-        }
+    {
         UnblockRequest entry;
         entry.studentId = clip(request.value(QStringLiteral("id")).toString(), 64);
         entry.student = clip(request.value(QStringLiteral("name")).toString(), kMaxName);
@@ -448,9 +532,6 @@ QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target
         emit changed();
         return QJsonDocument(QJsonObject{{QStringLiteral("ok"), true}}).toJson(QJsonDocument::Compact);
     }
-
-    *status = 404;
-    return error("not found");
 }
 
 // ---- Student -------------------------------------------------------------------
@@ -530,7 +611,9 @@ void Classroom::discover(const QString &code, std::function<void(QHostAddress, q
 {
     auto *socket = new QUdpSocket(this);
     socket->bind(QHostAddress::AnyIPv4, 0);
-    const QByteArray question = "SPCLASS?" + code.toUpper().toUtf8();
+    const QByteArray key = classKey(code);
+    const QByteArray nonce = randomNonce();
+    const QByteArray question = kDiscoveryQuestion + nonce + '?' + sign(key, "discover\n" + nonce);
     // Every network this computer is on, and this computer itself.
     QList<QHostAddress> targets{QHostAddress::Broadcast, QHostAddress::LocalHost};
     for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
@@ -543,17 +626,21 @@ void Classroom::discover(const QString &code, std::function<void(QHostAddress, q
         socket->writeDatagram(question, target, kDiscoveryPort);
 
     auto done = std::make_shared<bool>(false);
-    connect(socket, &QUdpSocket::readyRead, this, [socket, found, done] {
+    connect(socket, &QUdpSocket::readyRead, this, [socket, found, done, key, nonce] {
         while (socket->hasPendingDatagrams()) {
             const QNetworkDatagram datagram = socket->receiveDatagram(512);
-            const QList<QByteArray> parts = datagram.data().split('!');
-            if (*done || parts.size() < 2 || parts.first() != "SPCLASS")
+            const QByteArray data = datagram.data();
+            if (*done || !data.startsWith(kDiscoveryAnswer))
+                continue;
+            // "SPCLASS2!<port>!<mac>": only the teacher, who has the code, can sign it.
+            const QList<QByteArray> parts = data.mid(kDiscoveryAnswer.size()).split('!');
+            if (parts.size() != 2 || !sameMac(parts.at(1), sign(key, "here\n" + nonce + '\n' + parts.at(0))))
                 continue;
             *done = true;
             QHostAddress address = datagram.senderAddress();
             if (address.protocol() == QAbstractSocket::IPv6Protocol)
                 address = QHostAddress(address.toIPv4Address());
-            found(address, quint16(parts.at(1).toUInt()));
+            found(address, quint16(parts.at(0).toUInt()));
             socket->deleteLater();
             return;
         }
@@ -572,7 +659,7 @@ void Classroom::join(const QString &text, const QString &name)
     QString code, host;
     quint16 port = kHttpPort;
     if (!parseJoinCode(text, &code, &host, &port)) {
-        emit joinFinished(false, tr("That is not a class code: it has six letters and digits, like K7MP3X."));
+        emit joinFinished(false, tr("That is not a class code: it has ten letters and digits, like K7MP3-XQR9A."));
         return;
     }
     const QString studentName = clip(name, kMaxName);
@@ -593,23 +680,21 @@ void Classroom::join(const QString &text, const QString &name)
         url.setScheme(QStringLiteral("http"));
         url.setHost(address.toString());
         url.setPort(port);
-        url.setPath(QStringLiteral("/v1/class"));
-        QUrlQuery query;
-        query.addQueryItem(QStringLiteral("code"), code);
-        query.addQueryItem(QStringLiteral("id"), id);
-        query.addQueryItem(QStringLiteral("name"), studentName);
-        url.setQuery(query);
-        QNetworkRequest request(url);
-        request.setTransferTimeout(5000);
-        QNetworkReply *reply = network()->get(request);
-        connect(reply, &QNetworkReply::finished, this, [this, reply, code, studentName, address, port, fixed] {
+        url.setPath(QStringLiteral("/v2/class"));
+        QByteArray nonce;
+        QNetworkReply *reply = post(url, {{QStringLiteral("id"), id}, {QStringLiteral("name"), studentName}},
+                                    code, &nonce);
+        connect(reply, &QNetworkReply::finished, this, [this, reply, code, nonce, studentName, address, port, fixed] {
             reply->deleteLater();
-            if (reply->error() != QNetworkReply::NoError) {
+            QByteArray body;
+            const bool verified = verifiedAnswer(reply, code, nonce, &body);
+            if (reply->error() != QNetworkReply::NoError || !verified) {
                 const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
                 emit joinFinished(false, status == 403 ? tr("The teacher's computer answered, but not to that code.")
                                          : status == 410 ? tr("That class is closed.")
-                                                         : tr("The teacher's computer did not answer (%1).")
-                                                               .arg(reply->errorString()));
+                                         : reply->error() == QNetworkReply::NoError
+                                             ? tr("Something answered, but it could not show it was your teacher's computer.")
+                                             : tr("The teacher's computer did not answer (%1).").arg(reply->errorString()));
                 return;
             }
             QSettings settings;
@@ -621,7 +706,7 @@ void Classroom::join(const QString &text, const QString &name)
             settings.setValue(kStudent + QStringLiteral("name"), studentName);
             m_reachable = true;
             m_failures = 0;
-            applyClass(reply->readAll());
+            applyClass(body);
             refresh();
             emit joinFinished(true, joinedClassName());
         });
@@ -651,24 +736,23 @@ void Classroom::poll()
         return;
     m_polling = true;
     QSettings settings;
-    QUrl url = teacherUrl(QStringLiteral("/v1/class"));
-    QUrlQuery query;
-    query.addQueryItem(QStringLiteral("code"), settings.value(kStudent + QStringLiteral("code")).toString());
-    query.addQueryItem(QStringLiteral("id"), settings.value(kStudent + QStringLiteral("id")).toString());
-    query.addQueryItem(QStringLiteral("name"), studentName());
-    url.setQuery(query);
-    QNetworkRequest request(url);
-    request.setTransferTimeout(5000);
-    QNetworkReply *reply = network()->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+    const QString code = settings.value(kStudent + QStringLiteral("code")).toString();
+    QByteArray nonce;
+    QNetworkReply *reply = post(teacherUrl(QStringLiteral("/v2/class")),
+                                {{QStringLiteral("id"), settings.value(kStudent + QStringLiteral("id")).toString()},
+                                 {QStringLiteral("name"), studentName()}},
+                                code, &nonce);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, code, nonce] {
         reply->deleteLater();
         m_polling = false;
-        if (reply->error() == QNetworkReply::NoError) {
+        QByteArray body;
+        // An answer the teacher did not sign counts as no answer.
+        if (reply->error() == QNetworkReply::NoError && verifiedAnswer(reply, code, nonce, &body)) {
             const bool was = m_reachable;
             m_reachable = true;
             m_failures = 0;
             QSettings().setValue(kStudent + QStringLiteral("lastContact"), QDateTime::currentDateTime());
-            applyClass(reply->readAll());
+            applyClass(body);
             if (!was)
                 emit changed();
             return;
@@ -762,16 +846,15 @@ void Classroom::postRequest(const QJsonObject &fields)
 {
     QSettings settings;
     QJsonObject body = fields;
-    body.insert(QStringLiteral("code"), settings.value(kStudent + QStringLiteral("code")).toString());
     body.insert(QStringLiteral("id"), settings.value(kStudent + QStringLiteral("id")).toString());
     body.insert(QStringLiteral("name"), studentName());
-    QNetworkRequest request(teacherUrl(QStringLiteral("/v1/request")));
-    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
-    request.setTransferTimeout(5000);
-    QNetworkReply *reply = network()->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+    const QString code = settings.value(kStudent + QStringLiteral("code")).toString();
+    QByteArray nonce;
+    QNetworkReply *reply = post(teacherUrl(QStringLiteral("/v2/request")), body, code, &nonce);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, code, nonce] {
         reply->deleteLater();
-        emit askFinished(reply->error() == QNetworkReply::NoError);
+        QByteArray answer;
+        emit askFinished(reply->error() == QNetworkReply::NoError && verifiedAnswer(reply, code, nonce, &answer));
     });
 }
 
@@ -781,16 +864,63 @@ QString Classroom::makeCode()
 {
     static const QString letters = QStringLiteral("ABCDEFGHJKMNPQRSTUVWXYZ23456789");
     QString code;
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < kCodeLength; ++i)
         code.append(letters.at(QRandomGenerator::system()->bounded(int(letters.size()))));
     return code;
+}
+
+QString Classroom::displayCode(const QString &code)
+{
+    return code.size() == kCodeLength ? code.left(5) + QLatin1Char('-') + code.mid(5) : code;
+}
+
+QByteArray Classroom::classKey(const QString &code)
+{
+    // Stretched, so trying codes against a recorded exchange is slow: 31^10 codes
+    // at this cost each are out of reach. Worked out once per code.
+    static QHash<QString, QByteArray> cache;
+    const QString normalized = code.toUpper();
+    auto it = cache.constFind(normalized);
+    if (it != cache.cend())
+        return it.value();
+    const QByteArray key = QPasswordDigestor::deriveKeyPbkdf2(
+        QCryptographicHash::Sha256, normalized.toUtf8(), QByteArrayLiteral("SpacePenguin classroom v2"),
+        50000, 32);
+    cache.insert(normalized, key);
+    return key;
+}
+
+QByteArray Classroom::sign(const QByteArray &key, const QByteArray &message)
+{
+    return QMessageAuthenticationCode::hash(message, key, QCryptographicHash::Sha256).toHex();
+}
+
+QNetworkReply *Classroom::post(const QUrl &url, const QJsonObject &body, const QString &code, QByteArray *nonce)
+{
+    const QByteArray data = QJsonDocument(body).toJson(QJsonDocument::Compact);
+    const QByteArray time = QByteArray::number(QDateTime::currentSecsSinceEpoch());
+    *nonce = randomNonce();
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setTransferTimeout(5000);
+    request.setRawHeader("X-SP-Time", time);
+    request.setRawHeader("X-SP-Nonce", *nonce);
+    request.setRawHeader("X-SP-Mac", sign(classKey(code), requestMessage("POST", url.path().toUtf8(), time, *nonce, data)));
+    return network()->post(request, data);
+}
+
+bool Classroom::verifiedAnswer(QNetworkReply *reply, const QString &code, const QByteArray &nonce, QByteArray *body)
+{
+    *body = reply->readAll();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    return sameMac(reply->rawHeader("X-SP-Mac"), sign(classKey(code), answerMessage(nonce, status, *body)));
 }
 
 bool Classroom::parseJoinCode(const QString &text, QString *code, QString *host, quint16 *port)
 {
     const QString trimmed = text.trimmed();
-    const QString codePart = trimmed.section(QLatin1Char('@'), 0, 0).toUpper().remove(QLatin1Char(' '));
-    static const QRegularExpression valid(QStringLiteral("^[A-Z0-9]{6}$"));
+    const QString codePart = trimmed.section(QLatin1Char('@'), 0, 0).toUpper().remove(QLatin1Char(' ')).remove(QLatin1Char('-'));
+    static const QRegularExpression valid(QStringLiteral("^[A-Z0-9]{10}$"));
     if (!valid.match(codePart).hasMatch())
         return false;
     *code = codePart;
@@ -932,7 +1062,8 @@ QString Classroom::askedPage(const QString &site, bool sent)
         .arg(title.toHtmlEscaped(), sent ? QStringLiteral("✉️") : QStringLiteral("📡"), text.toHtmlEscaped());
 }
 
-Classroom::Parse Classroom::parseHttp(const QByteArray &data, QByteArray *method, QByteArray *target, QByteArray *body)
+Classroom::Parse Classroom::parseHttp(const QByteArray &data, QByteArray *method, QByteArray *target, QByteArray *body,
+                                     QHash<QByteArray, QByteArray> *headers)
 {
     const int end = data.indexOf("\r\n\r\n");
     if (end < 0)
@@ -946,6 +1077,8 @@ Classroom::Parse Classroom::parseHttp(const QByteArray &data, QByteArray *method
     qsizetype length = 0;
     for (const QByteArray &line : lines.mid(1)) {
         const int colon = line.indexOf(':');
+        if (colon > 0 && headers)
+            headers->insert(line.left(colon).trimmed().toLower(), line.mid(colon + 1).trimmed());
         if (colon > 0 && line.left(colon).trimmed().toLower() == "content-length") {
             bool ok = false;
             length = line.mid(colon + 1).trimmed().toLongLong(&ok);

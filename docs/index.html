@@ -41,7 +41,7 @@
     <p class="cta">
       <a class="button" href="#download">Download</a>
       <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin">View on GitHub</a>
-      <span class="fineprint">Free and open source · GPLv3 · Version 0.1</span>
+      <span class="fineprint">Free and open source · GPLv3 · Version 1.0 (release candidate)</span>
     </p>
     <picture class="shot">
       <source srcset="assets/screenshot-dark.webp" media="(prefers-color-scheme: dark)">
@@ -137,11 +137,19 @@
         <h3>Windows<span class="meta">Windows 10 and 11, 64-bit</span></h3>
         <p>An installer for just you (no administrator rights) or everyone, plus a portable
           zip.</p>
+        <p class="fineprint">The installer isn't code-signed yet, so Windows SmartScreen may
+          say it "protected your PC". Click <strong>More info</strong>, then
+          <strong>Run anyway</strong>.</p>
         <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the installer</a>
       </article>
       <article class="row">
         <h3>macOS<span class="meta">macOS 12 Monterey to 26 Tahoe · Apple silicon and Intel</span></h3>
         <p>One universal app in a DMG: drag it to Applications.</p>
+        <p class="fineprint">The app isn't notarised by Apple yet. The first time, right-click
+          (or Control-click) SpacePenguin in Applications and choose <strong>Open</strong>, then
+          <strong>Open</strong> again. On macOS 15 and later, if that offers no Open button: try to
+          open it once, then go to System Settings › Privacy &amp; Security and click
+          <strong>Open Anyway</strong>.</p>
         <a class="button ghost" href="https://github.com/developer1-vd/SpacePenguin/releases">Get the DMG</a>
       </article>
       <article class="row">
@@ -172,8 +180,8 @@
     </div>
     <p class="note">On phones SpacePenguin uses the system's web engine, because Apple and Qt
       offer no other. It hides ads and skips YouTube ads once they start rather than
-      stopping them from downloading, and its private tabs stay out of history but share
-      cookies with other tabs.
+      stopping them from downloading, and its tabs without history stay out of history but
+      share cookies with other tabs.
       <a href="https://github.com/developer1-vd/SpacePenguin#phones-android-and-ios">What's different on phones</a></p>
     <details class="more">
       <summary>Which Linux package should I use?</summary>
@@ -293,7 +301,7 @@ cmake --build build --config Release --parallel 2</code></pre>
     <div class="list">
       <div>
         <h3>It's young</h3>
-        <p>SpacePenguin is at version 0.1. If a tab crashes it shows a Reload button, and
+        <p>SpacePenguin 1.0 is in its release-candidate stage. If a tab crashes it shows a Reload button, and
           if the browser itself goes down your tabs come back. Still, please
           <a href="https://github.com/developer1-vd/SpacePenguin/issues">report what you find</a>.</p>
       </div>

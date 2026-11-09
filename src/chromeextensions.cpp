@@ -16,7 +16,9 @@
 #include <QtEndian>
 #include <QtWebEngineCore/qtwebenginecoreglobal.h>
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+// Only in a build that asks for it (-DSPACEPENGUIN_CHROME_EXTENSIONS=ON) against Qt
+// 6.10+: turning an extension on still crashes QtWebEngine, so releases leave it out.
+#if defined(SPACEPENGUIN_WITH_CHROME_EXTENSIONS) && QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
 #    include <QWebEngineExtensionInfo>
 #    include <QWebEngineExtensionManager>
 #    define SPACEPENGUIN_EXTENSIONS 1

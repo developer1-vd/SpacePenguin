@@ -28,8 +28,9 @@ QString readText(const QString &path)
     return QString::fromUtf8(file.readAll());
 }
 
-/** Whether a download looks like a filter list, not an error page. */
-bool looksLikeFilterList(const QByteArray &data)
+} // namespace
+
+bool FilterLists::looksLikeFilterList(const QByteArray &data)
 {
     int rules = 0;
     for (const QByteArray &line : data.split('\n')) {
@@ -40,8 +41,6 @@ bool looksLikeFilterList(const QByteArray &data)
     }
     return false;
 }
-
-} // namespace
 
 FilterLists *FilterLists::instance()
 {

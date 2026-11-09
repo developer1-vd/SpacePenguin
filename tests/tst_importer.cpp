@@ -2,7 +2,9 @@
 
 #include "bookmarkmanager.h"
 #include "importer.h"
+#include "logins.h"
 #include "loginspage.h"
+#include "secretstore.h"
 
 using namespace spacepenguin;
 
@@ -18,6 +20,8 @@ private slots:
     void importKeepsFoldersAndSkipsDuplicates();
     void removingAFolderRemovesWhatItHolds();
     void loginsPageAnswersOnlyItself();
+    void loginsKeptInAFileWithoutKeyring();
+    void loginsMoveIntoTheKeyring();
 };
 
 void TestImporter::init()
@@ -126,6 +130,70 @@ void TestImporter::loginsPageAnswersOnlyItself()
     QVERIFY(!LoginsPage::isAllowedCaller(QUrl(QStringLiteral("sp://store/"))));
     QVERIFY(!LoginsPage::isAllowedCaller(QUrl()));
     QVERIFY(!LoginsPage::isAllowedCaller(QUrl(QStringLiteral("http://logins/"))));
+}
+
+void TestImporter::loginsKeptInAFileWithoutKeyring()
+{
+    qputenv("SPACEPENGUIN_NO_KEYRING", "1");
+    QTemporaryDir dir;
+    {
+        LoginStore store(dir.path());
+        store.save(QStringLiteral("https://example.com"), QStringLiteral("penny"), QStringLiteral("Fish&Ice"));
+        store.setNeverSave(QStringLiteral("https://nope.example"), true);
+    }
+    const QString file = QDir(dir.path()).filePath(QStringLiteral("logins.json"));
+#ifndef Q_OS_WIN
+    QVERIFY(QFile::exists(file));
+    // Readable by the user's account only.
+    QCOMPARE(QFile(file).permissions() & (QFileDevice::ReadGroup | QFileDevice::ReadOther), QFileDevice::Permissions());
+#endif
+    LoginStore again(dir.path());
+    QCOMPARE(again.logins().size(), 1);
+    QCOMPARE(again.logins().first().password, QStringLiteral("Fish&Ice"));
+    QVERIFY(again.isNeverSaved(QStringLiteral("https://nope.example")));
+    again.remove(QStringLiteral("https://example.com"), QStringLiteral("penny"));
+    QVERIFY(LoginStore(dir.path()).logins().isEmpty());
+}
+
+void TestImporter::loginsMoveIntoTheKeyring()
+{
+#ifdef Q_OS_WIN
+    QSKIP("Windows encrypts the file with DPAPI instead");
+#else
+    qunsetenv("SPACEPENGUIN_NO_KEYRING");
+    if (!SecretStore::isAvailable())
+        QSKIP("No keyring in this session");
+    // A keyring can be there and still refuse to store (a build sandbox's Keychain):
+    // the logins then stay in their file, which loginsKeptInAFileWithoutKeyring covers.
+    const QString probe = QStringLiteral("test-probe-%1").arg(QCoreApplication::applicationPid());
+    if (!SecretStore::write(probe, "probe", QStringLiteral("SpacePenguin test")))
+        QSKIP("The keyring refuses to store anything here");
+    SecretStore::remove(probe);
+    QTemporaryDir dir;
+    const QString file = QDir(dir.path()).filePath(QStringLiteral("logins.json"));
+    // A file from before the keyring…
+    qputenv("SPACEPENGUIN_NO_KEYRING", "1");
+    LoginStore(dir.path()).save(QStringLiteral("https://example.com"), QStringLiteral("penny"),
+                                QStringLiteral("Fish&Ice"));
+    QVERIFY(QFile::exists(file));
+    qunsetenv("SPACEPENGUIN_NO_KEYRING");
+    {
+        // …moves into it, and the plain file goes.
+        LoginStore store(dir.path());
+        QCOMPARE(store.logins().size(), 1);
+        QVERIFY(!QFile::exists(file));
+        store.save(QStringLiteral("https://example.org"), QString(), QStringLiteral("second"));
+        QVERIFY(!QFile::exists(file));
+    }
+    QByteArray raw;
+    QCOMPARE(SecretStore::read(QStringLiteral("logins:") + file, &raw), SecretStore::Result::Found);
+    QVERIFY(raw.contains("Fish&Ice"));
+    LoginStore again(dir.path());
+    QCOMPARE(again.logins().size(), 2);
+    QVERIFY(SecretStore::remove(QStringLiteral("logins:") + file));
+    QCOMPARE(SecretStore::read(QStringLiteral("logins:") + file, &raw), SecretStore::Result::NotFound);
+    qputenv("SPACEPENGUIN_NO_KEYRING", "1");
+#endif
 }
 
 int main(int argc, char **argv)

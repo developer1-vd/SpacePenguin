@@ -3,7 +3,16 @@
 #include "preferences.h"
 #include "roles.h"
 #include "tor.h"
+#include "updatechecker.h"
 #include "webapps.h"
+
+#include <QImage>
+#include <QTcpServer>
+#include <QTcpSocket>
+
+#include <future>
+#include <memory>
+#include <thread>
 
 using namespace spacepenguin;
 
@@ -12,6 +21,7 @@ class TestRoles : public QObject
     Q_OBJECT
 
 private slots:
+    void updateCheckOrdersVersions();
     void focusModeComesWithSomeRoles();
     void normalizeSite_data();
     void normalizeSite();
@@ -25,6 +35,8 @@ private slots:
     void searchTemplates();
     void gamerFlags();
     void onions();
+    void findsTorByItsAnswer();
+    void webAppInstallAndRemove();
 };
 
 void TestRoles::focusModeComesWithSomeRoles()
@@ -184,6 +196,124 @@ void TestRoles::gamerFlags()
     QVERIFY(all.contains(QStringLiteral("--disable-frame-rate-limit")));
     QVERIFY(all.contains(QStringLiteral("--show-fps-counter")));
     QVERIFY(!all.contains(QStringLiteral("--ignore-gpu-blocklist")));
+}
+
+void TestRoles::updateCheckOrdersVersions()
+{
+    QVERIFY(UpdateChecker::isNewer(QStringLiteral("v1.0.1"), QStringLiteral("1.0.0")));
+    QVERIFY(UpdateChecker::isNewer(QStringLiteral("v1.0.0"), QStringLiteral("0.1-A")));
+    // A release is newer than its own candidate, never the other way round.
+    QVERIFY(UpdateChecker::isNewer(QStringLiteral("v1.0.0"), QStringLiteral("1.0.0-rc.1")));
+    QVERIFY(!UpdateChecker::isNewer(QStringLiteral("v1.0.0-rc.2"), QStringLiteral("1.0.0")));
+    QVERIFY(!UpdateChecker::isNewer(QStringLiteral("v1.0.0"), QStringLiteral("1.0.0")));
+    QVERIFY(!UpdateChecker::isNewer(QStringLiteral("v0.1-A"), QStringLiteral("1.0.0-rc.1")));
+    QVERIFY(!UpdateChecker::isNewer(QStringLiteral("nightly"), QStringLiteral("1.0.0")));
+}
+
+namespace {
+
+// Answers one connection on its own thread, as Tor's SOCKS port (or another
+// program) would: isTorPort() waits without an event loop.
+quint16 serveOnce(const QByteArray &answer, std::thread *thread)
+{
+    std::promise<quint16> listening;
+    std::future<quint16> port = listening.get_future();
+    *thread = std::thread([answer, &listening] {
+        QTcpServer server;
+        if (!server.listen(QHostAddress::LocalHost, 0)) {
+            listening.set_value(0);
+            return;
+        }
+        listening.set_value(server.serverPort());
+        if (!server.waitForNewConnection(5000))
+            return;
+        std::unique_ptr<QTcpSocket> socket(server.nextPendingConnection());
+        socket->waitForReadyRead(2000);
+        socket->readAll();
+        socket->write(answer);
+        socket->waitForBytesWritten(2000);
+        socket->disconnectFromHost();
+        if (socket->state() != QAbstractSocket::UnconnectedState)
+            socket->waitForDisconnected(2000);
+    });
+    return port.get();
+}
+
+}
+
+void TestRoles::findsTorByItsAnswer()
+{
+    std::thread tor;
+    const quint16 torPort = serveOnce("HTTP/1.0 501 Tor is not an HTTP Proxy\r\nContent-Type: text/html\r\n\r\n"
+                                      "<html><body><h1>Tor is not an HTTP Proxy</h1></body></html>", &tor);
+    QVERIFY(torPort);
+    QVERIFY(Tor::isTorPort(torPort));
+    tor.join();
+
+    // Another program on the port is not Tor, and Tor windows must not route through it.
+    std::thread other;
+    const quint16 otherPort = serveOnce("HTTP/1.0 200 OK\r\n\r\nhello", &other);
+    QVERIFY(!Tor::isTorPort(otherPort));
+    other.join();
+
+    QTcpServer closed;
+    QVERIFY(closed.listen(QHostAddress::LocalHost, 0));
+    const quint16 closedPort = closed.serverPort();
+    closed.close();
+    QVERIFY(!Tor::isTorPort(closedPort));
+}
+
+void TestRoles::webAppInstallAndRemove()
+{
+#if !defined(Q_OS_LINUX)
+    QSKIP("Writes a Start menu shortcut or an .app on this system; the Linux launcher is tested");
+#else
+    QStandardPaths::setTestModeEnabled(true);
+    QCoreApplication::setOrganizationName(QStringLiteral("SpacePenguinTests"));
+    QCoreApplication::setApplicationName(QStringLiteral("roles-%1").arg(QCoreApplication::applicationPid()));
+    WebApps *apps = WebApps::instance();
+    WebApp app;
+    app.name = QStringLiteral("Mail");
+    app.startUrl = QUrl(QStringLiteral("https://mail.example.com/inbox"));
+    QImage icon(64, 64, QImage::Format_ARGB32);
+    icon.fill(Qt::blue);
+    QString error;
+    QVERIFY2(apps->install(app, icon, &error), qPrintable(error));
+
+    const QString id = WebApps::idFor(app.startUrl);
+    const WebApp saved = apps->app(id);
+    QVERIFY(saved.isValid());
+    QCOMPARE(saved.name, QStringLiteral("Mail"));
+    // The scope defaults to the start page's folder.
+    QVERIFY(saved.contains(QUrl(QStringLiteral("https://mail.example.com/compose"))));
+    QVERIFY(!saved.contains(QUrl(QStringLiteral("https://other.example/"))));
+    QCOMPARE(apps->apps().size(), 1);
+    QVERIFY(!apps->icon(id).isNull());
+
+    const QString launcher = QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation)
+        + QStringLiteral("/spacepenguin-app-") + id + QStringLiteral(".desktop");
+    QFile entry(launcher);
+    QVERIFY(entry.open(QIODevice::ReadOnly));
+    const QByteArray text = entry.readAll();
+    QVERIFY(text.contains("--app=" + id.toUtf8()));
+    QVERIFY(text.contains("Name=Mail"));
+    entry.close();
+
+    // A reinstall under a new name replaces it rather than adding another.
+    app.name = QStringLiteral("Webmail");
+    QVERIFY(apps->install(app, icon));
+    QCOMPARE(apps->apps().size(), 1);
+    QCOMPARE(apps->app(id).name, QStringLiteral("Webmail"));
+
+    apps->remove(id);
+    QVERIFY(!apps->app(id).isValid());
+    QVERIFY(apps->apps().isEmpty());
+    QVERIFY(!QFile::exists(launcher));
+    QVERIFY(apps->icon(id).isNull());
+    QSettings settings;
+    settings.clear();
+    QFile::remove(settings.fileName());
+#endif
 }
 
 QTEST_GUILESS_MAIN(TestRoles)

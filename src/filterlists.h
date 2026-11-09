@@ -60,6 +60,11 @@ public:
     void reload();
     /** Downloads the subscribed lists: all of them, or only those over a few days old. */
     void update(bool all);
+    /**
+     * Whether a download is a filter list, not a captive portal's or an error page:
+     * only then does it replace the copy that works.
+     */
+    static bool looksLikeFilterList(const QByteArray &data);
 
 signals:
     /** The lists in use, or their download state, changed. */

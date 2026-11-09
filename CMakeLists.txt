@@ -4,14 +4,16 @@ cmake_minimum_required(VERSION 3.21)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 
 project(SpacePenguin
-    VERSION 0.1.0
+    VERSION 1.0.0
     DESCRIPTION "A secure, lightweight, and usable browser written in Qt"
     LANGUAGES CXX)
 
 # The version people see: the app's About page and --version, the download file
 # names and the release. Package formats, Windows file properties and Info.plist
-# need plain numbers and take VERSION above.
-set(SPACEPENGUIN_VERSION_NAME "0.1-A")
+# need plain numbers and take VERSION above. It is VERSION itself, or VERSION with
+# a pre-release suffix ("-rc.1") while a release is being tried out; the release
+# tag is "v" and this name.
+set(SPACEPENGUIN_VERSION_NAME "1.0.0-rc.1")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -111,6 +113,10 @@ qt_add_executable(spacepenguin
     src/logins.h
     src/loginspage.cpp
     src/loginspage.h
+    src/secretstore.cpp
+    src/secretstore.h
+    src/session.cpp
+    src/session.h
     src/notifications.cpp
     src/notifications.h
     src/sidetabs.cpp
@@ -205,14 +211,27 @@ qt_add_executable(spacepenguin
 )
 
 target_link_libraries(spacepenguin PRIVATE Qt6::Network Qt6::Widgets Qt6::WebEngineWidgets)
-# The desktop portal tells Linux desktops' light or dark style (src/systemscheme.cpp).
+# Chrome (Manifest V3) extensions: experimental, and left out of releases, because
+# QtWebEngine 6.10 and 6.11 crash when one is turned on (src/chromeextensions.cpp).
+option(SPACEPENGUIN_CHROME_EXTENSIONS "Build the experimental Chrome extension support (needs Qt 6.10+)" OFF)
+if(SPACEPENGUIN_CHROME_EXTENSIONS)
+    target_compile_definitions(spacepenguin PRIVATE SPACEPENGUIN_WITH_CHROME_EXTENSIONS)
+endif()
+# The desktop portal tells Linux desktops' light or dark style (src/systemscheme.cpp),
+# and the Secret Service keeps saved logins (src/secretstore.cpp); both over D-Bus.
 if(UNIX AND NOT APPLE AND NOT ANDROID)
     find_package(Qt6 6.8 QUIET COMPONENTS DBus)
-    if(TARGET Qt6::DBus)
-        target_link_libraries(spacepenguin PRIVATE Qt6::DBus)
-        target_compile_definitions(spacepenguin PRIVATE SPACEPENGUIN_HAVE_DBUS)
-    endif()
 endif()
+# The keyring saved logins are kept in (src/secretstore.cpp).
+function(spacepenguin_link_keyring target)
+    if(APPLE)
+        target_link_libraries(${target} PRIVATE "-framework Security" "-framework CoreFoundation")
+    elseif(TARGET Qt6::DBus)
+        target_link_libraries(${target} PRIVATE Qt6::DBus)
+        target_compile_definitions(${target} PRIVATE SPACEPENGUIN_HAVE_DBUS)
+    endif()
+endfunction()
+spacepenguin_link_keyring(spacepenguin)
 target_compile_definitions(spacepenguin PRIVATE
     SPACEPENGUIN_VERSION="${SPACEPENGUIN_VERSION_NAME}"
     SPACEPENGUIN_BUILD_TYPE="$<CONFIG>")
@@ -366,12 +385,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/logins.h
             src/loginspage.cpp
             src/loginspage.h
+            src/secretstore.cpp
+            src/secretstore.h
             src/icons.cpp
             src/icons.h
             src/theme.cpp
             src/theme.h
         )
         target_link_libraries(tst_importer PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
+        spacepenguin_link_keyring(tst_importer)
         if(WIN32)
             # Saved logins are encrypted with the Windows account (logins.cpp).
             target_link_libraries(tst_importer PRIVATE crypt32)
@@ -381,6 +403,8 @@ if(SPACEPENGUIN_BUILD_TESTS)
 
         qt_add_executable(tst_roles
             tests/tst_roles.cpp
+            src/updatechecker.cpp
+            src/updatechecker.h
             src/roles.cpp
             src/roles.h
             src/webapps.cpp
@@ -483,6 +507,27 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_sponsorblock PRIVATE Qt6::Test Qt6::Network)
         target_include_directories(tst_sponsorblock PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME sponsorblock COMMAND tst_sponsorblock)
+
+        qt_add_executable(tst_userdata
+            tests/tst_userdata.cpp
+            src/session.cpp
+            src/session.h
+            src/filterlists.cpp
+            src/filterlists.h
+            src/adblocker.cpp
+            src/adblocker.h
+            src/cosmeticfilters.cpp
+            src/cosmeticfilters.h
+            src/sitepermissions.cpp
+            src/sitepermissions.h
+        )
+        target_link_libraries(tst_userdata PRIVATE Qt6::Test Qt6::Widgets Qt6::Network Qt6::WebEngineCore)
+        target_include_directories(tst_userdata PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME userdata COMMAND tst_userdata)
+
+        # Tests never touch the real keyring (a test that does turns it back on).
+        get_property(spacepenguin_tests DIRECTORY PROPERTY TESTS)
+        set_tests_properties(${spacepenguin_tests} PROPERTIES ENVIRONMENT "SPACEPENGUIN_NO_KEYRING=1")
     endif()
 endif()
 

@@ -9,7 +9,7 @@ Item {
     // The web view is a native view drawn above everything else on Android and
     // iOS, so it is shown only while nothing should cover it.
     property bool pageVisible: true
-    // A private tab is not recorded in history and not reopened with the app.
+    // A tab without history: not recorded in history and not reopened with the app.
     property bool isPrivate: false
 
     property bool onStartPage: true
@@ -63,9 +63,10 @@ Item {
         wrapMode: Text.Wrap
         color: Theme.muted
         font.pixelSize: 13
-        text: qsTr("Private tab: what you visit here is not saved to history, and the tab is not "
-                   + "reopened with the app. Sites still share cookies with your other tabs; "
-                   + "Settings › Clear history and cookies removes them.")
+        // Not called "private": the phone's web view cannot keep its cookies apart.
+        text: qsTr("Tab without history: what you visit here is not saved to history, and the "
+                   + "tab is not reopened with the app. It is not private: sites share cookies "
+                   + "with your other tabs, and Settings › Clear history and cookies removes them.")
     }
 
     WebView {

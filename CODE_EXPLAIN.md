@@ -52,7 +52,8 @@ The largest file. `BrowserWindow` owns:
 - **Prompts:** the bar above the page that asks questions (site permissions, saving a
   login, a student's request to unblock) — `addPrompt()`.
 - **Session:** tabs and their back/forward history are saved a moment after every
-  change (`scheduleSessionSave()`) and restored on start. A `session/running` flag
+  change (`scheduleSessionSave()`) and restored on start; `session.cpp` reads and
+  writes them. A `session/running` flag
   left set means the last run crashed; the tabs are then restored, or offered back.
 - **Roles' tools** (developer tools, Focus mode, citations…) and installing sites as
   apps — see below.
@@ -90,7 +91,7 @@ page load. In order, it handles:
   OpenUserJS for user scripts).
 - `about:logins` — `html/logins.html`, served as `sp://logins` by `loginspage.cpp`.
   Its small JSON API answers only requests made from that page itself.
-- `about:` pages (`about:history`, `about:version`, `about:mozilla`…) —
+- `about:` pages (`about:history`, `about:version`, `about:penguin`…) —
   `aboutpages.cpp`.
 - Reader view — a script in `readerview.cpp` that redraws the page as its article.
 
@@ -100,7 +101,7 @@ page load. In order, it handles:
 |---|---|
 | `historymanager.cpp` | visited pages, for the omnibox and `about:history` |
 | `bookmarkmanager.cpp` | bookmarks and folders (`bookmarksdialog.cpp` edits them) |
-| `logins.cpp` | saved logins, encrypted with DPAPI on Windows |
+| `logins.cpp`, `secretstore.cpp` | saved logins: DPAPI on Windows, the Keychain on macOS, the Secret Service on Linux |
 | `importer.cpp` | bringing bookmarks and logins in from Chrome, Edge, Firefox… |
 | `downloadmanager.cpp` | downloads (`downloadsdialog.cpp` shows them) |
 | `cookiemanager.cpp` | the profile's cookies, listed and removed per site |
@@ -112,7 +113,8 @@ page load. In order, it handles:
 - `userextensions.cpp` — user scripts (Tampermonkey-style), with the `GM_` functions
   they expect, injected per site.
 - `chromeextensions.cpp` — Chrome (Manifest V3) extensions through QtWebEngine's
-  extension support. Needs Qt 6.10; with an older Qt it reports itself unavailable.
+  extension support. Experimental and left out of releases (Qt 6.10's support crashes):
+  only built with `-DSPACEPENGUIN_CHROME_EXTENSIONS=ON` against Qt 6.10+.
 - `extensionsdialog.cpp` — manages both.
 
 ## Made for you: roles (`roles.cpp`)
@@ -133,13 +135,17 @@ page load. In order, it handles:
 Teacher and student pair over the local network, with nothing on the internet:
 
 - **Teacher's side:** the teacher's SpacePenguin runs a small HTTP/JSON server
-  (`QTcpServer`, port 47800) and answers UDP broadcasts on port 47801 to its
-  six-character class code.
-- **Joining:** a student broadcasts the code to find the teacher, then polls
-  `GET /v1/class` every 15 s. The reply carries the blocked sites, each with the
+  (`QTcpServer`, port 47800) and answers UDP broadcasts on port 47801.
+- **The code is the secret, and never sent.** Both sides stretch the ten-character
+  class code into a key (`classKey()`, PBKDF2) and sign with HMAC-SHA256: the
+  discovery broadcast proves the student knows the code, the answer proves it's the
+  teacher; each request is signed with a time and a nonce (stale or repeated ones
+  are refused), and each answer is signed over the request's nonce.
+- **Joining:** a student broadcasts to find the teacher, then polls
+  `POST /v2/class` every 15 s. The reply carries the blocked sites, each with the
   teacher's reason, plus this student's exceptions and answers.
 - **Requests:** a student's request to unblock a site, or to leave, is a
-  `POST /v1/request`. It appears as a prompt in the teacher's window.
+  `POST /v2/request`. It appears as a prompt in the teacher's window.
 - **Enforcement:** `Classroom::blocks()` is called from `BrowserPage` for every page
   and frame. It also unwraps view-source, translation proxies and archives, knows a
   site's other addresses (youtu.be…), and blocks web proxies. While a student is in a
@@ -182,9 +188,10 @@ Qt Test, one executable per area; run them with `ctest --test-dir build`.
 |---|---|
 | `tst_adblocker` | rule parsing and matching |
 | `tst_urlresolver` | turning typed text into an address or a search |
-| `tst_classroom` | runs a whole class over 127.0.0.1: join, block, ask, allow, leave |
-| `tst_roles` | Focus mode, citations, manifests, search templates, onions, gamer switches |
-| `tst_importer` | bookmark and login import; only about:logins may use its API |
+| `tst_classroom` | runs a whole class over 127.0.0.1: join, block, ask, allow, leave; refuses outsiders, forgeries and replays |
+| `tst_userdata` | the saved session and crash restore, filter list subscriptions, site permission names |
+| `tst_roles` | Focus mode, citations, web app manifests, installing and removing a web app, search templates, onions, finding Tor, gamer switches, the update check |
+| `tst_importer` | bookmark and login import; saved logins in a file and moving into the keyring; only about:logins may use its API |
 | `tst_userextensions` | user-script installation and injection |
 | `tst_aboutpages` | the `about:` pages |
 | `tst_startpage` | the start page |

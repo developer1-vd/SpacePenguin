@@ -20,11 +20,12 @@ struct Login {
 /**
  * The logins people chose to save, per site.
  *
- * Kept in the profile's folder. On Windows the file is encrypted with the user's
- * Windows account (DPAPI), so another account, or the disk in another computer,
- * cannot read it. Elsewhere it is a file only the user's account may read, as the
- * system's keyring is not something every desktop has; storageDescription() says
- * which, for the manager to tell people.
+ * On Windows a file in the profile's folder, encrypted with the user's Windows
+ * account (DPAPI), so another account, or the disk in another computer, cannot read
+ * it. On macOS the login Keychain, and on Linux and the BSDs the desktop's keyring
+ * (the Secret Service: GNOME Keyring, KWallet…), hold them, encrypted and unlocked
+ * with the user's login; a file from before moves in there. With no keyring they
+ * stay in a file only the user's account may read. storageDescription() says which.
  *
  * Pages never get a login unasked: the window fills one in only when the person
  * picks it.
@@ -38,7 +39,8 @@ public:
 
     /** The origin logins are filed under for a page at @p url; empty for non-web pages. */
     static QString originOf(const QUrl &url);
-    static QString storageDescription();
+    /** Where the logins are kept now, for the manager to tell people. */
+    QString storageDescription() const;
 
     QList<Login> logins() const { return m_logins; }
     QList<Login> loginsFor(const QString &origin) const;
@@ -72,8 +74,11 @@ signals:
 private:
     void load();
     void store() const;
+    QString keyringKey() const;
 
     QString m_path;
+    bool m_inKeyring = false; // kept in the system keyring, not the file
+    bool m_readOnly = false;  // the keyring stayed locked: do not overwrite it
     QList<Login> m_logins;
     QSet<QString> m_never;
 };

@@ -33,22 +33,6 @@ const PageDefinition kPages[] = {
       "RFC 2324, rendered with dignity.", true },
     { "about:pan", "Panned",
       "The other half of the bread.", true },
-    { "about:force", "Use the Force",
-      "May it be with you. Always.", true },
-    { "about:deathstar", "That's No Moon",
-      "A fully operational battle station.", true },
-    { "about:yoda", "Wise, You Are",
-      "Do. Or do not. There is no try.", true },
-    { "about:hyperdrive", "Punch It",
-      "Making the jump to lightspeed.", true },
-    { "about:mozilla", "The Book of Mozilla",
-      "The verses Netscape and Firefox have kept since 1995.", true },
-    { "about:firefox", "Phoenix Rising",
-      "From the ashes of Netscape, a browser for everyone.", true },
-    { "about:servo", "Fearless Concurrency",
-      "A browser engine written in Rust, parallel by default.", true },
-    { "about:rust", "Empowering Everyone",
-      "Build reliable and efficient software.", true },
     { "about:downloads", "Downloads",
       "View and manage your downloads.", false },
     { "about:history", "History",
@@ -59,18 +43,6 @@ const PageDefinition kPages[] = {
       "Search, add, edit and delete saved usernames and passwords.", false },
     { "about:settings", "Settings",
       "Configure SpacePenguin.", false },
-    { "about:tatooine", "Tatooine",
-      "If there's a bright center to the universe, you're on the planet that it's farthest from.", true },
-    { "about:hoth", "Hoth",
-      "Climate: frozen. Indigenous life: tauntauns, wampas, and rebel bases.", true },
-    { "about:dagobah", "Dagobah",
-      "Strong with the Force, this place is. Much to learn, you still have.", true },
-    { "about:endor", "Endor",
-      "Home of the Ewoks. Cute, fuzzy, and surprisingly good at taking down AT-STs.", true },
-    { "about:naboo", "Naboo",
-      "Peaceful planet. Beautiful architecture. Gungan neighbors. Underwater cities.", true },
-    { "about:coruscant", "Coruscant",
-      "The entire planet is a city. Traffic is terrible. Senate meets here.", true },
 };
 
 QString escape(const QString &text)
@@ -212,192 +184,6 @@ QString panBody()
         "word. Ours is spelled correctly, which feels like cheating.</p>");
 }
 
-QString forceBody()
-{
-    return QStringLiteral(
-        "<h1>Use the Force</h1>"
-        "<pre class=\"art\">"
-        "  \\ | /     \n"
-        "  -- * --    \n"
-        "  / | \\      \n"
-        "            \n"
-        "  ~ ~ ~ ~ ~  \n"
-        "</pre>"
-        "<p>The Force is what gives a browser its power. It surrounds us, penetrates us, "
-        "binds the galaxy together... and makes page loads feel snappy.</p>"
-        "<p class=\"hint\">For a more elegant weapon from a more civilized age, try "
-        "<code>about:yoda</code>.</p>");
-}
-
-QString deathstarBody()
-{
-    return QStringLiteral(
-        "<h1>That's No Moon</h1>"
-        "<pre class=\"art\">"
-        "     .--.    \n"
-        "    /      \\  \n"
-        "   |  ( )  |  \n"
-        "    \\  __  /  \n"
-        "     '--'    \n"
-        "</pre>"
-        "<p>A fully operational battle station. It has the power to destroy a planet, "
-        "or at least your productivity.</p>"
-        "<p class=\"hint\">The thermal exhaust port is two meters wide. "
-        "Womp rats not included.</p>");
-}
-
-QString yodaBody()
-{
-    return QStringLiteral(
-        "<h1>Wise, You Are</h1>"
-        "<pre class=\"art\">"
-        "      .--.   \n"
-        "     /    \\  \n"
-        "    |  ::  |  \n"
-        "     \\ __ /   \n"
-        "       ||     \n"
-        "       ||     \n"
-        "</pre>"
-        "<p>Do. Or do not. There is no try.</p>"
-        "<p>Clear your mind must be, if you are to find the bugs in your code.</p>"
-        "<p class=\"hint\">Patience you must have, young padawan. "
-        "Clear the cache, you must.</p>");
-}
-
-QString hyperdriveBody()
-{
-    return QStringLiteral(
-        "<h1>Punch It</h1>"
-        "<pre class=\"art\">"
-        "    * * * * * * *   \n"
-        "   * * * * * * * *  \n"
-        "  * * * * * * * * * \n"
-        " * * * * * * * * * *\n"
-        "  * * * * * * * * * \n"
-        "   * * * * * * * *  \n"
-        "    * * * * * * *   \n"
-        "</pre>"
-        "<p>Making the jump to lightspeed. Warp factor 9.9 engaged.</p>"
-        "<p>Your tabs are now streaking through hyperspace. </p>"
-        "<p class=\"hint\">Navicomputer calculates: 12 parsecs to Kessel. "
-        "The Falcon did it in less than twelve.</p>");
-}
-
-// The Book of Mozilla, the verses Netscape and Firefox have shown at about:mozilla
-// since 1995. Text by Mozilla, under the Mozilla Public License 2.0.
-struct Verse {
-    const char *reference;
-    const char *text;
-};
-
-const Verse kBookOfMozilla[] = {
-    { "12:10",
-      "And the beast shall come forth surrounded by a roiling cloud of vengeance. "
-      "The house of the unbelievers shall be razed and they shall be scorched to the earth. "
-      "Their tags shall blink until the end of days." },
-    { "3:31",
-      "And the beast shall be made legion. Its numbers shall be increased a thousand "
-      "thousand fold. The din of a million keyboards like unto a great storm shall cover "
-      "the earth, and the followers of Mammon shall tremble." },
-    { "7:15",
-      "And so at last the beast fell and the unbelievers rejoiced. But all was not lost, "
-      "for from the ash rose a great bird. The bird gazed down upon the unbelievers and cast "
-      "fire and thunder upon them. For the beast had been reborn with its strength renewed, "
-      "and the followers of Mammon cowered in horror." },
-    { "8:20",
-      "The Beast adopted new raiment and studied the ways of Time and Space and Light and "
-      "the Flow of energy through the Universe. From its studies, the Beast fashioned new "
-      "structures from oxidised metal and proclaimed their glories. And the Beast's "
-      "followers rejoiced, finding renewed purpose in these teachings." },
-    { "11:9",
-      "Mammon slept. And the beast reborn spread over the earth and its numbers grew legion. "
-      "And they proclaimed the times and sacrificed crops unto the fire, with the cunning of "
-      "foxes. And they built a new world in their own image as promised by the sacred words, "
-      "and spoke of the beast with their children. Mammon awoke, and lo! it was naught but a "
-      "follower." },
-};
-
-QString mozillaPage()
-{
-    // As Firefox shows it: the newest verse, white on red; the older ones follow.
-    QString verses;
-    const int count = int(std::size(kBookOfMozilla));
-    for (int i = count - 1; i >= 0; --i) {
-        verses += QStringLiteral("<section%1><p>%2</p><p class=\"from\">from <b>The Book of Mozilla,</b> %3</p></section>")
-                      .arg(i == count - 1 ? QString() : QStringLiteral(" class=\"older\""),
-                           escape(QString::fromUtf8(kBookOfMozilla[i].text)),
-                           QString::fromLatin1(kBookOfMozilla[i].reference));
-    }
-    return QStringLiteral(
-               "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
-               "<title>The Book of Mozilla — SpacePenguin</title>"
-               "<style>"
-               "html{background:#800000;color:#fff;color-scheme:dark}"
-               "body{margin:0;min-height:100vh;padding:12vh 1.5rem 4rem;"
-               "font:1.35rem/1.6 Georgia,'Times New Roman',serif}"
-               "section{max-width:36rem;margin:0 auto 4rem}"
-               "section p{margin:0}"
-               ".from{text-align:right;font-style:italic;margin-top:1rem}"
-               ".older{opacity:.6;font-size:1rem}"
-               ".credit{max-width:36rem;margin:0 auto;font:.8rem/1.5 system-ui,sans-serif;opacity:.6}"
-               ".credit a{color:#fff}"
-               "</style></head><body>%1"
-               "<p class=\"credit\">The Book of Mozilla is by Mozilla, under the "
-               "<a href=\"https://www.mozilla.org/MPL/2.0/\">Mozilla Public License 2.0</a>.</p>"
-               "</body></html>")
-        .arg(verses);
-}
-
-QString firefoxBody()
-{
-    return QStringLiteral(
-        "<h1>Phoenix Rising</h1>"
-        "<pre class=\"art\">"
-        "      /\\      \n"
-        "     /  \\     \n"
-        "    /____\\    \n"
-        "   /      \\   \n"
-        "  /________\\  \n"
-        "   \\  ||  /   \n"
-        "    \\||/     \n"
-        "</pre>"
-        "<p>From the ashes of Netscape, a browser for everyone.</p>"
-        "<p>Built on Gecko, shaped by community, guided by principles.</p>"
-        "<p class=\"hint\">Your browser, your rules. Since 2002.</p>");
-}
-
-QString servoBody()
-{
-    return QStringLiteral(
-        "<h1>Fearless Concurrency</h1>"
-        "<pre class=\"art\">"
-        "  // || \\\\   \n"
-        " //  ||  \\\\  \n"
-        "///  ||  \\\\\\ \n"
-        "      ||      \n"
-        "      ||      \n"
-        "</pre>"
-        "<p>A browser engine written in Rust, parallel by default.</p>"
-        "<p>Memory safety without garbage collection. Fearless parallelism.</p>"
-        "<p class=\"hint\">Racing the future, one thread at a time.</p>");
-}
-
-QString rustBody()
-{
-    return QStringLiteral(
-        "<h1>Empowering Everyone</h1>"
-        "<pre class=\"art\">"
-        "   .--.       \n"
-        "  /  .\\      \n"
-        "  |  | |      \n"
-        "  \\  / /      \n"
-        "   '--'       \n"
-        "</pre>"
-        "<p>A language for building reliable and efficient software.</p>"
-        "<p>Zero-cost abstractions. Move semantics. Fearless concurrency.</p>"
-        "<p class=\"hint\">If it compiles, it probably works. Mostly.</p>");
-}
-
 bool isWebUrl(const QString &url)
 {
     return url.startsWith(QLatin1String("https://"), Qt::CaseInsensitive)
@@ -496,54 +282,6 @@ QString settingsBody(const AboutPageContext &context)
         .arg(shortcutHint(context, QStringLiteral("settings"), QStringLiteral("Ctrl+,")));
 }
 
-bool isStarWarsPage(const QString &normalized)
-{
-    static const char *starWarsIds[] = {
-        "about:tatooine", "about:hoth", "about:dagobah",
-        "about:endor", "about:naboo", "about:coruscant",
-        nullptr
-    };
-    for (int i = 0; starWarsIds[i]; ++i) {
-        if (normalized == QLatin1String(starWarsIds[i]))
-            return true;
-    }
-    return false;
-}
-
-QString starWarsBody(const QString &id)
-{
-    const AboutPage page = AboutPages::page(id);
-    if (page.id.isEmpty())
-        return QString();
-
-    QStringList hints = {
-        QStringLiteral("May the Force be with you."),
-        QStringLiteral("Do. Or do not. There is no try."),
-        QStringLiteral("I find your lack of faith disturbing."),
-        QStringLiteral("These aren't the droids you're looking for."),
-        QStringLiteral("I've got a bad feeling about this."),
-        QStringLiteral("It's a trap!"),
-        QStringLiteral("Hello there."),
-        QStringLiteral("That's no moon. That's a space station."),
-        QStringLiteral("Fear leads to the dark side."),
-        QStringLiteral("Truly wonderful, the mind of a child is."),
-        QStringLiteral("The Force is strong with this one."),
-        QStringLiteral("Size matters not."),
-        QStringLiteral("Always in motion is the future."),
-        QStringLiteral("The Force will be with you. Always."),
-        QStringLiteral("Difficult, this age-old relation between teacher and pupil."),
-    };
-
-    const int hintIndex = qHash(id) % hints.size();
-
-    return QStringLiteral(
-        "<h1>%1</h1>"
-        "<p>%2</p>"
-        "<p class=\"hint\">%3</p>")
-        .arg(escape(page.title), escape(page.summary), hints[hintIndex]);
-
-}
-
 } // namespace
 
 QList<AboutPage> AboutPages::all()
@@ -603,22 +341,6 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
         return htmlShell(pageTitle(id), teapotBody());
     if (normalized == QLatin1String("about:pan"))
         return htmlShell(pageTitle(id), panBody());
-    if (normalized == QLatin1String("about:force"))
-        return htmlShell(pageTitle(id), forceBody());
-    if (normalized == QLatin1String("about:deathstar"))
-        return htmlShell(pageTitle(id), deathstarBody());
-    if (normalized == QLatin1String("about:yoda"))
-        return htmlShell(pageTitle(id), yodaBody());
-    if (normalized == QLatin1String("about:hyperdrive"))
-        return htmlShell(pageTitle(id), hyperdriveBody());
-    if (normalized == QLatin1String("about:mozilla"))
-        return mozillaPage();
-    if (normalized == QLatin1String("about:firefox"))
-        return htmlShell(pageTitle(id), firefoxBody());
-    if (normalized == QLatin1String("about:servo"))
-        return htmlShell(pageTitle(id), servoBody());
-    if (normalized == QLatin1String("about:rust"))
-        return htmlShell(pageTitle(id), rustBody());
     if (normalized == QLatin1String("about:downloads"))
         return htmlShell(pageTitle(id), downloadsBody(context));
     if (normalized == QLatin1String("about:history"))
@@ -631,8 +353,6 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
     if (normalized == QLatin1String("about:logins"))
         return htmlShell(pageTitle(id), QStringLiteral("<h1>Saved Logins</h1>"
                                                        "<p><a href=\"sp://logins/\">Open saved logins</a></p>"));
-    if (isStarWarsPage(normalized))
-        return htmlShell(pageTitle(id), starWarsBody(id));
 
     return renderUnknown(id);
 }

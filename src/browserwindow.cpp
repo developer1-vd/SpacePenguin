@@ -9,6 +9,7 @@
 #include "bookmarkmanager.h"
 #include "bookmarksdialog.h"
 #include "chromeextensions.h"
+#include "session.h"
 #include "classroom.h"
 #include "browserpage.h"
 #include "cookiemanager.h"
@@ -1727,12 +1728,12 @@ void BrowserWindow::restoreSession()
     if (!geometry.isEmpty())
         restoreGeometry(geometry);
 
-    // "running" stays set while SpacePenguin runs and is cleared when it quits; found
-    // set at start, the last run ended without quitting (a crash, a power cut).
-    const bool unclean = settings.value(QStringLiteral("session/running"), false).toBool();
-    settings.setValue(QStringLiteral("session/running"), true);
+    const bool unclean = Session::markRunning(settings);
     connect(qApp, &QCoreApplication::aboutToQuit, qApp,
-            [] { QSettings().setValue(QStringLiteral("session/running"), false); },
+            [] {
+                QSettings settings;
+                Session::markClosed(settings);
+            },
             Qt::UniqueConnection);
 
     if (Preferences::instance()->restoreSession()) {
@@ -1746,20 +1747,14 @@ void BrowserWindow::restoreSession()
     }
     // Tabs aren't brought back at start here, but after a crash they may be wanted. They
     // are kept aside first: this window's own tabs will be saved over them.
-    const bool offer = unclean && !settings.value(QStringLiteral("session/urls")).toStringList().isEmpty();
-    if (offer) {
-        settings.remove(QStringLiteral("crashedSession"));
-        for (const QString &key : {QStringLiteral("urls"), QStringLiteral("histories"), QStringLiteral("currentTab"),
-                                   QStringLiteral("groups")})
-            settings.setValue(QStringLiteral("crashedSession/") + key, settings.value(QStringLiteral("session/") + key));
-    }
+    const bool offer = unclean && Session::setAsideForRestore(settings);
     newTab();
     if (offer) {
         Prompt prompt;
         prompt.key = QStringLiteral("restore");
         prompt.icon = Icons::History;
         prompt.text = tr("SpacePenguin didn't close properly last time.");
-        prompt.buttons = {{tr("Restore Tabs"), [this] { restoreTabs(QStringLiteral("crashedSession")); }}};
+        prompt.buttons = {{tr("Restore Tabs"), [this] { restoreTabs(Session::kCrashedGroup); }}};
         addPrompt(currentView(), prompt);
     }
 }
@@ -1767,53 +1762,39 @@ void BrowserWindow::restoreSession()
 bool BrowserWindow::restoreTabs(const QString &group)
 {
     QSettings settings;
-    settings.beginGroup(group);
-    const QStringList urls = settings.value(QStringLiteral("urls")).toStringList().mid(0, kMaximumRestoredTabs);
-    if (urls.isEmpty())
+    const Session::Saved saved = Session::read(settings, kMaximumRestoredTabs, group);
+    if (saved.isEmpty())
         return false;
-    const int current = qBound(0, settings.value(QStringLiteral("currentTab")).toInt(),
-                               int(urls.size()) - 1);
     // Each tab's back and forward history, with what Chromium keeps for each page
     // (where it was scrolled to, what was typed into forms); the address alone if not.
     const int offset = m_tabBar->count();
-    const QStringList histories = settings.value(QStringLiteral("histories")).toStringList();
-    for (int index = 0; index < urls.size(); ++index) {
+    for (int index = 0; index < saved.urls.size(); ++index) {
         WebView *view = addTab(false);
-        const QByteArray history = QByteArray::fromBase64(histories.value(index).toLatin1());
+        const QByteArray &history = saved.histories.at(index);
         if (!history.isEmpty()) {
             QDataStream stream(history);
             stream >> *view->history();
             if (stream.status() == QDataStream::Ok && view->history()->count() > 0)
                 continue;
         }
-        loadUrl(view, QUrl(urls.at(index)));
+        loadUrl(view, QUrl(saved.urls.at(index)));
     }
 
-    const QJsonObject saved =
-        QJsonDocument::fromJson(settings.value(QStringLiteral("groups")).toString().toUtf8())
-            .object();
-    const QJsonArray groupList = saved.value(QStringLiteral("groups")).toArray();
-    const QJsonArray tabGroups = saved.value(QStringLiteral("tabs")).toArray();
     QHash<int, int> ids; // place in the saved list -> new group
-    for (int index = 0; index < tabGroups.size() && offset + index < m_tabBar->count(); ++index) {
-        const int place = tabGroups.at(index).toInt(-1);
-        if (place < 0 || place >= groupList.size())
+    for (int index = 0; index < saved.tabGroups.size() && offset + index < m_tabBar->count(); ++index) {
+        const int place = saved.tabGroups.at(index);
+        if (place < 0)
             continue;
-        if (!ids.contains(place)) {
-            const QJsonObject group = groupList.at(place).toObject();
-            ids.insert(place, m_groups->create(group.value(QStringLiteral("title")).toString(),
-                                               group.value(QStringLiteral("color")).toInt()));
-        }
+        if (!ids.contains(place))
+            ids.insert(place, m_groups->create(saved.groups.at(place).title, saved.groups.at(place).color));
         m_groups->setGroupOf(viewAt(offset + index), ids.value(place));
     }
-    for (auto it = ids.cbegin(); it != ids.cend(); ++it) {
-        m_groups->setCollapsed(it.value(),
-                               groupList.at(it.key()).toObject().value(QStringLiteral("collapsed")).toBool());
-    }
+    for (auto it = ids.cbegin(); it != ids.cend(); ++it)
+        m_groups->setCollapsed(it.value(), saved.groups.at(it.key()).collapsed);
     m_groups->arrange(m_tabBar);
     refreshGroups();
     // Tabs already open (the start tab of a window that offered to restore) come first.
-    m_tabBar->setCurrentIndex(m_tabBar->count() - int(urls.size()) + current);
+    m_tabBar->setCurrentIndex(m_tabBar->count() - int(saved.urls.size()) + saved.currentTab);
     return true;
 }
 
@@ -1822,48 +1803,35 @@ void BrowserWindow::saveSession() const
     if (m_isPrivate)
         return;
 
-    QSettings settings;
-
-    QStringList urls;
-    urls.reserve(m_tabBar->count());
-    QStringList histories;
+    Session::Saved session;
     // Each saved tab's group, as a place in the list of groups; -1 for none.
     const QList<TabGroup> groups = m_groups->groups();
-    QJsonArray tabGroups;
     for (int index = 0; index < m_tabBar->count(); ++index) {
         const WebView *view = viewAt(index);
         if (view && view->url().isValid() && !view->url().isEmpty()) {
-            urls.append(view->url().toString());
+            session.urls.append(view->url().toString());
             // Internal pages are drawn by the browser, so only their address is kept.
             QByteArray history;
             if (isWebScheme(view->url()) || view->url().isLocalFile()) {
                 QDataStream stream(&history, QIODevice::WriteOnly);
                 stream << *view->history();
             }
-            histories.append(QString::fromLatin1(history.toBase64()));
+            session.histories.append(history);
             const int group = m_groups->groupOf(view);
             int place = -1;
             for (int i = 0; i < groups.size(); ++i) {
                 if (groups.at(i).id == group)
                     place = i;
             }
-            tabGroups.append(place);
+            session.tabGroups.append(place);
         }
     }
-    QJsonArray groupList;
-    for (const TabGroup &group : groups) {
-        groupList.append(QJsonObject{{QStringLiteral("title"), group.title},
-                                     {QStringLiteral("color"), group.color},
-                                     {QStringLiteral("collapsed"), group.collapsed}});
-    }
+    for (const TabGroup &group : groups)
+        session.groups.append({group.title, group.color, group.collapsed});
+    session.currentTab = m_tabBar->currentIndex();
 
-    settings.setValue(QStringLiteral("session/urls"), urls);
-    settings.setValue(QStringLiteral("session/histories"), histories);
-    settings.setValue(QStringLiteral("session/groups"),
-                      QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("groups"), groupList},
-                                                                  {QStringLiteral("tabs"), tabGroups}})
-                                            .toJson(QJsonDocument::Compact)));
-    settings.setValue(QStringLiteral("session/currentTab"), m_tabBar->currentIndex());
+    QSettings settings;
+    Session::write(settings, session);
     settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
 }
 

@@ -1,6 +1,7 @@
 #include "logins.h"
 
 #include "importer.h"
+#include "secretstore.h"
 
 #include <QApplication>
 #include <QDir>
@@ -73,14 +74,21 @@ QString LoginStore::originOf(const QUrl &url)
         .toString();
 }
 
-QString LoginStore::storageDescription()
+QString LoginStore::storageDescription() const
 {
 #ifdef Q_OS_WIN
     return tr("Saved logins are encrypted with your Windows account: other accounts on this "
               "computer cannot read them.");
 #else
-    return tr("Saved logins are kept in a file that only your user account can read. They are "
-              "not encrypted, so anyone who can sign in as you can see them.");
+    // In the keyring once a write there worked; the file is then gone.
+    if (m_inKeyring && !m_readOnly && !QFile::exists(m_path))
+        return tr("Saved logins are kept in %1, encrypted and unlocked with your login.")
+            .arg(SecretStore::name());
+    if (m_readOnly)
+        return tr("Your keyring stayed locked, so saved logins can't be read. Logins saved now "
+                  "last until SpacePenguin closes.");
+    return tr("Saved logins are kept in a file that only your user account can read. No keyring "
+              "could be used, so they are not encrypted: anyone who can sign in as you can see them.");
 #endif
 }
 
@@ -193,16 +201,45 @@ QStringList LoginStore::neverSaved() const
     return sites;
 }
 
+QString LoginStore::keyringKey() const
+{
+    // One entry per profile: the file it would otherwise be kept in names it.
+    return QStringLiteral("logins:") + m_path;
+}
+
 void LoginStore::load()
 {
     if (m_path.isEmpty())
         return;
-    QFile file(m_path);
-    if (!file.open(QIODevice::ReadOnly))
-        return;
-    QByteArray data = file.readAll();
+    QByteArray data;
+    bool migrate = false;
+#ifndef Q_OS_WIN
+    // The keyring when there is one. A file from before (or from when there was no
+    // keyring) moves into it, and the plain copy is deleted once it is safely there.
+    switch (SecretStore::read(keyringKey(), &data)) {
+    case SecretStore::Result::Found:
+        m_inKeyring = true;
+        break;
+    case SecretStore::Result::NotFound:
+        m_inKeyring = true;
+        migrate = QFile::exists(m_path);
+        break;
+    case SecretStore::Result::Unavailable:
+        // A keyring that is there but stayed locked must not be overwritten with
+        // nothing: keep this session's changes in memory only.
+        m_readOnly = SecretStore::isAvailable();
+        break;
+    }
+    if (!m_inKeyring || migrate) {
+#endif
+        QFile file(m_path);
+        if (!file.open(QIODevice::ReadOnly))
+            return;
+        data = file.readAll();
 #ifdef Q_OS_WIN
-    data = protect(data, false);
+        data = protect(data, false);
+#else
+    }
 #endif
     const QJsonObject root = QJsonDocument::fromJson(data).object();
     for (const QJsonValue &value : root.value(QStringLiteral("logins")).toArray()) {
@@ -217,11 +254,13 @@ void LoginStore::load()
     }
     for (const QJsonValue &value : root.value(QStringLiteral("never")).toArray())
         m_never.insert(value.toString());
+    if (migrate)
+        store();
 }
 
 void LoginStore::store() const
 {
-    if (m_path.isEmpty())
+    if (m_path.isEmpty() || m_readOnly)
         return;
     QJsonArray logins;
     for (const Login &login : m_logins) {
@@ -243,6 +282,14 @@ void LoginStore::store() const
     data = protect(data, true);
     if (data.isEmpty())
         return;
+#else
+    if (m_inKeyring) {
+        if (SecretStore::write(keyringKey(), data, tr("SpacePenguin saved logins"))) {
+            QFile::remove(m_path);
+            return;
+        }
+        // The keyring refused: keep the logins in the file rather than lose them.
+    }
 #endif
     QDir().mkpath(QFileInfo(m_path).absolutePath());
     QSaveFile file(m_path);

@@ -16,6 +16,7 @@ class LoginStore;
  *   GET  sp://logins/api/list     the logins, passwords included
  *   POST sp://logins/api/save     {site, username, password, oldOrigin?, oldUsername?}
  *   POST sp://logins/api/remove   {origin, username}
+ *   GET  sp://logins/api/info     {storage}: where the logins are kept
  *   GET  sp://logins/api/never    sites where saving was turned off
  *   POST sp://logins/api/allow    {origin}: offer to save there again
  *

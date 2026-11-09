@@ -8,7 +8,7 @@ name: build
 #     package (deb, rpm, Arch pkg) installed with the distribution's own tools
 #   - Nix: the flake's package, tests and dev shell on Linux and macOS
 #   - the Flatpak
-# A tag such as v0.1.0 also publishes the packages as a GitHub release, as does a
+# A tag such as v1.0.0 (or v1.0.0-rc.1, as a pre-release) also publishes the packages as a GitHub release, as does a
 # manual run given a tag and a name (it creates the tag on the commit it built).
 
 on:
@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release this build under a new tag, such as v0.2.0 (empty: no release)'
+        description: 'Release this build under a new tag, such as v1.0.0 or v1.0.0-rc.1 (empty: no release)'
         required: false
         default: ''
       name:
@@ -67,8 +67,8 @@ jobs:
           - name: Windows 11 (Server 2025, 24H2 core)
             os: windows-2025
             release: true
-          - name: macOS 14 Sonoma
-            os: macos-14
+          - name: macOS 15 Sequoia
+            os: macos-15
           - name: macOS 26 Tahoe
             os: macos-26
             release: true
@@ -413,6 +413,13 @@ jobs:
               while read -r id; do gh api -X DELETE "repos/${GH_REPO}/releases/${id}"; done
             gh api -X DELETE "repos/${GH_REPO}/git/refs/tags/${INPUT_TAG}" 2>/dev/null || true
           fi
+          # v1.0.0-rc.1, -beta.2, -alpha: a pre-release, which neither the update
+          # check nor install.sh offers ("latest" skips them).
+          tag="${INPUT_TAG:-${GITHUB_REF_NAME}}"
+          case "${tag}" in
+            *-rc*|*-beta*|*-alpha*) echo "prerelease=true" >> "${GITHUB_OUTPUT}" ;;
+            *) echo "prerelease=false" >> "${GITHUB_OUTPUT}" ;;
+          esac
           if [ -n "${INPUT_TAG}" ]; then
             echo "tag=${INPUT_TAG}" >> "${GITHUB_OUTPUT}"
             echo "name=${INPUT_NAME:-${INPUT_TAG}}" >> "${GITHUB_OUTPUT}"
@@ -431,6 +438,7 @@ jobs:
           tag_name: ${{ steps.name.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: ${{ steps.name.outputs.name }}
+          prerelease: ${{ steps.name.outputs.prerelease == 'true' }}
           files: packages/*
           generate_release_notes: true
 
@@ -441,12 +449,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.name.outputs.tag }}
+          PRERELEASE: ${{ steps.name.outputs.prerelease }}
         run: |
           id=$(gh api "repos/${GH_REPO}/releases?per_page=100" \
                  --jq ".[] | select(.tag_name == \"${TAG}\") | .id" | head -n 1)
           [ -n "${id}" ] || { echo "no release for ${TAG}" >&2; exit 1; }
           gh api -X PATCH "repos/${GH_REPO}/releases/${id}" -F draft=false \
-            -f tag_name="${TAG}" -f target_commitish="${GITHUB_SHA}" -f make_latest=true \
+            -f tag_name="${TAG}" -f target_commitish="${GITHUB_SHA}" \
+            -F prerelease="${PRERELEASE}" -f make_latest="$([ "${PRERELEASE}" = true ] && echo false || echo true)" \
             --jq '"\(.html_url) draft=\(.draft)"'
 
   # The newest build of main as the "nightly" pre-release, which install.sh falls
