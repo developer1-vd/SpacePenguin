@@ -464,7 +464,7 @@ Tested in CI on every push: Ubuntu 22.04 (AppImage), Ubuntu 24.04 and **Ubuntu
 Fedora, openSUSE Tumbleweed, Arch, Alpine, Void, Nix and Flatpak; **FreeBSD 14**
 (in a VM); **Windows 11**
 (the Windows Server 2025 runner, which shares Windows 11 24H2's core) and Windows
-10 (Server 2022); **macOS 26 Tahoe** and macOS 14 Sonoma.
+10 (Server 2022); **macOS 26 Tahoe** and macOS 15 Sequoia.
 
 What is handled per platform:
 

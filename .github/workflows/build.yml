@@ -67,8 +67,8 @@ jobs:
           - name: Windows 11 (Server 2025, 24H2 core)
             os: windows-2025
             release: true
-          - name: macOS 14 Sonoma
-            os: macos-14
+          - name: macOS 15 Sequoia
+            os: macos-15
           - name: macOS 26 Tahoe
             os: macos-26
             release: true
