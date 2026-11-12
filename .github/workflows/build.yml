@@ -141,7 +141,7 @@ jobs:
               set -e
               if command -v dnf >/dev/null; then dnf install -y -q sudo shadow-utils findutils >/dev/null
               elif command -v zypper >/dev/null; then zypper --non-interactive --quiet install sudo shadow findutils >/dev/null
-              else pacman -Sy --noconfirm --quiet sudo >/dev/null; fi
+              else pacman -Syu --noconfirm --quiet sudo >/dev/null; fi  # never a partial upgrade on Arch
               useradd -m student && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student
               sudo -iu student bash -c "bash /src/install.sh --yes /src/dist/*.AppImage"
               sudo -iu student env QT_QPA_PLATFORM=offscreen /home/student/.local/bin/spacepenguin --version | tee /dev/stderr | grep -q SpacePenguin'
