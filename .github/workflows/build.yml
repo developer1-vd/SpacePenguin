@@ -306,19 +306,30 @@ jobs:
           nix develop -c sh -c 'cmake -B build-nix -G Ninja && cmake --build build-nix && QT_QPA_PLATFORM=offscreen ctest --test-dir build-nix --output-on-failure'
 
   flatpak:
-    name: Flatpak
-    runs-on: ubuntu-24.04
+    name: Flatpak (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.8
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.11
       options: --privileged
     steps:
       - uses: actions/checkout@v4
+      # The bundle carries Flathub as its runtime's source, so installing it fetches
+      # the KDE runtime too: flatpak install --user SpacePenguin-x86_64.flatpak
       - uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
         with:
           manifest-path: packaging/flatpak/org.spacepenguin.SpacePenguin.yml
-          bundle: SpacePenguin.flatpak
-          cache-key: flatpak-builder-${{ github.sha }}
+          bundle: SpacePenguin-${{ matrix.arch }}.flatpak
+          arch: ${{ matrix.arch }}
+          cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
 
   mobile:
     name: ${{ matrix.name }}
@@ -387,7 +398,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      # SpacePenguin.flatpak-<arch> as well as the SpacePenguin-<platform> sets.
+      # SpacePenguin-<arch>.flatpak-<arch> as well as the SpacePenguin-<platform> sets.
       - uses: actions/download-artifact@v4
         with:
           path: packages

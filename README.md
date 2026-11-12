@@ -22,6 +22,7 @@ once a version is tagged.
 | Windows | *SpacePenguin-Windows-X64* | run the `-setup.exe`, or unzip the portable zip |
 | macOS | *SpacePenguin-macOS-ARM64* (works on Intel Macs too) | open the DMG and drag SpacePenguin to Applications |
 | Linux | the installer below, or *SpacePenguin-Linux-X64* (or *-ARM64*) for the AppImage; *SpacePenguin-deb-…*, *-rpm-…*, *-pkg-…* for native packages | the installer, or `chmod +x` the AppImage and run it |
+| Linux, as a Flatpak | `SpacePenguin-x86_64.flatpak` (or `-aarch64`) from [Releases](https://github.com/developer1-vd/SpacePenguin/releases) | `flatpak install --user SpacePenguin-x86_64.flatpak` (it fetches the KDE runtime from Flathub), then open it from the app menu or `flatpak run org.spacepenguin.SpacePenguin` |
 | Android | *SpacePenguin-Android* | open the `.apk` on the phone (allow installing from your browser or files app) |
 | iPhone and iPad | *SpacePenguin-iOS* | install the `-ios-unsigned.ipa` with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) and your Apple ID |
 
@@ -777,7 +778,7 @@ it is on; CI builds them all and, for a `v*` tag, attaches them to a GitHub rele
 | Package | Command | Output | Runs on |
 | ------- | ------- | ------ | ------- |
 | AppImage | `./build-appimage.sh` | `SpacePenguin-<v>-x86_64.AppImage` (or `aarch64`) | any Linux distribution with glibc at least as new as the build machine's (CI: Ubuntu 22.04 and newer, Debian 12+, Fedora 36+, RHEL 9+) |
-| Flatpak | `flatpak-builder` with `packaging/flatpak/org.spacepenguin.SpacePenguin.yml` | `SpacePenguin.flatpak` | any distribution with Flatpak |
+| Flatpak | `flatpak-builder` with `packaging/flatpak/org.spacepenguin.SpacePenguin.yml` (the commands are at its top) | `SpacePenguin-x86_64.flatpak` and `-aarch64` | any distribution with Flatpak, x86-64 and ARM64, on the KDE 6.11 runtime |
 | `.deb` / `.rpm` | `./build-linux-packages.sh` | `spacepenguin_<v>_amd64.deb`, `spacepenguin-<v>-1.x86_64.rpm` | the distribution it was built on; needs that distribution's Qt 6.8+ (Debian 13, Ubuntu 26.04 LTS, Fedora 41, openSUSE Tumbleweed, …) |
 | Nix | `nix build` | `result/` (a Nix store path) | NixOS and any Linux or macOS with Nix |
 | Arch package | `makepkg -si` in `packaging/arch` | `spacepenguin-<v>-1-x86_64.pkg.tar.zst` | Arch, Manjaro, EndeavourOS, … |

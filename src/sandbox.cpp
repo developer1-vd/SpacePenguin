@@ -16,6 +16,7 @@ namespace {
 bool s_enabled = true;
 QString s_reason;
 QString s_fix;
+bool s_flatpak = false;
 
 #ifdef Q_OS_LINUX
 /**
@@ -52,6 +53,12 @@ void Sandbox::prepare()
         && qEnvironmentVariable("QTWEBENGINE_DISABLE_SANDBOX") != QLatin1String("0")) {
         s_enabled = false;
         s_reason = QStringLiteral("it was turned off with QTWEBENGINE_DISABLE_SANDBOX");
+        // In a Flatpak, Chromium's sandbox cannot nest inside Flatpak's, which
+        // isolates the whole app instead: nothing to warn about.
+        if (QFile::exists(QStringLiteral("/.flatpak-info"))) {
+            s_flatpak = true;
+            s_reason = QStringLiteral("SpacePenguin runs in Flatpak's sandbox, which isolates the whole app");
+        }
         return;
     }
 
@@ -84,6 +91,11 @@ void Sandbox::prepare()
 bool Sandbox::isEnabled()
 {
     return s_enabled;
+}
+
+bool Sandbox::isolatedByFlatpak()
+{
+    return s_flatpak;
 }
 
 QString Sandbox::disabledReason()
