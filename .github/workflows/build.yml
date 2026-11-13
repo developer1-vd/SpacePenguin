@@ -110,8 +110,8 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends shellcheck
           shellcheck install.sh install-deps.sh build-*.sh .github/scripts/*.sh packaging/chromeos/*.sh tools/*.sh
-          desktop-file-validate packaging/linux/org.spacepenguin.SpacePenguin.desktop
-          appstreamcli validate --no-net build/org.spacepenguin.SpacePenguin.metainfo.xml
+          desktop-file-validate packaging/linux/io.github.developer1_vd.SpacePenguin.desktop
+          appstreamcli validate --no-net build/io.github.developer1_vd.SpacePenguin.metainfo.xml
 
       - name: Package AppImage
         if: runner.os == 'Linux'
@@ -326,7 +326,7 @@ jobs:
       # the KDE runtime too: flatpak install --user SpacePenguin-x86_64.flatpak
       - uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
         with:
-          manifest-path: packaging/flatpak/org.spacepenguin.SpacePenguin.yml
+          manifest-path: packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
           bundle: SpacePenguin-${{ matrix.arch }}.flatpak
           arch: ${{ matrix.arch }}
           cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}

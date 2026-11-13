@@ -1,0 +1,74 @@
+# SpacePenguin on Flathub.
+#
+# This is the manifest submitted to Flathub: it builds a tagged release from this
+# repository's Git history, never from a local folder. (For building the code in
+# your checkout, use packaging/flatpak/ instead.)
+#
+# For a new release, set tag and commit below to the new tag and the commit it
+# points at (git rev-parse v1.2.3^{commit}); Flathub's bot proposes the change on
+# its own once the tag exists, thanks to x-checker-data.
+#
+# Try it before submitting, from the repository root:
+#   flatpak install --user flathub org.kde.Sdk//6.11 org.kde.Platform//6.11 \
+#       io.qt.qtwebengine.BaseApp//6.11 org.flatpak.Builder
+#   flatpak run --command=flathub-build org.flatpak.Builder --install \
+#       packaging/flathub/io.github.developer1_vd.SpacePenguin.yml
+#   flatpak run --command=flatpak-builder-lint org.flatpak.Builder \
+#       manifest packaging/flathub/io.github.developer1_vd.SpacePenguin.yml
+#   flatpak run --command=flatpak-builder-lint org.flatpak.Builder repo repo
+#   flatpak run io.github.developer1_vd.SpacePenguin
+
+id: io.github.developer1_vd.SpacePenguin
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+# QtWebEngine, built by the Qt and Flathub people for apps on the KDE runtime.
+base: io.qt.qtwebengine.BaseApp
+base-version: '6.11'
+command: SpacePenguin
+
+finish-args:
+  # Windows on Wayland, or on X11 where there is no Wayland.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # Drawing pages with the GPU.
+  - --device=dri
+  # Sound and video.
+  - --socket=pulseaudio
+  # It is a web browser.
+  - --share=network
+  # Downloads go to the Downloads folder. Other files are opened and saved
+  # through the file chooser portal.
+  - --filesystem=xdg-download
+  # Site notifications on the desktop.
+  - --talk-name=org.freedesktop.Notifications
+  # Saved logins are kept in the desktop's keyring (Secret Service).
+  - --talk-name=org.freedesktop.secrets
+  # Chromium's sandbox cannot nest inside Flatpak's, which isolates the whole
+  # app instead; SpacePenguin then says so in about:version, without a warning.
+  - --env=QTWEBENGINE_DISABLE_SANDBOX=1
+
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
+
+modules:
+  - name: spacepenguin
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      # The tests run in this repository's CI, on every system it supports.
+      - -DSPACEPENGUIN_BUILD_TESTS=OFF
+      # Use the runtime's Qt as it is, without a qt.conf of our own.
+      - -DSPACEPENGUIN_INSTALL_QT_CONF=OFF
+      - -DSPACEPENGUIN_USE_LOCAL_QT=OFF
+      # AppArmor profiles are for distribution packages.
+      - -DSPACEPENGUIN_INSTALL_APPARMOR_PROFILE=OFF
+    sources:
+      - type: git
+        url: https://github.com/developer1-vd/SpacePenguin.git
+        tag: v1.0.0-rc.1
+        commit: 0000000000000000000000000000000000000000
+        x-checker-data:
+          type: git
+          tag-pattern: ^v([\d.]+(?:-rc\.\d+)?)$

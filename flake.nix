@@ -72,9 +72,9 @@
           config = lib.mkIf cfg.enable {
             environment.systemPackages = [ cfg.package ];
             xdg.mime.defaultApplications = lib.mkIf cfg.defaultBrowser {
-              "text/html" = "org.spacepenguin.SpacePenguin.desktop";
-              "x-scheme-handler/http" = "org.spacepenguin.SpacePenguin.desktop";
-              "x-scheme-handler/https" = "org.spacepenguin.SpacePenguin.desktop";
+              "text/html" = "io.github.developer1_vd.SpacePenguin.desktop";
+              "x-scheme-handler/http" = "io.github.developer1_vd.SpacePenguin.desktop";
+              "x-scheme-handler/https" = "io.github.developer1_vd.SpacePenguin.desktop";
             };
           };
         };

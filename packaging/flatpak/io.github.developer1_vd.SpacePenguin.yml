@@ -1,18 +1,19 @@
-# Flatpak build for every distribution with Flatpak, from the repository root:
+# Flatpak build of the code in this checkout, from the repository root. (The
+# manifest Flathub builds releases from is packaging/flathub/.)
 #
 #   flatpak install --user flathub org.kde.Platform//6.11 org.kde.Sdk//6.11 \
 #       io.qt.qtwebengine.BaseApp//6.11
 #   flatpak-builder --user --install --force-clean build-flatpak \
-#       packaging/flatpak/org.spacepenguin.SpacePenguin.yml
-#   flatpak run org.spacepenguin.SpacePenguin
+#       packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
+#   flatpak run io.github.developer1_vd.SpacePenguin
 #
 # Or make a single-file bundle to share:
-#   flatpak-builder --repo=repo --force-clean build-flatpak packaging/flatpak/org.spacepenguin.SpacePenguin.yml
+#   flatpak-builder --repo=repo --force-clean build-flatpak packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
 #   flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
-#       repo SpacePenguin.flatpak org.spacepenguin.SpacePenguin
+#       repo SpacePenguin.flatpak io.github.developer1_vd.SpacePenguin
 # which installs, fetching the runtime from Flathub, with
 #   flatpak install --user SpacePenguin.flatpak
-id: org.spacepenguin.SpacePenguin
+id: io.github.developer1_vd.SpacePenguin
 runtime: org.kde.Platform
 runtime-version: '6.11'
 sdk: org.kde.Sdk
