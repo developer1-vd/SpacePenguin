@@ -322,6 +322,12 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v4
+      # The image ships runtimes that Flatpak sometimes cannot update in place
+      # ("Invalid cross-device link": renames across the container's layers), which
+      # fails the build before it starts. Without them, the build installs the
+      # current ones fresh from Flathub.
+      - name: Start without the image's runtimes
+        run: flatpak uninstall -y --noninteractive --all || true
       # The bundle carries Flathub as its runtime's source, so installing it fetches
       # the KDE runtime too: flatpak install --user SpacePenguin-x86_64.flatpak
       - uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
