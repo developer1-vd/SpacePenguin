@@ -520,8 +520,23 @@ jobs:
         run: |
           sudo apt-get install -y -q --no-install-recommends flatpak ostree >/dev/null
           export GNUPGHOME="$(mktemp -d)"
-          printf '%s\n' "${FLATPAK_GPG_PRIVATE_KEY}" | gpg --batch --import
+          # The secret is the whole private key file, from "-----BEGIN PGP PRIVATE KEY
+          # BLOCK-----" to its END line. Say what is wrong with it, never what is in it.
+          secret="${FLATPAK_GPG_PRIVATE_KEY}"
+          if ! grep -q -- '-----BEGIN PGP PRIVATE KEY BLOCK-----' <<<"${secret}"; then
+            if grep -q -- '-----BEGIN PGP PUBLIC KEY BLOCK-----' <<<"${secret}"; then
+              echo "::error::FLATPAK_GPG_PRIVATE_KEY holds the public key; it needs the private key (FLATPAK_GPG_PRIVATE_KEY.txt)."
+            elif grep -qi 'revocation' <<<"${secret}"; then
+              echo "::error::FLATPAK_GPG_PRIVATE_KEY holds the revocation certificate; it needs the private key (FLATPAK_GPG_PRIVATE_KEY.txt)."
+            elif decoded="$(base64 -d <<<"${secret}" 2>/dev/null)" && grep -q -- '-----BEGIN PGP PRIVATE KEY BLOCK-----' <<<"${decoded}"; then
+              secret="${decoded}" # saved base64-encoded; that works too
+            else
+              echo "::error::FLATPAK_GPG_PRIVATE_KEY is not a private key: paste the whole of FLATPAK_GPG_PRIVATE_KEY.txt, BEGIN and END lines included."
+            fi
+          fi
+          printf '%s\n' "${secret}" | gpg --batch --import
           key=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')
+          [[ -n "${key}" ]] || { echo "::error::No signing key could be read from FLATPAK_GPG_PRIVATE_KEY."; exit 1; }
           bash packaging/flatpak/make-repo.sh flatpak "${key}" bundles/*.flatpak
           tar czf flatpak-repo.tar.gz flatpak
           gh release upload "${TAG}" flatpak-repo.tar.gz --clobber
