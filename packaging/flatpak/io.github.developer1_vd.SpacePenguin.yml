@@ -1,45 +1,59 @@
-# SpacePenguin
+# Flatpak build of the code in this checkout, from the repository root. (The
+# manifest Flathub builds releases from is packaging/flathub/.)
+#
+#   flatpak install --user flathub org.kde.Platform//6.11 org.kde.Sdk//6.11 \
+#       io.qt.qtwebengine.BaseApp//6.11
+#   flatpak-builder --user --install --force-clean build-flatpak \
+#       packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
+#   flatpak run io.github.developer1_vd.SpacePenguin
+#
+# Or make a single-file bundle to share:
+#   flatpak-builder --repo=repo --force-clean build-flatpak packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
+#   flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+#       repo SpacePenguin.flatpak io.github.developer1_vd.SpacePenguin
+# which installs, fetching the runtime from Flathub, with
+#   flatpak install --user SpacePenguin.flatpak
 id: io.github.developer1_vd.SpacePenguin
 runtime: org.kde.Platform
 runtime-version: '6.11'
 sdk: org.kde.Sdk
-# Of course it oulls in kde deps idk wat to say here um we need... qt deps
 base: io.qt.qtwebengine.BaseApp
 base-version: '6.11'
 command: SpacePenguin
-
 finish-args:
-  # MY GOD THIS IS COMPLEX
-  - --socket=wayland
-  - --socket=fallback-x11
   - --share=ipc
-  - --device=dri
-  - --socket=pulseaudio
   - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=dri
+  # Downloads land in the user's Downloads folder, like any browser.
   - --filesystem=xdg-download
   - --talk-name=org.freedesktop.Notifications
+  # Saved logins live in the desktop's keyring (src/secretstore.cpp).
   - --talk-name=org.freedesktop.secrets
+  # Chromium's own sandbox cannot nest inside Flatpak's; Flatpak isolates the app.
   - --env=QTWEBENGINE_DISABLE_SANDBOX=1
-
 cleanup-commands:
   - /app/cleanup-BaseApp.sh
-  # Gudby
-
-  modules:
+modules:
   - name: spacepenguin
     buildsystem: cmake-ninja
     config-opts:
-    # i dunno you tell me
       - -DCMAKE_BUILD_TYPE=Release
       - -DSPACEPENGUIN_BUILD_TESTS=OFF
       - -DSPACEPENGUIN_INSTALL_QT_CONF=OFF
       - -DSPACEPENGUIN_USE_LOCAL_QT=OFF
       - -DSPACEPENGUIN_INSTALL_APPARMOR_PROFILE=OFF
     sources:
-      - type: git
-        url: https://github.com/developer1-vd/SpacePenguin.git
-        tag: v1.0.0-rc.1
-        commit: 0000000000000000000000000000000000000000
-        x-checker-data:
-          type: git
-          tag-pattern: ^v([\d.]+(?:-rc\.\d+)?)$
+      - type: dir
+        path: ../..
+        skip:
+          - .qt
+          - build
+          - dist
+          - build-appimage
+          - build-flatpak
+          - build-mobile
+          - .flatpak-builder
+          - .cache
