@@ -172,8 +172,15 @@ if [[ ${MAKE_DMG} -eq 1 ]]; then
     ditto "${APP}" "${STAGING}/SpacePenguin.app"
     ln -s /Applications "${STAGING}/Applications"
     rm -f "${DMG}"
-    hdiutil create -volname "SpacePenguin ${VERSION}" -srcfolder "${STAGING}" \
-        -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "${DMG}" >/dev/null
+    # hdiutil now and then fails with "Resource busy" while something (Spotlight,
+    # XProtect, an earlier image still detaching) holds the files: wait and retry.
+    for attempt in 1 2 3 4 5; do
+        hdiutil create -volname "SpacePenguin ${VERSION}" -srcfolder "${STAGING}" \
+            -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "${DMG}" >/dev/null && break
+        [[ ${attempt} -lt 5 ]] || die "hdiutil could not create ${DMG}"
+        echo "    hdiutil failed (attempt ${attempt} of 5); trying again in $((attempt * 10)) s"
+        sleep $((attempt * 10))
+    done
     [[ -n "${IDENTITY}" ]] && codesign --force --timestamp --sign "${IDENTITY}" "${DMG}"
     hdiutil verify "${DMG}" >/dev/null
     PACKAGES+=("${BASENAME}.dmg")
