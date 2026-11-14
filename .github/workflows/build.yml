@@ -320,17 +320,22 @@ jobs:
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.11
       options: --privileged
+    # The image's own Flatpak installation can be neither updated nor changed
+    # inside the container once Flathub has newer runtimes ("Invalid cross-device
+    # link": renames across the image's layers). A fresh one on the runner's disk
+    # gets the current runtimes from Flathub instead (FLATPAK_SYSTEM_DIR below;
+    # flatpak-builder installs what it needs system-wide).
     steps:
       - uses: actions/checkout@v4
-      # The image ships runtimes that Flatpak sometimes cannot update in place
-      # ("Invalid cross-device link": renames across the container's layers), which
-      # fails the build before it starts. Without them, the build installs the
-      # current ones fresh from Flathub.
-      - name: Start without the image's runtimes
-        run: flatpak uninstall -y --noninteractive --all || true
+      - name: A fresh Flatpak installation, with Flathub
+        env:
+          FLATPAK_SYSTEM_DIR: ${{ runner.temp }}/flatpak
+        run: flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
       # The bundle carries Flathub as its runtime's source, so installing it fetches
       # the KDE runtime too: flatpak install --user SpacePenguin-x86_64.flatpak
       - uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
+        env:
+          FLATPAK_SYSTEM_DIR: ${{ runner.temp }}/flatpak
         with:
           manifest-path: packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
           bundle: SpacePenguin-${{ matrix.arch }}.flatpak
