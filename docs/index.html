@@ -193,10 +193,11 @@
           Tumbleweed. They also set up the sandbox permission on Ubuntu.</li>
         <li><strong>Arch</strong> — <code>packaging/arch/PKGBUILD</code>.</li>
         <li><strong>Nix</strong> — <code>nix run github:developer1-vd/SpacePenguin</code>.</li>
-        <li><strong>Flatpak</strong> — download <code>SpacePenguin-x86_64.flatpak</code> (or
-          <code>-aarch64</code>) from the releases, then
-          <code>flatpak install --user SpacePenguin-x86_64.flatpak</code>. It fetches the KDE
-          runtime from Flathub and runs in Flatpak's sandbox.</li>
+        <li><strong>Flatpak</strong> — from SpacePenguin's own repository, which then keeps it
+          up to date:
+          <code>flatpak install --user https://developer1-vd.github.io/SpacePenguin/flatpak/spacepenguin.flatpakref</code>.
+          Or download <code>SpacePenguin-x86_64.flatpak</code> (or <code>-aarch64</code>) from
+          the releases and <code>flatpak install --user</code> it.</li>
       </ul>
     </details>
     <details class="more">

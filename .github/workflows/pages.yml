@@ -1,6 +1,8 @@
 name: pages
 
-# Publishes the project site in docs/ to GitHub Pages whenever it changes on main.
+# Publishes the project site in docs/ to GitHub Pages whenever it changes on main,
+# with the newest release's Flatpak repository under /flatpak/ (the build workflow
+# attaches it to the release as flatpak-repo.tar.gz, then starts this one).
 # One-time setup: Settings › Pages › Build and deployment › Source: GitHub Actions.
 
 on:
@@ -39,6 +41,21 @@ jobs:
             [ -e "$ref" ] || { echo "missing: $ref"; missing=1; }
           done
           exit $missing
+
+      - name: Add the Flatpak repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=$(gh api "repos/${GH_REPO}/releases?per_page=30" \
+                  --jq '[.[] | select(any(.assets[]; .name == "flatpak-repo.tar.gz"))][0].tag_name // empty')
+          if [ -z "${tag}" ]; then
+            echo "No release has a Flatpak repository yet."
+            exit 0
+          fi
+          gh release download "${tag}" --pattern flatpak-repo.tar.gz --dir "${RUNNER_TEMP}"
+          tar xzf "${RUNNER_TEMP}/flatpak-repo.tar.gz" -C docs
+          echo "Flatpak repository from ${tag}: $(du -sh docs/flatpak | cut -f1)"
 
       - uses: actions/configure-pages@v5
 

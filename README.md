@@ -36,6 +36,32 @@ one extra step:
   try to open it once, then go to *System Settings › Privacy & Security* and click
   *Open Anyway*.
 
+### Flatpak, with updates
+
+SpacePenguin has its own Flatpak repository. One command adds it, with Flathub for
+the KDE runtime it runs on, and installs SpacePenguin:
+
+```sh
+flatpak install --user https://developer1-vd.github.io/SpacePenguin/flatpak/spacepenguin.flatpakref
+```
+
+After that, `flatpak update` (or GNOME Software, or KDE Discover) brings each new
+release. To add the repository on its own and install from it:
+
+```sh
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak remote-add --user --if-not-exists spacepenguin https://developer1-vd.github.io/SpacePenguin/flatpak/spacepenguin.flatpakrepo
+flatpak install --user spacepenguin io.github.developer1_vd.SpacePenguin
+```
+
+It holds the newest release, for x86-64 and ARM64, signed with the key in
+`packaging/flatpak/spacepenguin-repo-public.asc` (fingerprint
+`698F B4A4 78A8 8F69 41E9  CEDE 069C 8962 B15C D831`); Flatpak checks every update
+against it. To remove it: `flatpak uninstall io.github.developer1_vd.SpacePenguin`,
+then `flatpak remote-delete --user spacepenguin`.
+
+### Installer script
+
 On Linux, one command installs it for you, with an app-menu entry; run it again to
 update:
 
