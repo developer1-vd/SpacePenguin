@@ -80,11 +80,19 @@ void TestUrlResolver::resolve_data()
     QTest::newRow("host with path") << QStringLiteral("example.com/a")
                                     << QStringLiteral("https://example.com/a");
     QTest::newRow("localhost") << QStringLiteral("localhost:3000")
-                               << QStringLiteral("https://localhost:3000");
-    QTest::newRow("onion is http") << QStringLiteral("duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/about")
-                                   << QStringLiteral("http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/about");
-    QTest::newRow("onion https kept") << QStringLiteral("https://example.onion")
-                                      << QStringLiteral("https://example.onion");
+                               << QStringLiteral("http://localhost:3000");
+    QTest::newRow("localhost port path") << QStringLiteral("localhost:3000/app")
+                                         << QStringLiteral("http://localhost:3000/app");
+    QTest::newRow("ip port path") << QStringLiteral("127.0.0.1:8123/b.html")
+                                  << QStringLiteral("http://127.0.0.1:8123/b.html");
+    QTest::newRow("lan ip") << QStringLiteral("192.168.1.1")
+                            << QStringLiteral("http://192.168.1.1");
+    QTest::newRow("mdns host") << QStringLiteral("printer.local/status")
+                               << QStringLiteral("http://printer.local/status");
+    QTest::newRow("host port path") << QStringLiteral("example.com:8080/page?q=1")
+                                    << QStringLiteral("https://example.com:8080/page?q=1");
+    QTest::newRow("scheme kept") << QStringLiteral("mailto:someone@example.com")
+                                 << QStringLiteral("mailto:someone@example.com");
     QTest::newRow("onion is http") << QStringLiteral("duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/about")
                                    << QStringLiteral("http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/about");
     QTest::newRow("onion https kept") << QStringLiteral("https://example.onion")

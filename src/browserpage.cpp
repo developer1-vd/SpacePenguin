@@ -88,13 +88,23 @@ bool BrowserPage::isAllowedScheme(const QString &scheme)
 
 bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame)
 {
-    // A class's blocked site stays out of other pages' frames too (embedded videos).
-    if (!isMainFrame)
+    if (!isMainFrame) {
+        // The browser's own pages (saved logins among them) stay out of websites'
+        // frames, where a site could trick people into clicking on them.
+        if (url.scheme().compare(QLatin1String("sp"), Qt::CaseInsensitive) == 0
+            && this->url().scheme().compare(QLatin1String("sp"), Qt::CaseInsensitive) != 0)
+            return false;
+        // A class's blocked site stays out of other pages' frames too (embedded videos).
         return !Classroom::instance()->blocks(url);
+    }
 
     // Student mode: "Ask to unblock" on a class's blocked page goes to the teacher.
     if (url.scheme() == QLatin1String("sp") && url.host() == QLatin1String("classroom")
         && url.path() == QLatin1String("/ask")) {
+        // Only from the blocked page itself: other pages must not send the
+        // teacher requests in the student's name.
+        if (!Classroom::instance()->blocks(this->url()))
+            return false;
         const QUrlQuery query(url);
         const QString site = query.queryItemValue(QStringLiteral("site"), QUrl::FullyDecoded);
         const QString note = query.queryItemValue(QStringLiteral("note"), QUrl::FullyDecoded).replace(QLatin1Char('+'), QLatin1Char(' '));
@@ -157,7 +167,10 @@ void BrowserPage::javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
         const QJsonObject login =
             QJsonDocument::fromJson(message.mid(LoginStore::captureToken().size()).toUtf8()).object();
         const QString password = login.value(QStringLiteral("p")).toString();
-        if (!password.isEmpty())
+        // Only for the page that sent it: had the tab already gone on to another
+        // site, the login would be kept, and later filled in, for the wrong one.
+        const QString origin = LoginStore::originOf(QUrl(login.value(QStringLiteral("o")).toString()));
+        if (!password.isEmpty() && !origin.isEmpty() && origin == LoginStore::originOf(url()))
             emit loginSubmitted(login.value(QStringLiteral("u")).toString(), password);
         return;
     }

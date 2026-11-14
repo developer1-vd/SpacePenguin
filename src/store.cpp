@@ -142,6 +142,14 @@ void Store::handle(QWebEngineUrlRequestJob *job)
     const QUrlQuery query(url);
     const QByteArray json = QByteArrayLiteral("application/json");
 
+    // Its API is for the store page alone: a website's <img src="sp://store/api/theme?…">
+    // must not change the theme, or start searches.
+    if (path.startsWith(QLatin1String("/api/"))
+        && (job->initiator().scheme() != QLatin1String("sp") || job->initiator().host() != QLatin1String("store"))) {
+        job->fail(QWebEngineUrlRequestJob::RequestDenied);
+        return;
+    }
+
     if (path == QLatin1String("/api/search")) {
         search(job, query.queryItemValue(QStringLiteral("q"), QUrl::FullyDecoded));
         return;

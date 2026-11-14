@@ -327,7 +327,7 @@ QString LoginStore::captureScript(const QString &token)
       if (/^(text|email|tel|)$/i.test(input.getAttribute('type') || '') && input.value)
         username = input.value;
     }
-    const report = JSON.stringify({ u: username, p: password.value });
+    const report = JSON.stringify({ o: location.origin, u: username, p: password.value });
     if (report === last) return;
     last = report;
     console.log(token + report);
