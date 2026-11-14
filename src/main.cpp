@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     QApplication::setWindowIcon(spacepenguin::Icons::appIcon());
     // Lets Wayland compositors and Linux docks match windows to the installed
     // launcher entry and its icon.
-    QGuiApplication::setDesktopFileName(QStringLiteral("org.spacepenguin.SpacePenguin"));
+    QGuiApplication::setDesktopFileName(QStringLiteral("io.github.developer1_vd.SpacePenguin"));
     QCoreApplication::setOrganizationName(QStringLiteral("SpacePenguin"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("spacepenguin.invalid"));
     QCoreApplication::setApplicationName(QStringLiteral("SpacePenguin"));

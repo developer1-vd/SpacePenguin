@@ -18,6 +18,8 @@ public:
     static void prepare();
 
     static bool isEnabled();
+    /** Chromium's sandbox is off because Flatpak's isolates the app instead. */
+    static bool isolatedByFlatpak();
     /** Why the sandbox is off, for people; empty when it is on. */
     static QString disabledReason();
     /** What to do about it, for people; empty when nothing can be done. */

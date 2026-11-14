@@ -1,20 +1,24 @@
-# Flatpak build for every distribution with Flatpak, from the repository root:
+# Flatpak build of the code in this checkout, from the repository root. (The
+# manifest Flathub builds releases from is packaging/flathub/.)
 #
-#   flatpak install --user flathub org.kde.Platform//6.8 org.kde.Sdk//6.8 \
-#       io.qt.qtwebengine.BaseApp//6.8
+#   flatpak install --user flathub org.kde.Platform//6.11 org.kde.Sdk//6.11 \
+#       io.qt.qtwebengine.BaseApp//6.11
 #   flatpak-builder --user --install --force-clean build-flatpak \
-#       packaging/flatpak/org.spacepenguin.SpacePenguin.yml
-#   flatpak run org.spacepenguin.SpacePenguin
+#       packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
+#   flatpak run io.github.developer1_vd.SpacePenguin
 #
 # Or make a single-file bundle to share:
-#   flatpak-builder --repo=repo --force-clean build-flatpak packaging/flatpak/org.spacepenguin.SpacePenguin.yml
-#   flatpak build-bundle repo SpacePenguin.flatpak org.spacepenguin.SpacePenguin
-id: org.spacepenguin.SpacePenguin
+#   flatpak-builder --repo=repo --force-clean build-flatpak packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
+#   flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+#       repo SpacePenguin.flatpak io.github.developer1_vd.SpacePenguin
+# which installs, fetching the runtime from Flathub, with
+#   flatpak install --user SpacePenguin.flatpak
+id: io.github.developer1_vd.SpacePenguin
 runtime: org.kde.Platform
-runtime-version: '6.8'
+runtime-version: '6.11'
 sdk: org.kde.Sdk
 base: io.qt.qtwebengine.BaseApp
-base-version: '6.8'
+base-version: '6.11'
 command: SpacePenguin
 finish-args:
   - --share=ipc
@@ -26,6 +30,8 @@ finish-args:
   # Downloads land in the user's Downloads folder, like any browser.
   - --filesystem=xdg-download
   - --talk-name=org.freedesktop.Notifications
+  # Saved logins live in the desktop's keyring (src/secretstore.cpp).
+  - --talk-name=org.freedesktop.secrets
   # Chromium's own sandbox cannot nest inside Flatpak's; Flatpak isolates the app.
   - --env=QTWEBENGINE_DISABLE_SANDBOX=1
 cleanup-commands:
@@ -48,4 +54,6 @@ modules:
           - dist
           - build-appimage
           - build-flatpak
+          - build-mobile
           - .flatpak-builder
+          - .cache

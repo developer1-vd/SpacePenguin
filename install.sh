@@ -24,7 +24,9 @@
 set -euo pipefail
 
 REPO="developer1-vd/SpacePenguin"
-APP_ID="org.spacepenguin.SpacePenguin"
+APP_ID="io.github.developer1_vd.SpacePenguin"
+# The name SpacePenguin had before Flathub: its menu entry and icons are removed.
+OLD_APP_ID="org.spacepenguin.SpacePenguin"
 DATA_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}"
 INSTALL_DIR="${HOME}/.local/opt/spacepenguin"
 BIN_DIR="${HOME}/.local/bin"
@@ -92,9 +94,9 @@ if [[ ${UNINSTALL} -eq 1 ]]; then
     fi
     if [[ -e "${INSTALL_DIR}" || -e "${BIN_DIR}/spacepenguin" || -e "${LAUNCHER}" ]]; then
         rm -rf "${INSTALL_DIR}"
-        rm -f "${BIN_DIR}/spacepenguin" "${LAUNCHER}"
+        rm -f "${BIN_DIR}/spacepenguin" "${LAUNCHER}" "${DATA_HOME}/applications/${OLD_APP_ID}.desktop"
         for size in "${ICON_SIZES[@]}"; do
-            rm -f "${ICON_THEME}/${size}x${size}/apps/${APP_ID}.png"
+            rm -f "${ICON_THEME}/${size}x${size}/apps/${APP_ID}.png" "${ICON_THEME}/${size}x${size}/apps/${OLD_APP_ID}.png"
             if [[ -e "${SYSTEM_ICON_THEME}/${size}x${size}/apps/${APP_ID}.png" ]]; then
                 if [[ "$(id -u)" -eq 0 ]]; then
                     rm -f "${SYSTEM_ICON_THEME}/${size}x${size}/apps/${APP_ID}.png"
@@ -296,6 +298,12 @@ cat > "${BIN_DIR}/spacepenguin" <<EOF
 exec "${INSTALL_DIR}/AppRun" "\$@"
 EOF
 chmod +x "${BIN_DIR}/spacepenguin"
+
+# An install from before the rename: one menu entry, not two.
+rm -f "${DATA_HOME}/applications/${OLD_APP_ID}.desktop"
+for size in "${ICON_SIZES[@]}"; do
+    rm -f "${ICON_THEME}/${size}x${size}/apps/${OLD_APP_ID}.png"
+done
 
 # The penguin in every size the app ships, where icon themes look for it.
 for size in "${ICON_SIZES[@]}"; do

@@ -110,8 +110,8 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends shellcheck
           shellcheck install.sh install-deps.sh build-*.sh .github/scripts/*.sh packaging/chromeos/*.sh tools/*.sh
-          desktop-file-validate packaging/linux/org.spacepenguin.SpacePenguin.desktop
-          appstreamcli validate --no-net build/org.spacepenguin.SpacePenguin.metainfo.xml
+          desktop-file-validate packaging/linux/io.github.developer1_vd.SpacePenguin.desktop
+          appstreamcli validate --no-net build/io.github.developer1_vd.SpacePenguin.metainfo.xml
 
       - name: Package AppImage
         if: runner.os == 'Linux'
@@ -141,7 +141,7 @@ jobs:
               set -e
               if command -v dnf >/dev/null; then dnf install -y -q sudo shadow-utils findutils >/dev/null
               elif command -v zypper >/dev/null; then zypper --non-interactive --quiet install sudo shadow findutils >/dev/null
-              else pacman -Sy --noconfirm --quiet sudo >/dev/null; fi
+              else pacman -Syu --noconfirm --quiet sudo >/dev/null; fi  # never a partial upgrade on Arch
               useradd -m student && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student
               sudo -iu student bash -c "bash /src/install.sh --yes /src/dist/*.AppImage"
               sudo -iu student env QT_QPA_PLATFORM=offscreen /home/student/.local/bin/spacepenguin --version | tee /dev/stderr | grep -q SpacePenguin'
@@ -306,19 +306,30 @@ jobs:
           nix develop -c sh -c 'cmake -B build-nix -G Ninja && cmake --build build-nix && QT_QPA_PLATFORM=offscreen ctest --test-dir build-nix --output-on-failure'
 
   flatpak:
-    name: Flatpak
-    runs-on: ubuntu-24.04
+    name: Flatpak (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.8
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.11
       options: --privileged
     steps:
       - uses: actions/checkout@v4
+      # The bundle carries Flathub as its runtime's source, so installing it fetches
+      # the KDE runtime too: flatpak install --user SpacePenguin-x86_64.flatpak
       - uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
         with:
-          manifest-path: packaging/flatpak/org.spacepenguin.SpacePenguin.yml
-          bundle: SpacePenguin.flatpak
-          cache-key: flatpak-builder-${{ github.sha }}
+          manifest-path: packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
+          bundle: SpacePenguin-${{ matrix.arch }}.flatpak
+          arch: ${{ matrix.arch }}
+          cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
 
   mobile:
     name: ${{ matrix.name }}
@@ -387,7 +398,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      # SpacePenguin.flatpak-<arch> as well as the SpacePenguin-<platform> sets.
+      # SpacePenguin-<arch>.flatpak-<arch> as well as the SpacePenguin-<platform> sets.
       - uses: actions/download-artifact@v4
         with:
           path: packages

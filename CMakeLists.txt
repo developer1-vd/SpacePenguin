@@ -323,17 +323,17 @@ if(UNIX AND NOT APPLE)
     endif()
 
     # Desktop integration: launcher entry, AppStream metadata and icons.
-    install(FILES packaging/linux/org.spacepenguin.SpacePenguin.desktop
+    install(FILES packaging/linux/io.github.developer1_vd.SpacePenguin.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
     string(TIMESTAMP SPACEPENGUIN_RELEASE_DATE "%Y-%m-%d" UTC)
-    configure_file(packaging/linux/org.spacepenguin.SpacePenguin.metainfo.xml
-        "${CMAKE_CURRENT_BINARY_DIR}/org.spacepenguin.SpacePenguin.metainfo.xml" @ONLY)
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/org.spacepenguin.SpacePenguin.metainfo.xml"
+    configure_file(packaging/linux/io.github.developer1_vd.SpacePenguin.metainfo.xml
+        "${CMAKE_CURRENT_BINARY_DIR}/io.github.developer1_vd.SpacePenguin.metainfo.xml" @ONLY)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/io.github.developer1_vd.SpacePenguin.metainfo.xml"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
     foreach(size IN ITEMS 16 32 48 64 128 256 512)
         install(FILES packaging/icons/spacepenguin-${size}.png
             DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps
-            RENAME org.spacepenguin.SpacePenguin.png)
+            RENAME io.github.developer1_vd.SpacePenguin.png)
     endforeach()
 endif()
 

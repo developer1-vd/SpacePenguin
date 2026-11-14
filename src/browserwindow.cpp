@@ -393,6 +393,12 @@ BrowserWindow::~BrowserWindow()
     ServiceRegistry &shared = registry();
     if (m_tabBar)
         m_tabBar->disconnect(this);
+    // The tabs are deleted after this body, with the window's other widgets already
+    // gone: their destroyed() must not reach the prompt bar or the session timer.
+    for (int index = 0; m_tabBar && index < m_tabBar->count(); ++index) {
+        if (WebView *view = viewAt(index))
+            view->disconnect(this);
+    }
     if (m_isPrivate) {
         if (--shared.privateWindows <= 0 && shared.privateServices.profile == m_services.profile) {
             // Close the tabs first so no page outlives its profile.
@@ -658,7 +664,7 @@ void BrowserWindow::createChrome()
     layout->addWidget(m_bookmarksBar);
 
     // Said plainly in every window: pages are running without Chromium's sandbox.
-    if (!Sandbox::isEnabled()) {
+    if (!Sandbox::isEnabled() && !Sandbox::isolatedByFlatpak()) {
         auto *banner = new QWidget;
         banner->setObjectName(QStringLiteral("sandboxBanner"));
         banner->setAttribute(Qt::WA_StyledBackground);
@@ -1729,12 +1735,16 @@ void BrowserWindow::restoreSession()
         restoreGeometry(geometry);
 
     const bool unclean = Session::markRunning(settings);
-    connect(qApp, &QCoreApplication::aboutToQuit, qApp,
-            [] {
-                QSettings settings;
-                Session::markClosed(settings);
-            },
-            Qt::UniqueConnection);
+    // Once per run. (Qt::UniqueConnection does not work with a lambda: it refuses the
+    // connection, and every start would then look like a crash.)
+    static bool closingWatched = false;
+    if (!closingWatched) {
+        closingWatched = true;
+        connect(qApp, &QCoreApplication::aboutToQuit, qApp, [] {
+            QSettings settings;
+            Session::markClosed(settings);
+        });
+    }
 
     if (Preferences::instance()->restoreSession()) {
         if (!restoreTabs())

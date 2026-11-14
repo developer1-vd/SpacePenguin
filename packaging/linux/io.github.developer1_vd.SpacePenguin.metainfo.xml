@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.developer1_vd.SpacePenguin</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>SpacePenguin</name>
+  <summary>Browse the web without ads or trackers</summary>
+  <description>
+    <p>
+      SpacePenguin is a small, fast web browser built on Qt and Chromium's engine. It blocks
+      ads and trackers, YouTube's ads too, and never phones home.
+    </p>
+    <ul>
+      <li>Ad and tracker blocking with EasyList, EasyPrivacy and other filter lists</li>
+      <li>YouTube ads removed, and sponsor segments skipped with SponsorBlock</li>
+      <li>Private windows that keep nothing on disk, and Tor windows</li>
+      <li>Saved logins kept in your desktop's keyring</li>
+      <li>Tabs on top or on the side, tab groups, reader view and session restore</li>
+      <li>User scripts, and sites installed as apps</li>
+      <li>Tools for developers, gamers, students, workers and teachers</li>
+    </ul>
+  </description>
+  <developer id="io.github.developer1_vd">
+    <name>SpacePenguin contributors</name>
+  </developer>
+  <!-- The ID before SpacePenguin came to Flathub. -->
+  <replaces>
+    <id>org.spacepenguin.SpacePenguin</id>
+  </replaces>
+  <launchable type="desktop-id">io.github.developer1_vd.SpacePenguin.desktop</launchable>
+  <provides>
+    <binary>SpacePenguin</binary>
+  </provides>
+  <url type="homepage">https://developer1-vd.github.io/SpacePenguin/</url>
+  <url type="bugtracker">https://github.com/developer1-vd/SpacePenguin/issues</url>
+  <categories>
+    <category>Network</category>
+    <category>WebBrowser</category>
+  </categories>
+  <keywords>
+    <keyword>web</keyword>
+    <keyword>browser</keyword>
+    <keyword>ad blocker</keyword>
+    <keyword>privacy</keyword>
+  </keywords>
+  <branding>
+    <color type="primary" scheme_preference="light">#a8c3ff</color>
+    <color type="primary" scheme_preference="dark">#1b2a55</color>
+  </branding>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The start page, with tabs and the address bar</caption>
+      <image>https://raw.githubusercontent.com/developer1-vd/SpacePenguin/main/docs/screenshot.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <releases>
+    <release version="@PROJECT_VERSION@" date="@SPACEPENGUIN_RELEASE_DATE@">
+      <description>
+        <p>The first release: saved logins in the keyring, crash recovery, and a Flatpak.</p>
+      </description>
+    </release>
+  </releases>
+</component>

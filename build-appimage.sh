@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${ROOT}"
 
-APP_ID="org.spacepenguin.SpacePenguin"
+APP_ID="io.github.developer1_vd.SpacePenguin"
 VERSION="$(sed -n 's/^set(SPACEPENGUIN_VERSION_NAME "\(.*\)")$/\1/p' CMakeLists.txt | head -n1)"
 ARCH="$(uname -m)"
 BUILD_DIR="${BUILD_DIR:-build-appimage}"

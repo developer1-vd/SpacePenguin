@@ -1,0 +1,45 @@
+# SpacePenguin
+id: io.github.developer1_vd.SpacePenguin
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+# Of course it oulls in kde deps idk wat to say here um we need... qt deps
+base: io.qt.qtwebengine.BaseApp
+base-version: '6.11'
+command: SpacePenguin
+
+finish-args:
+  # MY GOD THIS IS COMPLEX
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  - --socket=pulseaudio
+  - --share=network
+  - --filesystem=xdg-download
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.freedesktop.secrets
+  - --env=QTWEBENGINE_DISABLE_SANDBOX=1
+
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
+  # Gudby
+
+modules:
+  - name: spacepenguin
+    buildsystem: cmake-ninja
+    config-opts:
+    # i dunno you tell me
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSPACEPENGUIN_BUILD_TESTS=OFF
+      - -DSPACEPENGUIN_INSTALL_QT_CONF=OFF
+      - -DSPACEPENGUIN_USE_LOCAL_QT=OFF
+      - -DSPACEPENGUIN_INSTALL_APPARMOR_PROFILE=OFF
+    sources:
+      - type: git
+        url: https://github.com/developer1-vd/SpacePenguin.git
+        tag: v1.0.0-rc.1
+        commit: 0000000000000000000000000000000000000000
+        x-checker-data:
+          type: git
+          tag-pattern: ^v([\d.]+(?:-rc\.\d+)?)$

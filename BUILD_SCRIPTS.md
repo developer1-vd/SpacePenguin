@@ -155,8 +155,8 @@ the license as Arch requires.
 
 ```bash
 flatpak install --user flathub org.kde.Platform//6.8 org.kde.Sdk//6.8 io.qt.qtwebengine.BaseApp//6.8
-flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/org.spacepenguin.SpacePenguin.yml
-flatpak run org.spacepenguin.SpacePenguin
+flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml
+flatpak run io.github.developer1_vd.SpacePenguin
 ```
 
 Built on the KDE 6.8 runtime with the QtWebEngine base app. The app may use the
