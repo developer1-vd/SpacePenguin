@@ -397,6 +397,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.name.outputs.tag }}
     steps:
       # SpacePenguin-<arch>.flatpak-<arch> as well as the SpacePenguin-<platform> sets.
       - uses: actions/download-artifact@v4
@@ -469,6 +471,50 @@ jobs:
             -f tag_name="${TAG}" -f target_commitish="${GITHUB_SHA}" \
             -F prerelease="${PRERELEASE}" -f make_latest="$([ "${PRERELEASE}" = true ] && echo false || echo true)" \
             --jq '"\(.html_url) draft=\(.draft)"'
+
+  # SpacePenguin's own Flatpak repository (packaging/flatpak/make-repo.sh): this
+  # release's two bundles, signed with the FLATPAK_GPG_PRIVATE_KEY secret,
+  # attached to the release as flatpak-repo.tar.gz. The pages workflow then
+  # publishes it under https://developer1-vd.github.io/SpacePenguin/flatpak/.
+  flatpak-repo:
+    name: Flatpak repository
+    needs: [release]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # to attach the repository to the release
+      actions: write    # to start the pages workflow
+    env:
+      FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+    steps:
+      - name: Without the signing key there is no repository
+        if: env.FLATPAK_GPG_PRIVATE_KEY == ''
+        run: echo "::notice::FLATPAK_GPG_PRIVATE_KEY is not set, so this release has no Flatpak repository."
+
+      - uses: actions/checkout@v4
+        if: env.FLATPAK_GPG_PRIVATE_KEY != ''
+
+      - uses: actions/download-artifact@v4
+        if: env.FLATPAK_GPG_PRIVATE_KEY != ''
+        with:
+          path: bundles
+          pattern: SpacePenguin-*.flatpak*
+          merge-multiple: true
+
+      - name: Build, sign, attach and publish
+        if: env.FLATPAK_GPG_PRIVATE_KEY != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          sudo apt-get install -y -q --no-install-recommends flatpak ostree >/dev/null
+          export GNUPGHOME="$(mktemp -d)"
+          printf '%s\n' "${FLATPAK_GPG_PRIVATE_KEY}" | gpg --batch --import
+          key=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')
+          bash packaging/flatpak/make-repo.sh flatpak "${key}" bundles/*.flatpak
+          tar czf flatpak-repo.tar.gz flatpak
+          gh release upload "${TAG}" flatpak-repo.tar.gz --clobber
+          gh workflow run pages.yml --ref main
 
   # The newest build of main as the "nightly" pre-release, which install.sh falls
   # back to while there is no release. Only the Linux AppImages: the installer's.
