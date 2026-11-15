@@ -171,6 +171,9 @@ bool isStartPage(const QUrl &url)
 
 const QUrl kStoreUrl(QStringLiteral("sp://store/"));
 
+// Set on a tab brought back from the last session until its page has loaded.
+constexpr char kRestoredProperty[] = "spacepenguin.restored";
+
 QToolButton *chromeButton(QAction *action, QWidget *parent = nullptr)
 {
     auto *button = new QToolButton(parent);
@@ -1780,6 +1783,8 @@ bool BrowserWindow::restoreTabs(const QString &group)
     const int offset = m_tabBar->count();
     for (int index = 0; index < saved.urls.size(); ++index) {
         WebView *view = addTab(false);
+        // Bringing a tab back is not a visit: history keeps its count and time.
+        view->setProperty(kRestoredProperty, true);
         const QByteArray &history = saved.histories.at(index);
         if (!history.isEmpty()) {
             QDataStream stream(history);
@@ -1937,6 +1942,18 @@ WebView *BrowserWindow::newTab(const QUrl &url, bool background)
 void BrowserWindow::openInNewTab(const QString &text)
 {
     newTab(m_resolver.resolve(text));
+}
+
+void BrowserWindow::openPages(const QStringList &texts)
+{
+    if (texts.isEmpty())
+        return;
+    const WebView *only = m_tabBar->count() == 1 ? viewAt(0) : nullptr;
+    const bool onlyStartTab = only && (only->url().isEmpty() || isStartPage(only->url()));
+    for (const QString &text : texts)
+        openInNewTab(text);
+    if (onlyStartTab)
+        closeTab(0);
 }
 
 BrowserWindow *BrowserWindow::openWindow(bool isPrivate, const QStringList &texts)
@@ -3516,7 +3533,9 @@ void BrowserWindow::onLoadProgress(WebView *view, int progress)
 
 void BrowserWindow::onLoadFinished(WebView *view, bool ok)
 {
-    if (ok && !m_isPrivate && m_services.historyManager && isWebScheme(view->url()))
+    const bool restored = view->property(kRestoredProperty).toBool();
+    view->setProperty(kRestoredProperty, QVariant());
+    if (ok && !restored && !m_isPrivate && m_services.historyManager && isWebScheme(view->url()))
         m_services.historyManager->addVisit(view->url(), view->title());
 
     updateTabLabel(view);
