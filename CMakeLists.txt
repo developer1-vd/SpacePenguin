@@ -173,6 +173,8 @@ qt_add_executable(spacepenguin
     src/historymanager.h
     src/settingsdialog.cpp
     src/settingsdialog.h
+    src/settingsversion.cpp
+    src/settingsversion.h
     src/devicetuning.cpp
     src/devicetuning.h
     src/sandbox.cpp
@@ -491,6 +493,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_accessibility PRIVATE Qt6::Test Qt6::Widgets)
         target_include_directories(tst_accessibility PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME accessibility COMMAND tst_accessibility)
+
+        qt_add_executable(tst_settingsversion
+            tests/tst_settingsversion.cpp
+            src/settingsversion.cpp
+            src/settingsversion.h
+        )
+        target_link_libraries(tst_settingsversion PRIVATE Qt6::Test Qt6::Core)
+        target_include_directories(tst_settingsversion PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME settingsversion COMMAND tst_settingsversion)
 
         qt_add_executable(tst_singleinstance
             tests/tst_singleinstance.cpp

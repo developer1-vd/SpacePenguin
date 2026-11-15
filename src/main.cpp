@@ -5,6 +5,7 @@
 #include <QFileOpenEvent>
 #include <QLoggingCategory>
 #include <QMessageBox>
+#include <QSettings>
 #include <QTimer>
 #include <QWebEngineProfile>
 
@@ -12,6 +13,7 @@
 #include <QWebEngineUrlScheme>
 
 #include "accessibility.h"
+#include "settingsversion.h"
 #include "appwindow.h"
 #include "browserwindow.h"
 #include "classroom.h"
@@ -72,6 +74,12 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain(QStringLiteral("spacepenguin.invalid"));
     QCoreApplication::setApplicationName(QStringLiteral("SpacePenguin"));
     QCoreApplication::setApplicationVersion(QStringLiteral(SPACEPENGUIN_VERSION));
+    // Before anything reads them: bring the settings up to this build's layout.
+    {
+        QSettings settings;
+        if (spacepenguin::SettingsVersion::upgrade(settings) == spacepenguin::SettingsVersion::Outcome::Newer)
+            qWarning("These settings come from a newer SpacePenguin; some may be ignored.");
+    }
 
     QCommandLineParser parser;
     parser.setApplicationDescription(
