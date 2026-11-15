@@ -186,6 +186,12 @@ packages_apt() {
         done
     fi
     [[ ${PACKAGING} -eq 1 ]] && PKGS+=(desktop-file-utils appstream file dpkg-dev)
+    # English spelling dictionaries, which build-appimage.sh converts for the AppImage.
+    if [[ ${PACKAGING} -eq 1 ]]; then
+        for name in hunspell-en-us hunspell-en-gb; do
+            apt_installable "${name}" && PKGS+=("${name}")
+        done
+    fi
     [[ ${QT_FROM_SYSTEM} -eq 1 ]] && PKGS+=(qt6-base-dev qt6-webengine-dev qt6-tools-dev
                                            qt6-base-dev-tools libgl-dev qt6-wayland)
     return 0

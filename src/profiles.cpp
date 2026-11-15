@@ -14,6 +14,7 @@
 #include "downloadmanager.h"
 #include "historymanager.h"
 #include "preferences.h"
+#include "spellcheck.h"
 #include "startpageschemehandler.h"
 #include "store.h"
 #include "userextensions.h"
@@ -139,6 +140,17 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
         capture.setRunsOnSubFrames(false);
         services.profile->scripts()->insert(capture);
     }
+
+    // Spell checking in text boxes, in the person's languages; it follows the setting.
+    const auto applySpellCheck = [profile = services.profile] {
+        const QStringList languages = SpellCheck::languagesForThisSystem();
+        const bool on = Preferences::instance()->spellCheck() && !languages.isEmpty();
+        if (on)
+            profile->setSpellCheckLanguages(languages);
+        profile->setSpellCheckEnabled(on);
+    };
+    applySpellCheck();
+    QObject::connect(Preferences::instance(), &Preferences::changed, services.profile, applySpellCheck);
 
     services.adBlocker = new AdBlocker(parent);
     services.profile->setUrlRequestInterceptor(services.adBlocker);

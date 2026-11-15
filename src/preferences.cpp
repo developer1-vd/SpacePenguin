@@ -27,6 +27,7 @@ const QString kStripTracking = QStringLiteral("adblock/stripTracking");
 const QString kCheckUpdates = QStringLiteral("updates/check");
 const QString kSaveLogins = QStringLiteral("privacy/offerToSaveLogins");
 const QString kHttpsOnly = QStringLiteral("privacy/httpsOnly");
+const QString kSpellCheck = QStringLiteral("general/spellCheck");
 const QString kRoles = QStringLiteral("roles/roles");
 const QString kBypassCache = QStringLiteral("roles/developer/bypassCache");
 const QString kUserAgent = QStringLiteral("roles/developer/userAgent");
@@ -205,6 +206,16 @@ bool Preferences::showMenuBar() const
 void Preferences::setShowMenuBar(bool show)
 {
     write(kMenuBar, show);
+}
+
+bool Preferences::spellCheck() const
+{
+    return QSettings().value(kSpellCheck, true).toBool();
+}
+
+void Preferences::setSpellCheck(bool on)
+{
+    write(kSpellCheck, on);
 }
 
 bool Preferences::httpsOnly() const

@@ -177,6 +177,8 @@ qt_add_executable(spacepenguin
     src/settingsdialog.h
     src/settingsversion.cpp
     src/settingsversion.h
+    src/spellcheck.cpp
+    src/spellcheck.h
     src/devicetuning.cpp
     src/devicetuning.h
     src/sandbox.cpp
@@ -506,6 +508,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_httpsonly PRIVATE Qt6::Test Qt6::Core)
         target_include_directories(tst_httpsonly PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME httpsonly COMMAND tst_httpsonly)
+
+        qt_add_executable(tst_spellcheck
+            tests/tst_spellcheck.cpp
+            src/spellcheck.cpp
+            src/spellcheck.h
+        )
+        target_link_libraries(tst_spellcheck PRIVATE Qt6::Test Qt6::Core)
+        target_include_directories(tst_spellcheck PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME spellcheck COMMAND tst_spellcheck)
 
         qt_add_executable(tst_settingsversion
             tests/tst_settingsversion.cpp

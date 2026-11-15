@@ -1,5 +1,7 @@
 #include "settingsdialog.h"
 
+#include "spellcheck.h"
+
 #include "adblocker.h"
 #include "classroom.h"
 #include "filterlists.h"
@@ -325,6 +327,25 @@ QWidget *SettingsDialog::createGeneralTab()
 
     layout->addWidget(mutedLabel(tr("Anything typed in the address bar that is not an "
                                     "address is sent here. Switch quickly from the menu (Search With).")));
+    layout->addWidget(sectionTitle(tr("Spelling")));
+    auto *spelling = new QCheckBox(tr("Check spelling as you type"));
+    spelling->setChecked(preferences->spellCheck());
+    connect(spelling, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setSpellCheck(checked); });
+    layout->addWidget(spelling);
+    const QStringList spellLanguages = SpellCheck::languagesForThisSystem();
+    if (spellLanguages.isEmpty()) {
+        spelling->setEnabled(false);
+        layout->addWidget(mutedLabel(
+            SpellCheck::availableLanguages().isEmpty()
+                ? tr("No spelling dictionaries are installed. Distributions offer them as packages "
+                     "of QtWebEngine dictionaries.")
+                : tr("None of the installed spelling dictionaries is for your language.")));
+    } else {
+        layout->addWidget(mutedLabel(tr("Misspelt words in text boxes are underlined; right-click "
+                                        "one for suggestions. Checked in: %1.")
+                                         .arg(SpellCheck::describe(spellLanguages))));
+    }
     layout->addStretch(1);
     return page;
 }

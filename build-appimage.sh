@@ -120,6 +120,31 @@ step "Installing into ${APPDIR}"
 rm -rf "${APPDIR}"
 DESTDIR="${ROOT}/${APPDIR}" cmake --install "${BUILD_DIR}"
 
+# Spelling dictionaries: Qt from aqtinstall has none, so convert this system's
+# Hunspell ones to Chromium's format (SpellCheck looks in usr/share). Without
+# them the AppImage still works; spell checking is just off.
+step "Spelling dictionaries"
+CONVERT_DICT=""
+for candidate in "${QT_PREFIX}/libexec/qwebengine_convert_dict" "${QT_PREFIX}/bin/qwebengine_convert_dict"; do
+    [[ -x "${candidate}" ]] && { CONVERT_DICT="${candidate}"; break; }
+done
+dictionaries=0
+if [[ -n "${CONVERT_DICT}" ]]; then
+    mkdir -p "${APPDIR}/usr/share/qtwebengine_dictionaries"
+    for language in en_US en_GB; do
+        source_dic="/usr/share/hunspell/${language}.dic"
+        [[ -f "${source_dic}" && -f "${source_dic%.dic}.aff" ]] || continue
+        if "${CONVERT_DICT}" "${source_dic}" "${APPDIR}/usr/share/qtwebengine_dictionaries/${language}.bdic" >/dev/null; then
+            dictionaries=$((dictionaries + 1))
+        fi
+    done
+fi
+if [[ ${dictionaries} -eq 0 ]]; then
+    echo "  none (install hunspell-en-us; Qt's qwebengine_convert_dict: ${CONVERT_DICT:-not found})"
+else
+    echo "  ${dictionaries} added"
+fi
+
 # ---- Tools ---------------------------------------------------------------------------
 
 # Fixed releases, checked against their SHA-256 before every use: these tools run

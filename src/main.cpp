@@ -14,6 +14,7 @@
 
 #include "accessibility.h"
 #include "settingsversion.h"
+#include "spellcheck.h"
 #include "appwindow.h"
 #include "browserwindow.h"
 #include "classroom.h"
@@ -139,6 +140,9 @@ int main(int argc, char *argv[])
     // A Tor window is a process of its own, whatever else is open (see tor.h).
     if (!torMode && instance.sendToRunningInstance(handOff))
         return 0;
+    // Spelling dictionaries, wherever this system keeps them, before the first page.
+    spacepenguin::SpellCheck::prepare(dataDirectory
+                                      + (torMode ? QStringLiteral("/dictionaries-tor") : QStringLiteral("/dictionaries")));
     if (torMode) {
         QString error;
         if (!spacepenguin::Tor::start(&error)) {
