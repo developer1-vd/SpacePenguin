@@ -7,6 +7,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-11-15
+
+The second release candidate for 1.0.
+
 ### Added
 - **Printing**: Print… (Ctrl+P) and Save Page as PDF…, in the menu and the File menu.
 - **HTTPS-only mode** (Settings › Privacy & Security, off by default): plain http
@@ -60,6 +64,7 @@ their store, sites installed as apps, saved logins (about:logins), crash
 recovery, roles for developers, gamers, students, workers and teachers, and
 packages for Windows, macOS, Linux, the BSDs, Chromebooks, Android and iPhone.
 
-[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.1...HEAD
+[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.2...HEAD
+[1.0.0-rc.2]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/developer1-vd/SpacePenguin/compare/v0.1-A...v1.0.0-rc.1
 [0.1-A]: https://github.com/developer1-vd/SpacePenguin/releases/tag/v0.1-A
