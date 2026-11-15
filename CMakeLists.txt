@@ -185,6 +185,8 @@ qt_add_executable(spacepenguin
     src/extensionsdialog.h
     src/systemscheme.cpp
     src/systemscheme.h
+    src/accessibility.cpp
+    src/accessibility.h
     src/appwindow.cpp
     src/appwindow.h
     src/roles.cpp
@@ -480,6 +482,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_shortcuts PRIVATE Qt6::Test Qt6::Gui)
         target_include_directories(tst_shortcuts PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME shortcuts COMMAND tst_shortcuts)
+
+        qt_add_executable(tst_accessibility
+            tests/tst_accessibility.cpp
+            src/accessibility.cpp
+            src/accessibility.h
+        )
+        target_link_libraries(tst_accessibility PRIVATE Qt6::Test Qt6::Widgets)
+        target_include_directories(tst_accessibility PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME accessibility COMMAND tst_accessibility)
 
         qt_add_executable(tst_singleinstance
             tests/tst_singleinstance.cpp

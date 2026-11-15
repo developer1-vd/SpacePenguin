@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <QWebEngineUrlScheme>
 
+#include "accessibility.h"
 #include "appwindow.h"
 #include "browserwindow.h"
 #include "classroom.h"
@@ -62,6 +63,8 @@ int main(int argc, char *argv[])
     // Fusion draws the same everywhere, which the chrome stylesheet relies on.
     QApplication::setStyle(spacepenguin::Theme::createStyle());
     QApplication::setWindowIcon(spacepenguin::Icons::appIcon());
+    // Every icon-only button gets a name screen readers can say.
+    spacepenguin::AccessibleNames::install();
     // Lets Wayland compositors and Linux docks match windows to the installed
     // launcher entry and its icon.
     QGuiApplication::setDesktopFileName(QStringLiteral("io.github.developer1_vd.SpacePenguin"));

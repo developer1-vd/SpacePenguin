@@ -74,6 +74,7 @@ QLabel *mutedLabel(const QString &text)
 QWidget *pageShell(const QString &title, const QString &subtitle, QVBoxLayout **contentLayout)
 {
     auto *scroll = new QScrollArea;
+    scroll->setAccessibleName(title);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
 
@@ -145,6 +146,7 @@ void SettingsDialog::setupTabs()
 {
     m_nav = new QListWidget;
     m_nav->setObjectName(QStringLiteral("settingsNav"));
+    m_nav->setAccessibleName(tr("Settings sections"));
     m_nav->setFixedWidth(200);
     m_nav->setIconSize(QSize(18, 18));
     m_nav->setFrameShape(QFrame::NoFrame);

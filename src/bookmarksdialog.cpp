@@ -172,6 +172,7 @@ BookmarksDialog::BookmarksDialog(BookmarkManager *bookmarks, QWidget *parent)
     layout->addWidget(m_search);
 
     m_tree = new QTreeWidget;
+    m_tree->setAccessibleName(tr("Bookmarks"));
     m_tree->setColumnCount(2);
     m_tree->setHeaderLabels({tr("Name"), tr("Address")});
     m_tree->setRootIsDecorated(true);
