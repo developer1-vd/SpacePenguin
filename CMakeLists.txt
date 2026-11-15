@@ -131,6 +131,8 @@ qt_add_executable(spacepenguin
     src/tabgroups.h
     src/browserpage.cpp
     src/browserpage.h
+    src/httpsonly.cpp
+    src/httpsonly.h
     src/webview.cpp
     src/webview.h
     src/startuptrace.cpp
@@ -493,6 +495,17 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_accessibility PRIVATE Qt6::Test Qt6::Widgets)
         target_include_directories(tst_accessibility PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME accessibility COMMAND tst_accessibility)
+
+        qt_add_executable(tst_httpsonly
+            tests/tst_httpsonly.cpp
+            src/httpsonly.cpp
+            src/httpsonly.h
+            src/urlresolver.cpp
+            src/urlresolver.h
+        )
+        target_link_libraries(tst_httpsonly PRIVATE Qt6::Test Qt6::Core)
+        target_include_directories(tst_httpsonly PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME httpsonly COMMAND tst_httpsonly)
 
         qt_add_executable(tst_settingsversion
             tests/tst_settingsversion.cpp

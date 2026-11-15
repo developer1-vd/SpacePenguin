@@ -12,6 +12,9 @@ public:
                           QString homeUrl = defaultHomeUrl());
 
     static bool looksLikeUrl(const QString &input);
+    /** On this computer or the local network: localhost, an IP address, .local,
+     *  .lan and the like, or a single name such as "nas". */
+    static bool isLocalHost(const QString &host);
 
     QUrl resolve(const QString &input) const;
     QUrl searchUrl(const QString &query) const;

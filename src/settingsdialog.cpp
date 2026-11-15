@@ -441,6 +441,16 @@ QWidget *SettingsDialog::createPrivacyTab()
     QWidget *page = pageShell(tr("Privacy & Security"),
                               tr("Content blocking, data use and your browsing data."), &layout);
 
+    layout->addWidget(sectionTitle(tr("Secure connections")));
+    auto *httpsOnly = new QCheckBox(tr("Always use secure connections (HTTPS-only mode)"));
+    httpsOnly->setChecked(Preferences::instance()->httpsOnly());
+    connect(httpsOnly, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setHttpsOnly(checked); });
+    layout->addWidget(httpsOnly);
+    layout->addWidget(mutedLabel(tr("Sites are loaded over HTTPS, and you are warned before one that "
+                                    "has no secure version loads unencrypted. Addresses on your own "
+                                    "computer or network are left as they are.")));
+
     layout->addWidget(sectionTitle(tr("Logins and permissions")));
     auto *offerLogins = new QCheckBox(tr("Offer to save logins"));
     offerLogins->setChecked(Preferences::instance()->offerToSaveLogins());

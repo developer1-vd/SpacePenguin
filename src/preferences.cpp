@@ -26,6 +26,7 @@ const QString kSponsors = QStringLiteral("adblock/skipSponsors");
 const QString kStripTracking = QStringLiteral("adblock/stripTracking");
 const QString kCheckUpdates = QStringLiteral("updates/check");
 const QString kSaveLogins = QStringLiteral("privacy/offerToSaveLogins");
+const QString kHttpsOnly = QStringLiteral("privacy/httpsOnly");
 const QString kRoles = QStringLiteral("roles/roles");
 const QString kBypassCache = QStringLiteral("roles/developer/bypassCache");
 const QString kUserAgent = QStringLiteral("roles/developer/userAgent");
@@ -204,6 +205,16 @@ bool Preferences::showMenuBar() const
 void Preferences::setShowMenuBar(bool show)
 {
     write(kMenuBar, show);
+}
+
+bool Preferences::httpsOnly() const
+{
+    return QSettings().value(kHttpsOnly, false).toBool();
+}
+
+void Preferences::setHttpsOnly(bool on)
+{
+    write(kHttpsOnly, on);
 }
 
 bool Preferences::offerToSaveLogins() const
