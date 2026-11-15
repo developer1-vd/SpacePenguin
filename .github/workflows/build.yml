@@ -411,6 +411,14 @@ jobs:
     outputs:
       tag: ${{ steps.name.outputs.tag }}
     steps:
+      # The changelog, for the release notes.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            CHANGELOG.md
+            tools/release-notes.sh
+          sparse-checkout-cone-mode: false
+
       # SpacePenguin-<arch>.flatpak-<arch> as well as the SpacePenguin-<platform> sets.
       - uses: actions/download-artifact@v4
         with:
@@ -457,6 +465,14 @@ jobs:
           fi
           echo "name=${name}" >> "${GITHUB_OUTPUT}"
 
+      # What is new, from CHANGELOG.md; GitHub's list of merged pull requests follows it.
+      - name: Release notes
+        env:
+          TAG: ${{ steps.name.outputs.tag }}
+        run: |
+          tools/release-notes.sh "${TAG}" CHANGELOG.md > release-notes.md
+          cat release-notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.name.outputs.tag }}
@@ -464,6 +480,7 @@ jobs:
           name: ${{ steps.name.outputs.name }}
           prerelease: ${{ steps.name.outputs.prerelease == 'true' }}
           files: packages/*
+          body_path: release-notes.md
           generate_release_notes: true
 
       # A tag deleted moments before (a replaced release) can leave the new
