@@ -1,5 +1,7 @@
 #include "urlresolver.h"
 
+#include <algorithm>
+
 #include <QDir>
 #include <QFileInfo>
 
@@ -45,14 +47,51 @@ bool isAllDigits(const QString &text)
     return true;
 }
 
+// "example.com:8080/page?q" -> "example.com:8080": the part before any path,
+// query or fragment.
+QString authorityOf(const QString &text)
+{
+    qsizetype end = text.size();
+    for (const QChar stop : {QLatin1Char('/'), QLatin1Char('?'), QLatin1Char('#')}) {
+        const qsizetype at = text.indexOf(stop);
+        if (at >= 0 && at < end)
+            end = at;
+    }
+    return text.left(end);
+}
+
 bool looksLikeHostAndPort(const QString &text)
 {
-    const int colon = text.lastIndexOf(QLatin1Char(':'));
+    // Only the host and port count: "localhost:3000/app" is a host and port too.
+    const QString authority = authorityOf(text);
+    const int colon = authority.lastIndexOf(QLatin1Char(':'));
     if (colon <= 0)
         return false;
-    if (!isAllDigits(text.mid(colon + 1)))
+    if (!isAllDigits(authority.mid(colon + 1)))
         return false;
-    return isHostChars(text.left(colon));
+    return isHostChars(authority.left(colon));
+}
+
+// Addresses on this computer or the local network, which nearly always serve plain
+// http (a development server, a router, a NAS) and have no certificate for https.
+bool isLocalHost(const QString &host)
+{
+    const QString name = host.toLower();
+    if (name == QLatin1String("localhost") || name.endsWith(QLatin1String(".localhost")))
+        return true;
+    if (name.startsWith(QLatin1Char('[')))
+        return true; // an IPv6 address
+    const QStringList parts = name.split(QLatin1Char('.'));
+    if (parts.size() == 4 && std::all_of(parts.cbegin(), parts.cend(), [](const QString &part) {
+            return !part.isEmpty() && part.size() <= 3 && isAllDigits(part);
+        }))
+        return true; // an IPv4 address
+    for (const char *suffix : {".local", ".lan", ".home.arpa", ".internal", ".intranet"}) {
+        if (name.endsWith(QLatin1String(suffix)))
+            return true;
+    }
+    // A single name with no dot ("nas", "router"): a machine on this network.
+    return !name.isEmpty() && !name.contains(QLatin1Char('.'));
 }
 
 } // namespace
@@ -154,9 +193,10 @@ QUrl UrlResolver::resolve(const QString &input) const
     if (text.startsWith(QLatin1String("//")))
         return QUrl(QStringLiteral("https:") + text);
 
-    // Onion sites are encrypted by Tor itself and mostly serve plain http.
-    const QString host = text.section(QLatin1Char('/'), 0, 0).section(QLatin1Char(':'), 0, 0);
-    if (host.endsWith(QLatin1String(".onion"), Qt::CaseInsensitive))
+    // Onion sites are encrypted by Tor itself and mostly serve plain http, and so
+    // do addresses on this computer or the local network.
+    const QString host = authorityOf(text).section(QLatin1Char(':'), 0, 0);
+    if (host.endsWith(QLatin1String(".onion"), Qt::CaseInsensitive) || isLocalHost(host))
         return QUrl(QStringLiteral("http://") + text);
 
     return QUrl(QStringLiteral("https://") + text);

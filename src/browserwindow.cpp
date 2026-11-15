@@ -2362,6 +2362,9 @@ void BrowserWindow::showLoginsMenu()
         connect(fill, &QAction::triggered, this, [this, view, login] {
             if (!m_tabBar || indexOfView(view) < 0)
                 return;
+            // The page may have gone to another site while the menu was open.
+            if (LoginStore::originOf(view->url()) != login.origin)
+                return;
             // Into the page's sign-in form, from the same isolated world the capture runs in.
             view->page()->runJavaScript(LoginStore::fillScript(login.username, login.password),
                                         QWebEngineScript::ApplicationWorld);
