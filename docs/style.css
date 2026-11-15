@@ -112,6 +112,7 @@ h3 { font-size: 17px; margin: 0 0 6px; }
 .row > * { min-width: 0; }
 .row h3 { margin: 0; }
 .row p { margin: 0; color: var(--muted); }
+.row > div > * + * { margin-top: 10px; }
 .row .meta { display: block; font-size: 14px; font-weight: 400; color: var(--muted); }
 
 .more { margin-top: 24px; }
