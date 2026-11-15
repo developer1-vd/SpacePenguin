@@ -52,6 +52,7 @@ public:
         WindowMinimize, // window controls, for the merged title bar
         WindowMaximize,
         WindowRestore,
+        Printer,
     };
 
     enum class AppIconShape {

@@ -87,7 +87,7 @@ if(SPACEPENGUIN_USE_LOCAL_QT AND NOT CMAKE_PREFIX_PATH AND NOT DEFINED ENV{CMAKE
     endif()
 endif()
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network Widgets WebEngineWidgets)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network PrintSupport Widgets WebEngineWidgets)
 
 # macOS 26 SDKs no longer have the long-deprecated AGL framework, but Qt 6.8's
 # CMake files still link it into everything that uses Qt GUI ("framework 'AGL'
@@ -212,7 +212,7 @@ qt_add_executable(spacepenguin
     filters/default.txt
 )
 
-target_link_libraries(spacepenguin PRIVATE Qt6::Network Qt6::Widgets Qt6::WebEngineWidgets)
+target_link_libraries(spacepenguin PRIVATE Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::WebEngineWidgets)
 # Chrome (Manifest V3) extensions: experimental, and left out of releases, because
 # QtWebEngine 6.10 and 6.11 crash when one is turned on (src/chromeextensions.cpp).
 option(SPACEPENGUIN_CHROME_EXTENSIONS "Build the experimental Chrome extension support (needs Qt 6.10+)" OFF)

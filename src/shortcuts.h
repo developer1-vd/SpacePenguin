@@ -44,6 +44,7 @@ public:
         Downloads,
         Extensions,
         Settings,
+        Print,
         KeyboardShortcuts,
     };
 

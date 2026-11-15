@@ -340,6 +340,11 @@ void drawGlyph(QPainter *p, Icons::Glyph glyph, const QColor &color, const QColo
         }
         break;
     }
+    case Icons::Printer:
+        p->drawPolyline(QPolygonF({QPointF(7, 9), QPointF(7, 4), QPointF(17, 4), QPointF(17, 9)}));
+        p->drawRoundedRect(QRectF(3.5, 9, 17, 8), 2, 2);
+        p->drawRect(QRectF(7, 14, 10, 6.5));
+        break;
     case Icons::Reader:
         p->drawRoundedRect(QRectF(5, 3.5, 14, 17), 2, 2);
         p->drawLine(QPointF(8.5, 8), QPointF(15.5, 8));

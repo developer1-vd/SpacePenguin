@@ -100,6 +100,8 @@ QList<QKeySequence> Shortcuts::keys(Command command)
         return {key(Qt::CTRL | Qt::SHIFT | Qt::Key_E)};
     case Settings:
         return {key(Qt::CTRL | Qt::Key_Comma)};
+    case Print:
+        return {key(Qt::CTRL | Qt::Key_P)};
     case KeyboardShortcuts:
         if constexpr (kMac)
             return QKeySequence::keyBindings(QKeySequence::HelpContents);
