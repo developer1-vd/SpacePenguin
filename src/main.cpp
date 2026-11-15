@@ -178,8 +178,7 @@ int main(int argc, char *argv[])
         spacepenguin::StartupTrace::mark("window built");
         window->show();
         QTimer::singleShot(0, [] { spacepenguin::StartupTrace::mark("window shown"); });
-        for (const QString &url : urls)
-            window->openInNewTab(url);
+        window->openPages(urls);
     }
 
     // Pages that arrive from outside go to the window in front, the way they do
@@ -201,8 +200,7 @@ int main(int argc, char *argv[])
         } else if (texts.isEmpty()) {
             target->openInNewTab(QString());
         } else {
-            for (const QString &text : std::as_const(texts))
-                target->openInNewTab(text);
+            target->openPages(texts);
         }
         if (target->isMinimized())
             target->showNormal();

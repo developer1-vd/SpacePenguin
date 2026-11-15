@@ -55,6 +55,12 @@ public:
     /** Opens an address, about: page or search in a new tab, as the omnibox would. */
     void openInNewTab(const QString &text);
 
+    /**
+     * Opens pages given from outside (the command line, another app). A window
+     * showing nothing but its start tab shows them in its place.
+     */
+    void openPages(const QStringList &texts);
+
     /** Opens a new window, private or not, with a tab for each of @p texts. */
     BrowserWindow *openWindow(bool isPrivate, const QStringList &texts = {});
 
