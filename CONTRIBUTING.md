@@ -90,8 +90,30 @@ docs/                    GitHub Pages site
 4. Run the existing tests: `ctest --test-dir build`. Add or update tests as
    needed.
 5. If your change affects user-facing behavior, update the relevant section of
-   `README.md`.
+   `README.md`, and add a line to `CHANGELOG.md` under "Unreleased".
 6. Open a pull request against `main`.
+
+## Translating SpacePenguin
+
+The browser's words come from `tr()` in the code; each language is a file in
+`translations/`, `spacepenguin_<language>.ts`, built into the app, which
+picks the one for the system's language. Qt Linguist (part of Qt's tools)
+edits them. To add a language, German for example:
+
+```bash
+cmake -B build -DSPACEPENGUIN_NEW_LANGUAGES=de
+cmake --build build --target update_translations   # writes translations/spacepenguin_de.ts
+linguist translations/spacepenguin_de.ts            # translate, and save
+cmake -B build -DSPACEPENGUIN_NEW_LANGUAGES=        # it is found on its own from now on
+```
+
+Rebuild and start SpacePenguin with the system in that language
+(`LANGUAGE=de ./build/SpacePenguin` on Linux) to see it. To bring every
+language up to date after strings change in the code, run the
+`update_translations` target again. `spacepenguin_en.ts` holds only English
+plural forms ("1 bookmark", "3 bookmarks"); when you add a `tr()` with `%n`,
+fill in its two forms there. The built-in pages (`html/`) are not translated
+yet.
 
 ## Pull request checklist
 

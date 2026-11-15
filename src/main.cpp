@@ -7,6 +7,9 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QTimer>
+#include <QLocale>
+#include <QLibraryInfo>
+#include <QTranslator>
 #include <QWebEngineProfile>
 
 #include <algorithm>
@@ -75,6 +78,17 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain(QStringLiteral("spacepenguin.invalid"));
     QCoreApplication::setApplicationName(QStringLiteral("SpacePenguin"));
     QCoreApplication::setApplicationVersion(QStringLiteral(SPACEPENGUIN_VERSION));
+    // The system's language: SpacePenguin's own words (translations/), else English
+    // with its plural forms, and Qt's dialogs (printing, opening files) where Qt
+    // has a translation installed.
+    static QTranslator qtTranslator;
+    if (qtTranslator.load(QLocale(), QStringLiteral("qtbase"), QStringLiteral("_"),
+                          QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
+        QCoreApplication::installTranslator(&qtTranslator);
+    static QTranslator appTranslator;
+    if (appTranslator.load(QLocale(), QStringLiteral("spacepenguin"), QStringLiteral("_"), QStringLiteral(":/i18n"))
+        || appTranslator.load(QStringLiteral(":/i18n/spacepenguin_en")))
+        QCoreApplication::installTranslator(&appTranslator);
     // Before anything reads them: bring the settings up to this build's layout.
     {
         QSettings settings;

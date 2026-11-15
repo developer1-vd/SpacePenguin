@@ -222,6 +222,36 @@ target_link_libraries(spacepenguin PRIVATE Qt6::Network Qt6::PrintSupport Qt6::W
 # Chrome (Manifest V3) extensions: experimental, and left out of releases, because
 # QtWebEngine 6.10 and 6.11 crash when one is turned on (src/chromeextensions.cpp).
 option(SPACEPENGUIN_CHROME_EXTENSIONS "Build the experimental Chrome extension support (needs Qt 6.10+)" OFF)
+# Translations: every translations/spacepenguin_<language>.ts is built into the app,
+# which loads the one for the system's language. spacepenguin_en.ts holds only
+# English plural forms ("1 bookmark", "3 bookmarks"). To start a language:
+#   cmake -B build -DSPACEPENGUIN_NEW_LANGUAGES=de
+#   cmake --build build --target update_translations   # writes translations/spacepenguin_de.ts
+# then translate that file in Qt Linguist. update_translations also brings every
+# file up to date with the strings in the code. See CONTRIBUTING.md.
+set(SPACEPENGUIN_NEW_LANGUAGES "" CACHE STRING "Languages to start translation files for (de;fr;...)")
+find_package(Qt6 6.8 QUIET COMPONENTS LinguistTools)
+if(TARGET Qt6::lupdate AND TARGET Qt6::lrelease)
+    file(GLOB _spacepenguin_ts_files CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/translations/spacepenguin_*.ts")
+    set(_spacepenguin_languages ${SPACEPENGUIN_NEW_LANGUAGES})
+    foreach(_ts IN LISTS _spacepenguin_ts_files)
+        string(REGEX REPLACE ".*/spacepenguin_(.+)\\.ts$" "\\1" _language "${_ts}")
+        if(NOT _language STREQUAL "en")
+            list(APPEND _spacepenguin_languages "${_language}")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES _spacepenguin_languages)
+    set(QT_I18N_TRANSLATED_LANGUAGES ${_spacepenguin_languages})
+    set(QT_I18N_SOURCE_LANGUAGE en)
+    qt_add_translations(spacepenguin
+        TS_FILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/translations"
+        TS_FILE_BASE spacepenguin
+        RESOURCE_PREFIX /i18n
+        LUPDATE_OPTIONS -no-obsolete -locations none)
+else()
+    message(STATUS "Qt Linguist tools not found: SpacePenguin is built in English only")
+endif()
+
 if(SPACEPENGUIN_CHROME_EXTENSIONS)
     target_compile_definitions(spacepenguin PRIVATE SPACEPENGUIN_WITH_CHROME_EXTENSIONS)
 endif()
