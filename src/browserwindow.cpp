@@ -2045,8 +2045,28 @@ void BrowserWindow::closeOtherTabs(int index)
 
 void BrowserWindow::duplicateTab(int index)
 {
-    if (WebView *view = viewAt(index))
-        newTab(view->url());
+    WebView *view = viewAt(index);
+    if (!view)
+        return;
+    // Beside the original, in its group, with its back and forward history.
+    QByteArray history;
+    {
+        QDataStream out(&history, QIODevice::WriteOnly);
+        out << *view->history();
+    }
+    WebView *copy = addTab(false);
+    QDataStream in(history);
+    in >> *copy->history();
+    if (in.status() != QDataStream::Ok || copy->history()->count() == 0)
+        loadUrl(copy, view->url());
+    const int from = indexOfView(copy);
+    const int to = qMin(indexOfView(view) + 1, m_tabBar->count() - 1);
+    if (from >= 0 && from != to)
+        m_tabBar->moveTab(from, to);
+    if (const int group = m_groups->groupOf(view))
+        m_groups->setGroupOf(copy, group);
+    m_groups->arrange(m_tabBar);
+    refreshGroups();
 }
 
 void BrowserWindow::reopenClosedTab()
