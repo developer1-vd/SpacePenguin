@@ -45,7 +45,8 @@ jobs:
   desktop:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 75
+    # macOS runners can be three times slower on a busy day (a 22-minute build took 67).
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
