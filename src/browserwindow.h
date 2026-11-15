@@ -220,6 +220,8 @@ private:
 
     // Find.
     void showFindBar();
+    void printPage();
+    void savePageAsPdf();
     void hideFindBar();
     void findNext(bool backwards);
     void findMatchesShown(int matchCount, int activeMatch);
@@ -327,6 +329,8 @@ private:
     QAction *m_homeAction = nullptr;
     QAction *m_focusAddressAction = nullptr;
     QAction *m_findAction = nullptr;
+    QAction *m_printAction = nullptr;
+    QAction *m_pdfAction = nullptr;
     QAction *m_zoomInAction = nullptr;
     QAction *m_zoomOutAction = nullptr;
     QAction *m_zoomResetAction = nullptr;

@@ -70,6 +70,14 @@ public:
     bool blockingEnabled() const;
     void setBlockingEnabled(bool enabled);
 
+    /** Underline misspelt words in text boxes (see spellcheck.h). */
+    bool spellCheck() const;
+    void setSpellCheck(bool on);
+
+    /** Load sites over https only, with a warning before any that has none (see httpsonly.h). */
+    bool httpsOnly() const;
+    void setHttpsOnly(bool on);
+
     /** Offer to save a login when one is used to sign in to a site. */
     bool offerToSaveLogins() const;
     void setOfferToSaveLogins(bool offer);

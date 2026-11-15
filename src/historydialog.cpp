@@ -58,6 +58,7 @@ HistoryDialog::HistoryDialog(HistoryManager *history, QWidget *parent)
     layout->addWidget(m_search);
 
     m_tree = new QTreeWidget;
+    m_tree->setAccessibleName(tr("History"));
     m_tree->setColumnCount(4);
     m_tree->setHeaderLabels({tr("Title"), tr("Address"), tr("Last visited"), tr("Visits")});
     m_tree->setRootIsDecorated(false);

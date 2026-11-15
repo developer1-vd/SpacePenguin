@@ -1,5 +1,7 @@
 #include "settingsdialog.h"
 
+#include "spellcheck.h"
+
 #include "adblocker.h"
 #include "classroom.h"
 #include "filterlists.h"
@@ -74,6 +76,7 @@ QLabel *mutedLabel(const QString &text)
 QWidget *pageShell(const QString &title, const QString &subtitle, QVBoxLayout **contentLayout)
 {
     auto *scroll = new QScrollArea;
+    scroll->setAccessibleName(title);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
 
@@ -145,6 +148,7 @@ void SettingsDialog::setupTabs()
 {
     m_nav = new QListWidget;
     m_nav->setObjectName(QStringLiteral("settingsNav"));
+    m_nav->setAccessibleName(tr("Settings sections"));
     m_nav->setFixedWidth(200);
     m_nav->setIconSize(QSize(18, 18));
     m_nav->setFrameShape(QFrame::NoFrame);
@@ -323,6 +327,25 @@ QWidget *SettingsDialog::createGeneralTab()
 
     layout->addWidget(mutedLabel(tr("Anything typed in the address bar that is not an "
                                     "address is sent here. Switch quickly from the menu (Search With).")));
+    layout->addWidget(sectionTitle(tr("Spelling")));
+    auto *spelling = new QCheckBox(tr("Check spelling as you type"));
+    spelling->setChecked(preferences->spellCheck());
+    connect(spelling, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setSpellCheck(checked); });
+    layout->addWidget(spelling);
+    const QStringList spellLanguages = SpellCheck::languagesForThisSystem();
+    if (spellLanguages.isEmpty()) {
+        spelling->setEnabled(false);
+        layout->addWidget(mutedLabel(
+            SpellCheck::availableLanguages().isEmpty()
+                ? tr("No spelling dictionaries are installed. Distributions offer them as packages "
+                     "of QtWebEngine dictionaries.")
+                : tr("None of the installed spelling dictionaries is for your language.")));
+    } else {
+        layout->addWidget(mutedLabel(tr("Misspelt words in text boxes are underlined; right-click "
+                                        "one for suggestions. Checked in: %1.")
+                                         .arg(SpellCheck::describe(spellLanguages))));
+    }
     layout->addStretch(1);
     return page;
 }
@@ -438,6 +461,16 @@ QWidget *SettingsDialog::createPrivacyTab()
     QVBoxLayout *layout = nullptr;
     QWidget *page = pageShell(tr("Privacy & Security"),
                               tr("Content blocking, data use and your browsing data."), &layout);
+
+    layout->addWidget(sectionTitle(tr("Secure connections")));
+    auto *httpsOnly = new QCheckBox(tr("Always use secure connections (HTTPS-only mode)"));
+    httpsOnly->setChecked(Preferences::instance()->httpsOnly());
+    connect(httpsOnly, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setHttpsOnly(checked); });
+    layout->addWidget(httpsOnly);
+    layout->addWidget(mutedLabel(tr("Sites are loaded over HTTPS, and you are warned before one that "
+                                    "has no secure version loads unencrypted. Addresses on your own "
+                                    "computer or network are left as they are.")));
 
     layout->addWidget(sectionTitle(tr("Logins and permissions")));
     auto *offerLogins = new QCheckBox(tr("Offer to save logins"));

@@ -87,7 +87,7 @@ if(SPACEPENGUIN_USE_LOCAL_QT AND NOT CMAKE_PREFIX_PATH AND NOT DEFINED ENV{CMAKE
     endif()
 endif()
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network Widgets WebEngineWidgets)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network PrintSupport Widgets WebEngineWidgets)
 
 # macOS 26 SDKs no longer have the long-deprecated AGL framework, but Qt 6.8's
 # CMake files still link it into everything that uses Qt GUI ("framework 'AGL'
@@ -131,6 +131,8 @@ qt_add_executable(spacepenguin
     src/tabgroups.h
     src/browserpage.cpp
     src/browserpage.h
+    src/httpsonly.cpp
+    src/httpsonly.h
     src/webview.cpp
     src/webview.h
     src/startuptrace.cpp
@@ -173,6 +175,10 @@ qt_add_executable(spacepenguin
     src/historymanager.h
     src/settingsdialog.cpp
     src/settingsdialog.h
+    src/settingsversion.cpp
+    src/settingsversion.h
+    src/spellcheck.cpp
+    src/spellcheck.h
     src/devicetuning.cpp
     src/devicetuning.h
     src/sandbox.cpp
@@ -185,6 +191,8 @@ qt_add_executable(spacepenguin
     src/extensionsdialog.h
     src/systemscheme.cpp
     src/systemscheme.h
+    src/accessibility.cpp
+    src/accessibility.h
     src/appwindow.cpp
     src/appwindow.h
     src/roles.cpp
@@ -210,10 +218,40 @@ qt_add_executable(spacepenguin
     filters/default.txt
 )
 
-target_link_libraries(spacepenguin PRIVATE Qt6::Network Qt6::Widgets Qt6::WebEngineWidgets)
+target_link_libraries(spacepenguin PRIVATE Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::WebEngineWidgets)
 # Chrome (Manifest V3) extensions: experimental, and left out of releases, because
 # QtWebEngine 6.10 and 6.11 crash when one is turned on (src/chromeextensions.cpp).
 option(SPACEPENGUIN_CHROME_EXTENSIONS "Build the experimental Chrome extension support (needs Qt 6.10+)" OFF)
+# Translations: every translations/spacepenguin_<language>.ts is built into the app,
+# which loads the one for the system's language. spacepenguin_en.ts holds only
+# English plural forms ("1 bookmark", "3 bookmarks"). To start a language:
+#   cmake -B build -DSPACEPENGUIN_NEW_LANGUAGES=de
+#   cmake --build build --target update_translations   # writes translations/spacepenguin_de.ts
+# then translate that file in Qt Linguist. update_translations also brings every
+# file up to date with the strings in the code. See CONTRIBUTING.md.
+set(SPACEPENGUIN_NEW_LANGUAGES "" CACHE STRING "Languages to start translation files for (de;fr;...)")
+find_package(Qt6 6.8 QUIET COMPONENTS LinguistTools)
+if(TARGET Qt6::lupdate AND TARGET Qt6::lrelease)
+    file(GLOB _spacepenguin_ts_files CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/translations/spacepenguin_*.ts")
+    set(_spacepenguin_languages ${SPACEPENGUIN_NEW_LANGUAGES})
+    foreach(_ts IN LISTS _spacepenguin_ts_files)
+        string(REGEX REPLACE ".*/spacepenguin_(.+)\\.ts$" "\\1" _language "${_ts}")
+        if(NOT _language STREQUAL "en")
+            list(APPEND _spacepenguin_languages "${_language}")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES _spacepenguin_languages)
+    set(QT_I18N_TRANSLATED_LANGUAGES ${_spacepenguin_languages})
+    set(QT_I18N_SOURCE_LANGUAGE en)
+    qt_add_translations(spacepenguin
+        TS_FILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/translations"
+        TS_FILE_BASE spacepenguin
+        RESOURCE_PREFIX /i18n
+        LUPDATE_OPTIONS -no-obsolete -locations none)
+else()
+    message(STATUS "Qt Linguist tools not found: SpacePenguin is built in English only")
+endif()
+
 if(SPACEPENGUIN_CHROME_EXTENSIONS)
     target_compile_definitions(spacepenguin PRIVATE SPACEPENGUIN_WITH_CHROME_EXTENSIONS)
 endif()
@@ -480,6 +518,44 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_shortcuts PRIVATE Qt6::Test Qt6::Gui)
         target_include_directories(tst_shortcuts PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME shortcuts COMMAND tst_shortcuts)
+
+        qt_add_executable(tst_accessibility
+            tests/tst_accessibility.cpp
+            src/accessibility.cpp
+            src/accessibility.h
+        )
+        target_link_libraries(tst_accessibility PRIVATE Qt6::Test Qt6::Widgets)
+        target_include_directories(tst_accessibility PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME accessibility COMMAND tst_accessibility)
+
+        qt_add_executable(tst_httpsonly
+            tests/tst_httpsonly.cpp
+            src/httpsonly.cpp
+            src/httpsonly.h
+            src/urlresolver.cpp
+            src/urlresolver.h
+        )
+        target_link_libraries(tst_httpsonly PRIVATE Qt6::Test Qt6::Core)
+        target_include_directories(tst_httpsonly PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME httpsonly COMMAND tst_httpsonly)
+
+        qt_add_executable(tst_spellcheck
+            tests/tst_spellcheck.cpp
+            src/spellcheck.cpp
+            src/spellcheck.h
+        )
+        target_link_libraries(tst_spellcheck PRIVATE Qt6::Test Qt6::Core)
+        target_include_directories(tst_spellcheck PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME spellcheck COMMAND tst_spellcheck)
+
+        qt_add_executable(tst_settingsversion
+            tests/tst_settingsversion.cpp
+            src/settingsversion.cpp
+            src/settingsversion.h
+        )
+        target_link_libraries(tst_settingsversion PRIVATE Qt6::Test Qt6::Core)
+        target_include_directories(tst_settingsversion PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME settingsversion COMMAND tst_settingsversion)
 
         qt_add_executable(tst_singleinstance
             tests/tst_singleinstance.cpp

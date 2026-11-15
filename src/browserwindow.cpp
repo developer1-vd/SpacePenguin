@@ -53,6 +53,7 @@
 #include <QDir>
 #include <QDialogButtonBox>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFocusEvent>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -70,7 +71,11 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QNetworkRequest>
+#include <QPageLayout>
+#include <QPageSize>
 #include <QPixmap>
+#include <QPrintDialog>
+#include <QPrinter>
 #include <QSignalBlocker>
 #include <QMouseEvent>
 #include <QPainter>
@@ -539,6 +544,11 @@ void BrowserWindow::createActions()
 
     m_findAction = makeAction(tr("Find in Page…"), Shortcuts::keys(Shortcuts::Find), Icons::icon(Icons::Search));
     connect(m_findAction, &QAction::triggered, this, &BrowserWindow::showFindBar);
+
+    m_printAction = makeAction(tr("Print…"), Shortcuts::keys(Shortcuts::Print), Icons::icon(Icons::Printer));
+    connect(m_printAction, &QAction::triggered, this, &BrowserWindow::printPage);
+    m_pdfAction = makeAction(tr("Save Page as PDF…"));
+    connect(m_pdfAction, &QAction::triggered, this, &BrowserWindow::savePageAsPdf);
 
     m_zoomInAction = makeAction(tr("Zoom In"), Shortcuts::keys(Shortcuts::ZoomIn), Icons::icon(Icons::Plus));
     connect(m_zoomInAction, &QAction::triggered, this,
@@ -1120,6 +1130,8 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(zoomAction);
 
     menu->addAction(m_findAction);
+    menu->addAction(m_printAction);
+    menu->addAction(m_pdfAction);
     menu->addSeparator();
     menu->addAction(m_focusModeAction);
     menu->addAction(m_workPagesAction);
@@ -1196,6 +1208,9 @@ void BrowserWindow::createMenus()
     fileMenu->addAction(m_newTorWindowAction);
     fileMenu->addAction(m_reopenTabAction);
     fileMenu->addAction(m_openFileAction);
+    fileMenu->addSeparator();
+    fileMenu->addAction(m_pdfAction);
+    fileMenu->addAction(m_printAction);
     fileMenu->addSeparator();
     fileMenu->addAction(m_closeTabAction);
     fileMenu->addAction(m_closeWindowAction);
@@ -3118,6 +3133,55 @@ void BrowserWindow::updateZoomIndicator()
 }
 
 // ---- Find ---------------------------------------------------------------------
+
+void BrowserWindow::printPage()
+{
+    WebView *view = currentView();
+    if (!view)
+        return;
+    // The printer lives until Chromium has laid out and sent every page.
+    auto *printer = new QPrinter(QPrinter::HighResolution);
+    printer->setDocName(view->title());
+    QPrintDialog dialog(printer, this);
+    dialog.setWindowTitle(tr("Print “%1”").arg(view->title()));
+    if (dialog.exec() != QDialog::Accepted) {
+        delete printer;
+        return;
+    }
+    connect(view, &QWebEngineView::printFinished, this, [this, printer](bool ok) {
+        if (!ok)
+            showToast(tr("The page could not be printed."), 5000);
+        delete printer;
+    }, Qt::SingleShotConnection);
+    view->print(printer);
+}
+
+void BrowserWindow::savePageAsPdf()
+{
+    WebView *view = currentView();
+    if (!view)
+        return;
+    QString name = view->title().trimmed();
+    name.replace(QRegularExpression(QStringLiteral(R"([\\/:*?"<>|\x00-\x1f]+)")), QStringLiteral(" "));
+    if (name.isEmpty())
+        name = tr("Page");
+    const QString suggested = QDir(Preferences::instance()->downloadDirectory()).filePath(name.left(120) + QStringLiteral(".pdf"));
+    QString path = QFileDialog::getSaveFileName(this, tr("Save Page as PDF"), suggested, tr("PDF documents (*.pdf)"));
+    if (path.isEmpty())
+        return;
+    if (!path.endsWith(QLatin1String(".pdf"), Qt::CaseInsensitive))
+        path += QStringLiteral(".pdf");
+    // A4 or Letter, whichever the person's country uses.
+    const QPageSize size(QLocale().measurementSystem() == QLocale::ImperialUSSystem ? QPageSize::Letter
+                                                                                      : QPageSize::A4);
+    const QPageLayout layout(size, QPageLayout::Portrait, QMarginsF(12, 12, 12, 12), QPageLayout::Millimeter);
+    connect(view->page(), &QWebEnginePage::pdfPrintingFinished, this,
+            [this](const QString &file, bool ok) {
+                showToast(ok ? tr("Saved “%1”.").arg(QFileInfo(file).fileName())
+                             : tr("The PDF could not be saved."), 5000);
+            }, Qt::SingleShotConnection);
+    view->page()->printToPdf(path, layout);
+}
 
 void BrowserWindow::showFindBar()
 {

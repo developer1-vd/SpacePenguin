@@ -44,7 +44,11 @@ protected:
     static bool isAboutPage(const QUrl &url);
 
 private:
+    void showHttpsWarning(const QUrl &insecureUrl);
+
     NavigationFilter m_navigationFilter;
+    QUrl m_upgradedFrom;    // the http address now being tried over https
+    QUrl m_httpsWarningFor; // the http address the warning page is showing for
     QUrl m_hoveredLink;
     QElapsedTimer m_hoverEnded;
 };
