@@ -364,6 +364,12 @@ bool NetworkRule::matches(const QUrl &url, const QString &documentHost,
 {
     if (type != RequestType::Any && requestType != RequestType::Any && type != requestType)
         return false;
+    // The page itself is blocked only by a rule that says so ($document) or that
+    // names nothing but a site (`||popads.example^`), as uBlock Origin does. A rule
+    // with a path or a pattern, like `/ads/`, is about what pages load, and would
+    // otherwise block a search for "ads".
+    if (requestType == RequestType::Document && type != RequestType::Document && hostOnly.isEmpty())
+        return false;
 
     if (!includedDomains.isEmpty() || !excludedDomains.isEmpty()) {
         if (documentHost.isEmpty())
@@ -738,7 +744,7 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info)
     if (isPausedFor(host))
         return;
 
-    const RequestType type = static_cast<RequestType>(static_cast<int>(info.resourceType()));
+    const RequestType type = requestTypeFor(info.resourceType());
     const QString documentHost = info.initiator().host();
 
     if (!wouldBlock(url, type, documentHost)) {
@@ -754,6 +760,46 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info)
     ++m_blockedCount;
     m_lastBlockedHost = host;
     emit blockedCountChanged(m_blockedCount);
+}
+
+RequestType AdBlocker::requestTypeFor(QWebEngineUrlRequestInfo::ResourceType type)
+{
+    // Qt numbers its types differently from RequestType, so each is named here.
+    switch (type) {
+    case QWebEngineUrlRequestInfo::ResourceTypeMainFrame:
+    case QWebEngineUrlRequestInfo::ResourceTypeNavigationPreloadMainFrame:
+        return RequestType::Document;
+    case QWebEngineUrlRequestInfo::ResourceTypeSubFrame:
+    case QWebEngineUrlRequestInfo::ResourceTypeNavigationPreloadSubFrame:
+        return RequestType::SubDocument;
+    case QWebEngineUrlRequestInfo::ResourceTypeStylesheet:
+        return RequestType::Stylesheet;
+    case QWebEngineUrlRequestInfo::ResourceTypeScript:
+    case QWebEngineUrlRequestInfo::ResourceTypeWorker:
+    case QWebEngineUrlRequestInfo::ResourceTypeSharedWorker:
+    case QWebEngineUrlRequestInfo::ResourceTypeServiceWorker:
+        return RequestType::Script;
+    case QWebEngineUrlRequestInfo::ResourceTypeImage:
+    case QWebEngineUrlRequestInfo::ResourceTypeFavicon:
+        return RequestType::Image;
+    case QWebEngineUrlRequestInfo::ResourceTypeFontResource:
+        return RequestType::Font;
+    case QWebEngineUrlRequestInfo::ResourceTypeObject:
+    case QWebEngineUrlRequestInfo::ResourceTypePluginResource:
+        return RequestType::Object;
+    case QWebEngineUrlRequestInfo::ResourceTypeMedia:
+        return RequestType::Media;
+    case QWebEngineUrlRequestInfo::ResourceTypeXhr:
+    case QWebEngineUrlRequestInfo::ResourceTypeJson:
+        return RequestType::Xhr;
+    case QWebEngineUrlRequestInfo::ResourceTypePing:
+    case QWebEngineUrlRequestInfo::ResourceTypeCspReport:
+        return RequestType::Ping;
+    case QWebEngineUrlRequestInfo::ResourceTypeWebSocket:
+        return RequestType::WebSocket;
+    default:
+        return RequestType::Other;
+    }
 }
 
 bool AdBlocker::wouldBlock(const QUrl &url, RequestType type, const QString &documentHost) const

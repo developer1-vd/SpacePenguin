@@ -32,6 +32,8 @@ private slots:
     void negatedDomainOptionExcludes();
     void domainOptionRequiresDocument();
     void typeOptionSelectsResourceType();
+    void pagesAreNotBlockedWithoutDocumentOption();
+    void qtResourceTypesAreMapped();
     void generichideExceptionDoesNotBlockNetwork();
     void matchCaseOptionIsHonoured();
     void unsupportedOptionSkipsTheRule();
@@ -71,6 +73,38 @@ static bool blocks(AdBlocker &blocker, const char *url,
                    const QString &documentHost = QString())
 {
     return blocker.wouldBlock(QUrl(QString::fromLatin1(url)), type, documentHost);
+}
+
+void TestAdBlocker::pagesAreNotBlockedWithoutDocumentOption()
+{
+    // A rule naming a site blocks what pages load from it, not opening the site.
+    auto blocker = blockerWith("||duckduckgo.com^$xhr\n/ads/\n?q=google&\n||ads.example.com/landing$document\n");
+    // A rule for one kind of request never blocks the page (this blocked DuckDuckGo).
+    QVERIFY(!blocks(*blocker, "https://duckduckgo.com/?q=google", RequestType::Document));
+    QVERIFY(blocks(*blocker, "https://duckduckgo.com/d.js", RequestType::Xhr, QStringLiteral("duckduckgo.com")));
+    // Patterns are about what pages load, not the pages you open.
+    QVERIFY(!blocks(*blocker, "https://example.org/ads/", RequestType::Document));
+    QVERIFY(!blocks(*blocker, "https://duckduckgo.com/?q=google&ia=web", RequestType::Document));
+    QVERIFY(blocks(*blocker, "https://example.org/ads/banner.png", RequestType::Image, QStringLiteral("example.org")));
+    // $document says the page itself.
+    QVERIFY(blocks(*blocker, "https://ads.example.com/landing", RequestType::Document));
+}
+
+void TestAdBlocker::qtResourceTypesAreMapped()
+{
+    using Info = QWebEngineUrlRequestInfo;
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeMainFrame), RequestType::Document);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeSubFrame), RequestType::SubDocument);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeStylesheet), RequestType::Stylesheet);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeScript), RequestType::Script);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeImage), RequestType::Image);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeFontResource), RequestType::Font);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeMedia), RequestType::Media);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeObject), RequestType::Object);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeXhr), RequestType::Xhr);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypePing), RequestType::Ping);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeWebSocket), RequestType::WebSocket);
+    QCOMPARE(AdBlocker::requestTypeFor(Info::ResourceTypeUnknown), RequestType::Other);
 }
 
 void TestAdBlocker::emptyListBlocksNothing()
