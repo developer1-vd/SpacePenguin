@@ -7,6 +7,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Yandex, Amazon and eBay as search engines, in Settings › General and the menu's Search With.
+
 ### Changed
 
 - The new-tab button sits right after the last tab instead of at the far end of the tab row.
