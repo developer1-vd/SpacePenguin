@@ -7,6 +7,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The Linux install script installed 0.1-A instead of the newest release candidate, and then failed to add the menu entry. It now installs the newest release, release candidates included, and finds the menu entry under either app name.
+
 ## [1.0.0-rc.2] - 2026-11-15
 
 The second release candidate for 1.0.
