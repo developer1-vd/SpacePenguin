@@ -190,6 +190,10 @@ void TestRoles::gamerFlags()
     const QStringList boost = Roles::gamerFlags(true, false, false, false);
     QVERIFY(boost.contains(QStringLiteral("--ignore-gpu-blocklist")));
     QVERIFY(boost.contains(QStringLiteral("--enable-gpu-rasterization")));
+#ifdef Q_OS_LINUX
+    // Zero-copy video crashes the browser on Linux (YouTube, any <video>).
+    QVERIFY(!boost.contains(QStringLiteral("--enable-zero-copy")));
+#endif
     // Where the GPU is off (no working driver, a Chromebook without one), it stays off.
     QVERIFY(Roles::gamerFlags(true, false, false, true).isEmpty());
     const QStringList all = Roles::gamerFlags(false, true, true, true);

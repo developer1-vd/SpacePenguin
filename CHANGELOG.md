@@ -7,6 +7,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Videos (YouTube and others) no longer crash the browser on Linux with Gamer mode's GPU boost on: it no longer turns on zero-copy there, which Chromium cannot do on Linux.
+
 ## [1.0.0-rc.3] - 2026-11-16
 
 The third release candidate for 1.0.
