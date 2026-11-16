@@ -69,6 +69,9 @@ public:
 
     void interceptRequest(QWebEngineUrlRequestInfo &info) override;
 
+    /** What a filter rule calls the kind of request QtWebEngine reports. */
+    static RequestType requestTypeFor(QWebEngineUrlRequestInfo::ResourceType type);
+
     bool loadFilters(const QString &path, QString *error = nullptr);
     bool loadFiltersFromText(const QString &text);
 
