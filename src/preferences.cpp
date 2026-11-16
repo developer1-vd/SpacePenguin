@@ -126,7 +126,11 @@ QList<SearchEngine> Preferences::builtInSearchEngines()
         {QStringLiteral("Mojeek"), QStringLiteral("https://www.mojeek.com/search?q={query}")},
         {QStringLiteral("Kagi"), QStringLiteral("https://kagi.com/search?q={query}")},
         {QStringLiteral("Yahoo"), QStringLiteral("https://search.yahoo.com/search?p={query}")},
+        {QStringLiteral("Yandex"), QStringLiteral("https://yandex.com/search/?text={query}")},
         {QStringLiteral("Wikipedia"), QStringLiteral("https://en.wikipedia.org/w/index.php?search={query}")},
+        // Shops: everything typed in the address bar searches their products.
+        {QStringLiteral("Amazon"), QStringLiteral("https://www.amazon.com/s?k={query}")},
+        {QStringLiteral("eBay"), QStringLiteral("https://www.ebay.com/sch/i.html?_nkw={query}")},
     };
 }
 

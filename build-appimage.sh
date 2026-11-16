@@ -118,7 +118,7 @@ fi
 
 step "Installing into ${APPDIR}"
 rm -rf "${APPDIR}"
-DESTDIR="${ROOT}/${APPDIR}" cmake --install "${BUILD_DIR}"
+DESTDIR="$(cd "${ROOT}" && realpath -m "${APPDIR}")" cmake --install "${BUILD_DIR}"
 
 # Spelling dictionaries: Qt from aqtinstall has none, so convert this system's
 # Hunspell ones to Chromium's format (SpellCheck looks in usr/share). Without
@@ -234,16 +234,41 @@ export NO_STRIP=1                           # Qt's libraries are already strippe
 [[ -n "${UPDATE_INFO}" ]] && export LDAI_UPDATE_INFORMATION="${UPDATE_INFO}"
 [[ ${SIGN} -eq 1 ]] && export LDAI_SIGN=1
 
+# NSS comes from the system, never from the AppImage. NSS loads its crypto modules
+# (libsoftokn3, libfreebl3) at run time from the system, so a bundled libnss3 from
+# the build machine meets a newer or older softokn on the user's system, fails to
+# initialize, and QtWebEngine aborts the first time it checks a certificate (seen
+# on Fedora). Every desktop has NSS, and install.sh installs it where missing.
+NSS_LIBS=(libnss3.so libnssutil3.so libsmime3.so libssl3.so libsoftokn3.so libfreebl3.so
+          libfreeblpriv3.so libnspr4.so libplc4.so libplds4.so)
+nss_excludes=()
+for library in "${NSS_LIBS[@]}"; do
+    nss_excludes+=(--exclude-library "${library}*")
+done
+
 step "Bundling Qt and QtWebEngine with linuxdeploy"
 PATH="${TOOLS_DIR}:${PATH}" "${TOOLS_DIR}/linuxdeploy-${ARCH}.AppImage" \
     --appdir "${APPDIR}" \
+    "${nss_excludes[@]}" \
     --desktop-file "${APPDIR}/usr/share/applications/${APP_ID}.desktop" \
     --icon-file "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png" \
     ${wayland_deps[@]+"${wayland_deps[@]}"} \
-    --plugin qt \
+    --plugin qt
+# The Qt plugin bundles QtWebEngine's libraries without the exclude list, so NSS is
+# removed afterwards, and the packaging run below keeps it out.
+rm -f "${NSS_LIBS[@]/#/${APPDIR}/usr/lib/}"
+
+step "Packaging the AppImage"
+PATH="${TOOLS_DIR}:${PATH}" "${TOOLS_DIR}/linuxdeploy-${ARCH}.AppImage" \
+    --appdir "${APPDIR}" \
+    "${nss_excludes[@]}" \
     --output appimage
 
 [[ -f "${OUTPUT}" ]] || die "linuxdeploy did not produce ${OUTPUT}"
+for library in "${NSS_LIBS[@]}"; do
+    [[ ! -e "${APPDIR}/usr/lib/${library}" ]] ||
+        die "${library} was bundled; NSS must come from the system (see above)"
+done
 # linuxdeploy writes the .zsync next to the current directory.
 [[ -f "$(basename "${OUTPUT}").zsync" ]] && mv "$(basename "${OUTPUT}").zsync" "${OUTPUT_DIR}/"
 

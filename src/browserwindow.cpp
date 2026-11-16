@@ -778,12 +778,15 @@ QWidget *BrowserWindow::createTabStrip()
     m_tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
     m_tabBar->installEventFilter(this);
     m_tabStrip->installEventFilter(this);
-    layout->addWidget(m_tabBar, 1);
+    // The bar is as wide as its tabs (narrower when they crowd the row), so the
+    // new-tab button sits right after the last tab, and the rest of the row is empty.
+    layout->addWidget(m_tabBar);
 
     auto *newTabButton = chromeButton(m_newTabAction);
     newTabButton->setToolTip(tr("New tab (%1)")
                                  .arg(m_newTabAction->shortcut().toString(QKeySequence::NativeText)));
     layout->addWidget(newTabButton, 0, Qt::AlignVCenter);
+    layout->addStretch(1);
 
     if (m_isPrivate) {
         auto *badgeIcon = new QLabel;

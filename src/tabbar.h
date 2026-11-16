@@ -33,6 +33,8 @@ public:
     };
 
     explicit TabBar(QWidget *parent = nullptr);
+    /** As wide as the tabs at full width, so what follows the bar sits right after its last tab. */
+    QSize sizeHint() const override;
 
     void setGroups(TabGroups *groups);
 

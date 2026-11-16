@@ -31,7 +31,7 @@ TabBar::TabBar(QWidget *parent)
     setDrawBase(false);
     setIconSize(QSize(16, 16));
     setFocusPolicy(Qt::NoFocus);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
     connect(this, &QTabBar::tabMoved, this, [](int from, int to) {
         if (qEnvironmentVariableIntValue("SPACEPENGUIN_DEBUG_TABS") != 0)
@@ -194,6 +194,7 @@ void TabBar::refreshGroups()
 
     // Tab sizes depend on the groups; have them measured again.
     setElideMode(elideMode());
+    updateGeometry();
     update();
 }
 
@@ -218,6 +219,17 @@ QSize TabBar::tabSizeHint(int index) const
     const int share = (width() - reserved) / qMax(1, tabs);
     hint.setWidth(qBound(kMinimumTabWidth, share, kMaximumTabWidth) + chipWidth(index));
     return hint;
+}
+
+QSize TabBar::sizeHint() const
+{
+    int width = 0;
+    for (int i = 0; i < count(); ++i) {
+        if (!isTabVisible(i))
+            continue;
+        width += isChipOnly(i) ? chipWidth(i) + 2 * kChipPadding : kMaximumTabWidth + chipWidth(i);
+    }
+    return QSize(width, QTabBar::sizeHint().height());
 }
 
 QSize TabBar::minimumTabSizeHint(int index) const
