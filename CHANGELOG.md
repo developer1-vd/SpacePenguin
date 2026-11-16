@@ -7,10 +7,6 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Fixed
-
-- Videos (YouTube and others) no longer crash the browser on Linux with Gamer mode's GPU boost on: it no longer turns on zero-copy there, which Chromium cannot do on Linux.
-
 ## [1.0.0-rc.3] - 2026-11-16
 
 The third release candidate for 1.0.
@@ -25,6 +21,7 @@ The third release candidate for 1.0.
 
 ### Fixed
 
+- Videos (YouTube and others) no longer crash the browser on Linux with Gamer mode's GPU boost on: it no longer turns on zero-copy there, which Chromium cannot do on Linux.
 - The ad blocker could block the page you opened, such as a DuckDuckGo search, which then showed ERR_ACCESS_DENIED. It misread which kind of request each one was, so rules meant for scripts or images could match the page itself. Now a page is only blocked by a rule for the whole site or one marked $document.
 - The AppImage could crash the first time it checked a site's certificate on distributions with a different NSS version than the build machine, such as Fedora. It now uses the system's NSS instead of bundling part of it.
 - The Linux install script installed 0.1-A instead of the newest release candidate, and then failed to add the menu entry. It now installs the newest release, release candidates included, and finds the menu entry under either app name.
