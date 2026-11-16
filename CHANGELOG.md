@@ -7,8 +7,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The new-tab button sits right after the last tab instead of at the far end of the tab row.
+
 ### Fixed
 
+- The AppImage could crash the first time it checked a site's certificate on distributions with a different NSS version than the build machine, such as Fedora. It now uses the system's NSS instead of bundling part of it.
 - The Linux install script installed 0.1-A instead of the newest release candidate, and then failed to add the menu entry. It now installs the newest release, release candidates included, and finds the menu entry under either app name.
 
 ## [1.0.0-rc.2] - 2026-11-15
