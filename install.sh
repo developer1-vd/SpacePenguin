@@ -242,16 +242,21 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
 appimage_url() {
-    # $1: a release API address. Prints the AppImage for this machine, if it has one.
-    # A missing release is a 404, which is not an error here: say nothing.
-    { curl -fsSL "$1" 2>/dev/null || true; } |
-        sed -n "s/.*\"browser_download_url\": *\"\([^\"]*-${ARCH}\.AppImage\)\".*/\1/p" | head -n1
+    # $1: a release API address, $2: what the download path must contain (optional).
+    # Prints the first AppImage for this machine, if there is one. A missing release
+    # is a 404, which is not an error here: say nothing.
+    { curl -fsSL "$1" 2>/dev/null || true; } | tr ',' '\n' |
+        sed -n "s/.*\"browser_download_url\": *\"\([^\"]*-${ARCH}\.AppImage\)\".*/\1/p" |
+        grep -e "${2:-}" | head -n1 || true
 }
 
 if [[ -z "${APPIMAGE}" ]]; then
     command -v curl >/dev/null || die "curl is missing; install it with your package manager"
     step "Looking up the newest version"
-    url="$(appimage_url "https://api.github.com/repos/${REPO}/releases/latest")"
+    # The newest release, pre-releases included: GitHub's "latest" skips them, and
+    # an older full release would win over a newer release candidate. Releases come
+    # newest first; only tagged versions (v…) count, not nightly or prealpha.
+    url="$(appimage_url "https://api.github.com/repos/${REPO}/releases?per_page=30" "/download/v[^/\"]*/")"
     if [[ -z "${url}" ]]; then
         # Before the first release: the build of main that CI publishes as "nightly".
         url="$(appimage_url "https://api.github.com/repos/${REPO}/releases/tags/nightly")"
@@ -286,6 +291,16 @@ step "Installing into ${INSTALL_DIR}"
 chmod +x "${APPIMAGE}"
 (cd "${WORK}" && "${APPIMAGE}" --appimage-extract >/dev/null)
 [[ -x "${WORK}/squashfs-root/AppRun" ]] || die "could not unpack the AppImage"
+# Its menu entry: under the current name, or the one older versions used.
+desktop_file=""
+for candidate in "usr/share/applications/${APP_ID}.desktop" "usr/share/applications/${OLD_APP_ID}.desktop" \
+                 "${APP_ID}.desktop" "${OLD_APP_ID}.desktop"; do
+    if [[ -f "${WORK}/squashfs-root/${candidate}" ]]; then
+        desktop_file="${candidate}"
+        break
+    fi
+done
+[[ -n "${desktop_file}" ]] || die "that AppImage has no menu entry; is it SpacePenguin?"
 if [[ -e "${INSTALL_DIR}" && ${ASSUME_YES} -eq 0 ]]; then
     echo "Replacing the SpacePenguin already installed there (your data is kept)."
 fi
@@ -332,7 +347,7 @@ fi
 sed -e "s|^Exec=SpacePenguin|Exec=${BIN_DIR}/spacepenguin|" \
     -e "s|^TryExec=.*|TryExec=${BIN_DIR}/spacepenguin|" \
     -e "s|^Icon=.*|Icon=${menu_icon}|" \
-    "${INSTALL_DIR}/usr/share/applications/${APP_ID}.desktop" > "${LAUNCHER}"
+    "${INSTALL_DIR}/${desktop_file}" > "${LAUNCHER}"
 refresh_menu
 
 output="$(QT_QPA_PLATFORM=offscreen "${BIN_DIR}/spacepenguin" --version 2>&1 || true)"
