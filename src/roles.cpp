@@ -135,9 +135,15 @@ QString citation(const QString &title, const QUrl &url, const QDate &accessed)
 QStringList gamerFlags(bool gpuBoost, bool uncapFrameRate, bool fpsCounter, bool gpuOff)
 {
     QStringList flags;
-    if (gpuBoost && !gpuOff)
-        flags << QStringLiteral("--ignore-gpu-blocklist") << QStringLiteral("--enable-gpu-rasterization")
-              << QStringLiteral("--enable-zero-copy");
+    if (gpuBoost && !gpuOff) {
+        flags << QStringLiteral("--ignore-gpu-blocklist") << QStringLiteral("--enable-gpu-rasterization");
+#ifndef Q_OS_LINUX
+        // On Linux, zero-copy hands video frames to the GPU as GBM buffers Chromium
+        // cannot allocate there ("multi-planar GBM buffer ... unsupported"), and
+        // the browser goes down as soon as a video plays.
+        flags << QStringLiteral("--enable-zero-copy");
+#endif
+    }
     if (uncapFrameRate)
         flags << QStringLiteral("--disable-frame-rate-limit") << QStringLiteral("--disable-gpu-vsync");
     if (fpsCounter)
