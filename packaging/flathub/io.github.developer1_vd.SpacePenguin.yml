@@ -39,7 +39,7 @@ modules:
       - type: git
         url: https://github.com/developer1-vd/SpacePenguin.git
         tag: v1.0.0-rc.3
-        commit: 2c32d3bdc1dd9606c5b104fc63093f5106585aef
+        commit: 2b54309ab81ee6363827abfa279dc2ac36d56706
         x-checker-data:
           type: git
           tag-pattern: ^v([\d.]+(?:-rc\.\d+)?)$
