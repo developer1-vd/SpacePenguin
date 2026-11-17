@@ -33,6 +33,9 @@ const QString kBypassCache = QStringLiteral("roles/developer/bypassCache");
 const QString kUserAgent = QStringLiteral("roles/developer/userAgent");
 const QString kPointerLock = QStringLiteral("roles/gamer/allowPointerLock");
 const QString kDevToolsDock = QStringLiteral("roles/developer/devToolsDock");
+const QString kWebsiteLanguages = QStringLiteral("languages/websites");
+const QString kSpellCheckLanguages = QStringLiteral("languages/spelling");
+const QString kAppLanguage = QStringLiteral("languages/app");
 const QString kReadAloudRate = QStringLiteral("browsing/readAloudRate");
 const QString kMouseGestures = QStringLiteral("browsing/mouseGestures");
 const QString kGpuBoost = QStringLiteral("roles/gamer/gpuBoost");
@@ -446,6 +449,36 @@ QString Preferences::devToolsDock() const
 void Preferences::setDevToolsDock(const QString &dock)
 {
     write(kDevToolsDock, dock);
+}
+
+QStringList Preferences::websiteLanguages() const
+{
+    return QSettings().value(kWebsiteLanguages).toStringList();
+}
+
+void Preferences::setWebsiteLanguages(const QStringList &tags)
+{
+    write(kWebsiteLanguages, tags);
+}
+
+QStringList Preferences::spellCheckLanguages() const
+{
+    return QSettings().value(kSpellCheckLanguages).toStringList();
+}
+
+void Preferences::setSpellCheckLanguages(const QStringList &dictionaries)
+{
+    write(kSpellCheckLanguages, dictionaries);
+}
+
+QString Preferences::appLanguage() const
+{
+    return QSettings().value(kAppLanguage).toString();
+}
+
+void Preferences::setAppLanguage(const QString &tag)
+{
+    write(kAppLanguage, tag);
 }
 
 int Preferences::readAloudRate() const

@@ -83,6 +83,11 @@ int main(int argc, char *argv[])
     // The system's language: SpacePenguin's own words (translations/), else English
     // with its plural forms, and Qt's dialogs (printing, opening files) where Qt
     // has a translation installed.
+    // Or the one chosen in Settings › General, which also sets how dates and numbers
+    // are written.
+    const QString chosenLanguage = QSettings().value(QStringLiteral("languages/app")).toString();
+    if (!chosenLanguage.isEmpty())
+        QLocale::setDefault(QLocale(QString(chosenLanguage).replace(QLatin1Char('-'), QLatin1Char('_'))));
     static QTranslator qtTranslator;
     if (qtTranslator.load(QLocale(), QStringLiteral("qtbase"), QStringLiteral("_"),
                           QLibraryInfo::path(QLibraryInfo::TranslationsPath)))

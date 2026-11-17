@@ -109,6 +109,16 @@ public:
     QString devToolsDock() const;
     void setDevToolsDock(const QString &dock);
 
+    /** The languages websites are asked for, most wanted first; empty: the system's. */
+    QStringList websiteLanguages() const;
+    void setWebsiteLanguages(const QStringList &tags);
+    /** Spelling dictionaries chosen by hand (en_US…); empty: the system's languages. */
+    QStringList spellCheckLanguages() const;
+    void setSpellCheckLanguages(const QStringList &dictionaries);
+    /** SpacePenguin's own language (a tag); empty: the system's. From the next start. */
+    QString appLanguage() const;
+    void setAppLanguage(const QString &tag);
+
     /** Read Aloud's pace: -5 (slow) to 5 (fast), 0 the voice's own. */
     int readAloudRate() const;
     void setReadAloudRate(int rate);

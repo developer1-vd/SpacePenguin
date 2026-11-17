@@ -12,6 +12,7 @@
 #include "downloadmanager.h"
 #include "historymanager.h"
 #include "icons.h"
+#include "languages.h"
 #include "mousegestures.h"
 #include "preferences.h"
 #include "shortcuts.h"
@@ -331,6 +332,109 @@ QWidget *SettingsDialog::createGeneralTab()
 
     layout->addWidget(mutedLabel(tr("Anything typed in the address bar that is not an "
                                     "address is sent here. Switch quickly from the menu (Search With).")));
+    layout->addWidget(sectionTitle(tr("Languages")));
+    auto *appRow = new QHBoxLayout;
+    appRow->addWidget(new QLabel(tr("SpacePenguin's language:")));
+    auto *appLanguage = new QComboBox;
+    appLanguage->setAccessibleName(tr("SpacePenguin's language"));
+    appLanguage->addItem(tr("The system's (%1)").arg(Languages::nativeName(Languages::systemLanguages().first())),
+                         QString());
+    for (const QString &tag : Languages::appLanguages())
+        appLanguage->addItem(Languages::nativeName(tag), tag);
+    appLanguage->setCurrentIndex(qMax(0, appLanguage->findData(preferences->appLanguage())));
+    appRow->addWidget(appLanguage, 1);
+    layout->addLayout(appRow);
+    auto *appLanguageNote = mutedLabel(tr("Also sets how dates and numbers are written. Takes effect the next "
+                                          "time SpacePenguin starts. Translations of SpacePenguin are welcome."));
+    layout->addWidget(appLanguageNote);
+    connect(appLanguage, &QComboBox::currentIndexChanged, this, [appLanguage](int) {
+        Preferences::instance()->setAppLanguage(appLanguage->currentData().toString());
+    });
+
+    layout->addWidget(new QLabel(tr("Ask websites for pages in these languages, the first one first:")));
+    auto *websiteRow = new QHBoxLayout;
+    auto *websiteList = new QListWidget;
+    websiteList->setAccessibleName(tr("Languages for websites"));
+    websiteList->setMaximumHeight(120);
+    websiteRow->addWidget(websiteList, 1);
+    auto *websiteButtons = new QVBoxLayout;
+    auto *addLanguage = new QPushButton(tr("Add…"));
+    auto *removeLanguage = new QPushButton(tr("Remove"));
+    auto *upLanguage = new QPushButton(tr("Move Up"));
+    auto *downLanguage = new QPushButton(tr("Move Down"));
+    auto *systemLanguagesButton = new QPushButton(tr("Use the System's"));
+    for (QPushButton *button : {addLanguage, removeLanguage, upLanguage, downLanguage, systemLanguagesButton})
+        websiteButtons->addWidget(button);
+    websiteButtons->addStretch(1);
+    websiteRow->addLayout(websiteButtons);
+    layout->addLayout(websiteRow);
+    layout->addWidget(mutedLabel(tr("Sites that come in several languages show the first of these they have. "
+                                    "Spelling is checked in them too, where dictionaries are installed.")));
+    const auto fillWebsiteLanguages = [websiteList](const QStringList &tags) {
+        websiteList->clear();
+        for (const QString &tag : tags) {
+            auto *item = new QListWidgetItem(QStringLiteral("%1 — %2").arg(Languages::nativeName(tag), tag));
+            item->setData(Qt::UserRole, tag);
+            websiteList->addItem(item);
+        }
+    };
+    {
+        // The languages as chosen, or the system's, without the plain forms that
+        // are added on the way out.
+        const QStringList chosen = preferences->websiteLanguages();
+        fillWebsiteLanguages(chosen.isEmpty() ? Languages::systemLanguages() : chosen);
+    }
+    const auto saveWebsiteLanguages = [websiteList] {
+        QStringList tags;
+        for (int i = 0; i < websiteList->count(); ++i)
+            tags << websiteList->item(i)->data(Qt::UserRole).toString();
+        Preferences::instance()->setWebsiteLanguages(tags);
+    };
+    connect(addLanguage, &QPushButton::clicked, this, [this, websiteList, saveWebsiteLanguages] {
+        const QList<Languages::Language> all = Languages::allLanguages();
+        QStringList names;
+        for (const Languages::Language &language : all)
+            names << QStringLiteral("%1 — %2").arg(language.name, language.tag);
+        bool ok = false;
+        const QString picked = QInputDialog::getItem(this, tr("Add a Language"), tr("Language:"), names, 0, true, &ok);
+        if (!ok)
+            return;
+        const int index = names.indexOf(picked);
+        const QString tag = index >= 0 ? all[index].tag : Languages::normalizeTag(picked);
+        if (tag.isEmpty())
+            return;
+        for (int i = 0; i < websiteList->count(); ++i) {
+            if (websiteList->item(i)->data(Qt::UserRole).toString() == tag)
+                return;
+        }
+        auto *item = new QListWidgetItem(QStringLiteral("%1 — %2").arg(Languages::nativeName(tag), tag));
+        item->setData(Qt::UserRole, tag);
+        websiteList->addItem(item);
+        saveWebsiteLanguages();
+    });
+    connect(removeLanguage, &QPushButton::clicked, this, [websiteList, saveWebsiteLanguages] {
+        if (websiteList->count() > 1 && websiteList->currentRow() >= 0) {
+            delete websiteList->takeItem(websiteList->currentRow());
+            saveWebsiteLanguages();
+        }
+    });
+    const auto move = [websiteList, saveWebsiteLanguages](int by) {
+        const int row = websiteList->currentRow();
+        const int to = row + by;
+        if (row < 0 || to < 0 || to >= websiteList->count())
+            return;
+        QListWidgetItem *item = websiteList->takeItem(row);
+        websiteList->insertItem(to, item);
+        websiteList->setCurrentRow(to);
+        saveWebsiteLanguages();
+    };
+    connect(upLanguage, &QPushButton::clicked, this, [move] { move(-1); });
+    connect(downLanguage, &QPushButton::clicked, this, [move] { move(1); });
+    connect(systemLanguagesButton, &QPushButton::clicked, this, [fillWebsiteLanguages] {
+        Preferences::instance()->setWebsiteLanguages({});
+        fillWebsiteLanguages(Languages::systemLanguages());
+    });
+
     layout->addWidget(sectionTitle(tr("Spelling")));
     auto *spelling = new QCheckBox(tr("Check spelling as you type"));
     spelling->setChecked(preferences->spellCheck());
@@ -349,6 +453,35 @@ QWidget *SettingsDialog::createGeneralTab()
         layout->addWidget(mutedLabel(tr("Misspelt words in text boxes are underlined; right-click "
                                         "one for suggestions. Checked in: %1.")
                                          .arg(SpellCheck::describe(spellLanguages))));
+    }
+    if (SpellCheck::availableLanguages().size() > 1) {
+        layout->addWidget(new QLabel(tr("Or choose the dictionaries yourself (up to three):")));
+        auto *dictionaries = new QListWidget;
+        dictionaries->setAccessibleName(tr("Spelling dictionaries"));
+        dictionaries->setMaximumHeight(110);
+        const QStringList chosen = preferences->spellCheckLanguages();
+        for (const QString &dictionary : SpellCheck::availableLanguages()) {
+            auto *item = new QListWidgetItem(SpellCheck::describe({dictionary}));
+            item->setData(Qt::UserRole, dictionary);
+            item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+            item->setCheckState(chosen.contains(dictionary) ? Qt::Checked : Qt::Unchecked);
+            dictionaries->addItem(item);
+        }
+        connect(dictionaries, &QListWidget::itemChanged, this, [dictionaries](QListWidgetItem *changed) {
+            QStringList picked;
+            for (int i = 0; i < dictionaries->count(); ++i) {
+                if (dictionaries->item(i)->checkState() == Qt::Checked)
+                    picked << dictionaries->item(i)->data(Qt::UserRole).toString();
+            }
+            if (picked.size() > 3) {
+                // Chromium checks each word against every one: three is plenty.
+                const QSignalBlocker blocker(dictionaries);
+                changed->setCheckState(Qt::Unchecked);
+                picked.removeAll(changed->data(Qt::UserRole).toString());
+            }
+            Preferences::instance()->setSpellCheckLanguages(picked);
+        });
+        layout->addWidget(dictionaries);
     }
 
     layout->addWidget(sectionTitle(tr("Read Aloud")));
