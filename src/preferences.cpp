@@ -33,6 +33,16 @@ const QString kBypassCache = QStringLiteral("roles/developer/bypassCache");
 const QString kUserAgent = QStringLiteral("roles/developer/userAgent");
 const QString kPointerLock = QStringLiteral("roles/gamer/allowPointerLock");
 const QString kDevToolsDock = QStringLiteral("roles/developer/devToolsDock");
+const QString kWebsiteLanguages = QStringLiteral("languages/websites");
+const QString kSpellCheckLanguages = QStringLiteral("languages/spelling");
+const QString kAppLanguage = QStringLiteral("languages/app");
+const QString kTranslateService = QStringLiteral("translate/service");
+const QString kTranslateTarget = QStringLiteral("translate/target");
+const QString kOfferTranslation = QStringLiteral("translate/offer");
+const QString kLibreTranslateServer = QStringLiteral("translate/libreTranslateServer");
+const QString kLibreTranslateKey = QStringLiteral("translate/libreTranslateKey");
+const QString kReadAloudRate = QStringLiteral("browsing/readAloudRate");
+const QString kMouseGestures = QStringLiteral("browsing/mouseGestures");
 const QString kGpuBoost = QStringLiteral("roles/gamer/gpuBoost");
 const QString kUncapFrameRate = QStringLiteral("roles/gamer/uncapFrameRate");
 const QString kFpsCounter = QStringLiteral("roles/gamer/fpsCounter");
@@ -444,6 +454,106 @@ QString Preferences::devToolsDock() const
 void Preferences::setDevToolsDock(const QString &dock)
 {
     write(kDevToolsDock, dock);
+}
+
+QStringList Preferences::websiteLanguages() const
+{
+    return QSettings().value(kWebsiteLanguages).toStringList();
+}
+
+void Preferences::setWebsiteLanguages(const QStringList &tags)
+{
+    write(kWebsiteLanguages, tags);
+}
+
+QStringList Preferences::spellCheckLanguages() const
+{
+    return QSettings().value(kSpellCheckLanguages).toStringList();
+}
+
+void Preferences::setSpellCheckLanguages(const QStringList &dictionaries)
+{
+    write(kSpellCheckLanguages, dictionaries);
+}
+
+QString Preferences::appLanguage() const
+{
+    return QSettings().value(kAppLanguage).toString();
+}
+
+void Preferences::setAppLanguage(const QString &tag)
+{
+    write(kAppLanguage, tag);
+}
+
+QString Preferences::translateService() const
+{
+    return QSettings().value(kTranslateService, QStringLiteral("google")).toString();
+}
+
+void Preferences::setTranslateService(const QString &key)
+{
+    write(kTranslateService, key);
+}
+
+QString Preferences::translateTarget() const
+{
+    return QSettings().value(kTranslateTarget).toString();
+}
+
+void Preferences::setTranslateTarget(const QString &tag)
+{
+    write(kTranslateTarget, tag);
+}
+
+bool Preferences::offerTranslation() const
+{
+    return QSettings().value(kOfferTranslation, true).toBool();
+}
+
+void Preferences::setOfferTranslation(bool offer)
+{
+    write(kOfferTranslation, offer);
+}
+
+QString Preferences::libreTranslateServer() const
+{
+    return QSettings().value(kLibreTranslateServer).toString();
+}
+
+void Preferences::setLibreTranslateServer(const QString &url)
+{
+    write(kLibreTranslateServer, url.trimmed());
+}
+
+QString Preferences::libreTranslateKey() const
+{
+    return QSettings().value(kLibreTranslateKey).toString();
+}
+
+void Preferences::setLibreTranslateKey(const QString &key)
+{
+    write(kLibreTranslateKey, key.trimmed());
+}
+
+int Preferences::readAloudRate() const
+{
+    return qBound(-5, QSettings().value(kReadAloudRate, 0).toInt(), 5);
+}
+
+void Preferences::setReadAloudRate(int rate)
+{
+    write(kReadAloudRate, qBound(-5, rate, 5));
+}
+
+bool Preferences::mouseGestures() const
+{
+    return QSettings().value(kMouseGestures, true).toBool();
+}
+
+void Preferences::setMouseGestures(bool on)
+{
+    write(kMouseGestures, on);
 }
 
 bool Preferences::gpuBoost() const

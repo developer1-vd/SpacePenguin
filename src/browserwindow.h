@@ -211,6 +211,20 @@ private:
     void fillBookmarkMenu(QMenu *menu, const QString &folderId);
     void toggleMuted(int index);
     void toggleReaderView();
+    /** The tab's video in a small window that stays on top; again brings it back. */
+    void togglePictureInPicture(WebView *view);
+    /** Reads the selection, or else the page's article, aloud; again stops. */
+    void toggleReadAloud(WebView *view);
+    /** Translates the page with the chosen service (translator.h). */
+    void translatePage(WebView *view);
+    /** The VPN button's menu: its state, and Off, Tor, Your Server. */
+    void populateVpnMenu();
+    void chooseVpnMode(int mode);
+    void translateText(const QString &text);
+    /** After a page loads: offers a translation if it is not in the person's languages. */
+    void offerTranslation(WebView *view);
+    void enterPictureInPicture(WebView *view);
+    void exitPictureInPicture();
     void setPageFullScreen(bool on);
     void exitPageFullScreen();
 
@@ -253,6 +267,11 @@ private:
     bool m_wasFullScreen = false;
     bool m_wasMaximized = false;
     QPointer<WebView> m_fullScreenView;
+    // Picture-in-Picture: the tab's view moves into its own small window, and a
+    // placeholder holds its place in the stack.
+    QPointer<WebView> m_pipView;
+    QPointer<QWidget> m_pipWindow;
+    QPointer<QWidget> m_pipPlaceholder;
     QList<QPointer<QWidget>> m_hiddenForFullScreen;
     QShortcut *m_exitFullScreenShortcut = nullptr;
     UrlResolver m_resolver;
@@ -314,6 +333,11 @@ private:
     QAction *m_openFileAction = nullptr;
     QAction *m_muteTabAction = nullptr;
     QAction *m_readerAction = nullptr;
+    QAction *m_pipAction = nullptr;
+    QAction *m_readAloudAction = nullptr;
+    QAction *m_translateAction = nullptr;
+    QToolButton *m_vpnButton = nullptr;
+    QMenu *m_vpnMenu = nullptr;
     QAction *m_newWindowAction = nullptr;
     QAction *m_newPrivateWindowAction = nullptr;
     QAction *m_closeTabAction = nullptr;

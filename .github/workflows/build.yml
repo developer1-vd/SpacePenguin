@@ -98,8 +98,14 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
+      # A job count is needed: Makefiles with a bare --parallel start every file at
+      # once, which swapped the 7 GB macOS runners to a standstill for two hours.
       - name: Build
-        run: cmake --build build --config Release --parallel
+        shell: bash
+        run: |
+          if [ "${RUNNER_OS}" = Windows ]; then jobs="${NUMBER_OF_PROCESSORS}"; else jobs="$(sh tools/build-jobs.sh)"; fi
+          echo "Building with ${jobs} jobs"
+          cmake --build build --config Release --parallel "${jobs}"
 
       - name: Test
         env:

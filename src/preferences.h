@@ -109,6 +109,39 @@ public:
     QString devToolsDock() const;
     void setDevToolsDock(const QString &dock);
 
+    /** The languages websites are asked for, most wanted first; empty: the system's. */
+    QStringList websiteLanguages() const;
+    void setWebsiteLanguages(const QStringList &tags);
+    /** Spelling dictionaries chosen by hand (en_US…); empty: the system's languages. */
+    QStringList spellCheckLanguages() const;
+    void setSpellCheckLanguages(const QStringList &dictionaries);
+    /** SpacePenguin's own language (a tag); empty: the system's. From the next start. */
+    QString appLanguage() const;
+    void setAppLanguage(const QString &tag);
+
+    /** The translator (translator.h key: "google", "deepl"…). */
+    QString translateService() const;
+    void setTranslateService(const QString &key);
+    /** The language to translate into (a tag); empty: the first website language. */
+    QString translateTarget() const;
+    void setTranslateTarget(const QString &tag);
+    /** Offer to translate pages in languages not among the person's. */
+    bool offerTranslation() const;
+    void setOfferTranslation(bool offer);
+    /** LibreTranslate: the server, and its API key if it wants one. */
+    QString libreTranslateServer() const;
+    void setLibreTranslateServer(const QString &url);
+    QString libreTranslateKey() const;
+    void setLibreTranslateKey(const QString &key);
+
+    /** Read Aloud's pace: -5 (slow) to 5 (fast), 0 the voice's own. */
+    int readAloudRate() const;
+    void setReadAloudRate(int rate);
+
+    /** Right-button strokes on pages go back, forward, close the tab… (mousegestures.h). */
+    bool mouseGestures() const;
+    void setMouseGestures(bool on);
+
     /** Gamer: GPU drawing even on graphics chips Chromium distrusts (from the next start). */
     bool gpuBoost() const;
     void setGpuBoost(bool boost);

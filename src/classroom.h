@@ -65,8 +65,8 @@ struct ClassStudent {
  *
  * The teacher's browser serves a small JSON API over HTTP on port 47800 (or the
  * next free one) and answers discovery on UDP port 47801:
- *   POST /v2/class      {id, name}                   the list, this student's allowed sites and answers
- *   POST /v2/request    {id, name, site, note, kind}
+ *   POST /v3/class      {id, name}                   the list, this student's allowed sites and answers
+ *   POST /v3/request    {id, name, site, note, kind}
  *
  * The class code is the shared secret, and it never crosses the network. Both
  * sides stretch it into a key (classKey(): PBKDF2, so a recorded exchange cannot
@@ -77,7 +77,10 @@ struct ClassStudent {
  *     path, time, nonce and body; the teacher refuses stale times and repeated
  *     nonces;
  *   - each answer carries X-SP-Mac over the request's nonce, its status and body,
- *     so a student takes blocks and answers from the teacher alone.
+ *     so a student takes blocks and answers from the teacher alone;
+ *   - bodies are encrypted end to end before they are signed (seal(): an
+ *     HMAC-SHA256 keystream for each nonce and direction), so others on the
+ *     network see neither the sites, the reasons nor the students' names.
  * Anyone without the code can neither join nor pose as the teacher. Students
  * share the code, so one student could pose as another; it is a classroom tool
  * for a school network, and the README calls it a beta.
@@ -171,6 +174,9 @@ public:
 
     /** The key both sides derive from a class code. Exposed for testing. */
     static QByteArray classKey(const QString &code);
+    /** Encrypts (or, again, decrypts) a request's or an answer's body. Exposed for testing. */
+    static QByteArray seal(const QByteArray &key, const QByteArray &nonce, const QByteArray &direction,
+                           const QByteArray &data);
     /** HMAC-SHA256 of @p message with @p key, in hex. */
     static QByteArray sign(const QByteArray &key, const QByteArray &message);
 

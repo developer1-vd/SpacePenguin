@@ -1,5 +1,10 @@
 #include "browserwindow.h"
 
+#include "languages.h"
+#include "readaloud.h"
+#include "translator.h"
+#include "primarypassword.h"
+#include "vpn.h"
 #include "readerview.h"
 #include "updatechecker.h"
 
@@ -437,6 +442,27 @@ void BrowserWindow::createActions()
 
     m_readerAction = makeAction(tr("Reader View"), {QKeySequence(Qt::Key_F9)}, Icons::icon(Icons::Reader));
     connect(m_readerAction, &QAction::triggered, this, &BrowserWindow::toggleReaderView);
+    m_readAloudAction = makeAction(tr("Read Aloud"), Shortcuts::keys(Shortcuts::ReadAloud));
+    m_readAloudAction->setVisible(ReadAloud::isAvailable());
+    connect(m_readAloudAction, &QAction::triggered, this, [this] {
+        if (WebView *view = currentView())
+            toggleReadAloud(view);
+    });
+    connect(ReadAloud::instance(), &ReadAloud::speakingChanged, this, [this](bool speaking) {
+        m_readAloudAction->setText(speaking ? tr("Stop Reading Aloud") : tr("Read Aloud"));
+    });
+    m_translateAction = makeAction(tr("Translate Page"), Shortcuts::keys(Shortcuts::TranslatePage));
+    connect(m_translateAction, &QAction::triggered, this, [this] {
+        if (WebView *view = currentView())
+            translatePage(view);
+    });
+    m_pipAction = makeAction(tr("Picture-in-Picture"), Shortcuts::keys(Shortcuts::PictureInPicture));
+    connect(m_pipAction, &QAction::triggered, this, [this] {
+        if (m_pipView)
+            exitPictureInPicture();
+        else if (WebView *view = currentView())
+            togglePictureInPicture(view);
+    });
 
 #ifdef Q_OS_MACOS
     // ⌘M is the system's Minimize; the Control key is free.
@@ -977,6 +1003,32 @@ QWidget *BrowserWindow::createNavigationBar()
     connect(m_blockingMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateBlockingMenu);
     layout->addWidget(m_blockingButton);
 
+    // The VPN: off, through Tor, or through the person's own server (vpn.h).
+    m_vpnButton = new QToolButton;
+    m_vpnButton->setIcon(Icons::icon(Icons::Globe));
+    m_vpnButton->setIconSize(QSize(18, 18));
+    m_vpnButton->setPopupMode(QToolButton::InstantPopup);
+    m_vpnButton->setFocusPolicy(Qt::NoFocus);
+    m_vpnButton->setObjectName(QStringLiteral("vpnButton"));
+    m_vpnButton->setAccessibleName(tr("VPN"));
+    {
+        const Vpn::Mode active = Vpn::activeMode();
+        m_vpnButton->setToolTip(active == Vpn::Mode::Off ? tr("VPN: off")
+                                                         : tr("VPN: on, through %1").arg(Vpn::describeActive()));
+        if (active != Vpn::Mode::Off) {
+            m_vpnButton->setText(tr("VPN"));
+            m_vpnButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            m_vpnButton->setCheckable(true);
+            m_vpnButton->setChecked(true);
+        }
+    }
+    m_vpnMenu = new QMenu(this);
+    m_vpnButton->setMenu(m_vpnMenu);
+    connect(m_vpnMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateVpnMenu);
+    // Tor windows have Tor already; a class keeps its network as it is.
+    m_vpnButton->setVisible(!Tor::isActive());
+    layout->addWidget(m_vpnButton);
+
     // Chrome extensions: their popups, and the way to manage them.
     m_extensionsButton = new QToolButton;
     m_extensionsButton->setIcon(Icons::icon(Icons::Extensions));
@@ -1090,6 +1142,9 @@ QMenu *BrowserWindow::createAppMenu()
     });
 
     menu->addAction(m_readerAction);
+    menu->addAction(m_pipAction);
+    menu->addAction(m_readAloudAction);
+    menu->addAction(m_translateAction);
     menu->addAction(m_historyAction);
     menu->addAction(m_downloadsAction);
     menu->addAction(m_installAppAction);
@@ -1238,6 +1293,9 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_zoomResetAction);
     viewMenu->addAction(m_fullScreenAction);
     viewMenu->addAction(m_readerAction);
+    viewMenu->addAction(m_pipAction);
+    viewMenu->addAction(m_readAloudAction);
+    viewMenu->addAction(m_translateAction);
     viewMenu->addAction(m_muteTabAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_bookmarksBarAction);
@@ -1767,7 +1825,10 @@ void BrowserWindow::restoreSession()
         });
     }
 
-    if (Preferences::instance()->restoreSession()) {
+    // After a restart for the VPN, the tabs come back once whatever the setting.
+    const bool restoreOnce = qApp->property("spacepenguin.restoreOnce").toBool();
+    qApp->setProperty("spacepenguin.restoreOnce", false);
+    if (Preferences::instance()->restoreSession() || restoreOnce) {
         if (!restoreTabs())
             newTab();
         else if (unclean)
@@ -2042,6 +2103,8 @@ void BrowserWindow::closeTab(int index)
         return;
     }
 
+    if (view == m_pipView)
+        exitPictureInPicture();
     m_tabBar->releaseChip(index);
     m_tabBar->removeTab(index);
     m_stack->removeWidget(view);
@@ -2407,6 +2470,10 @@ void BrowserWindow::showLoginsMenu()
     WebView *view = currentView();
     if (!view || !m_services.logins)
         return;
+    if (!PrimaryPassword::isUnlocked()) {
+        PrimaryPassword::unlock(this, [this] { showLoginsMenu(); });
+        return;
+    }
     const QString origin = LoginStore::originOf(view->url());
     QMenu menu(this);
     menu.addAction(tr("Fill in a saved login"))->setEnabled(false);
@@ -3017,7 +3084,11 @@ void BrowserWindow::loadAboutPage(WebView *view, const QString &id)
     const QString normalized = id.trimmed().toLower();
     // about:logins is a real page with its own API, served as sp://logins.
     if (normalized == QLatin1String("about:logins")) {
-        view->setUrl(QUrl(QStringLiteral("sp://logins/")));
+        const QPointer<WebView> target = view;
+        PrimaryPassword::unlock(this, [target] {
+            if (target)
+                target->setUrl(QUrl(QStringLiteral("sp://logins/")));
+        });
         return;
     }
     const AboutPageContext context = aboutContext();
@@ -3288,6 +3359,10 @@ void BrowserWindow::refreshCompletions()
 
 bool BrowserWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == m_pipWindow && event->type() == QEvent::Close && m_pipView) {
+        exitPictureInPicture();
+        return false;
+    }
     if (watched == m_omnibox) {
         // The suggestions popup takes focus and gives it back while you type; that
         // is not the box being focused or left, and must not select what was typed.
@@ -3399,6 +3474,37 @@ void BrowserWindow::showToast(const QString &text, int milliseconds)
 
 void BrowserWindow::connectView(WebView *view)
 {
+    connect(view, &WebView::translateSelectionRequested, this, &BrowserWindow::translateText);
+    connect(view, &QWebEngineView::loadFinished, this, [this, view](bool ok) {
+        if (ok)
+            offerTranslation(view);
+    });
+    connect(view, &WebView::readAloudRequested, this, [this, view] {
+        ReadAloud::instance()->stop();
+        toggleReadAloud(view);
+    });
+    connect(view, &WebView::pictureInPictureRequested, this, [this, view] { togglePictureInPicture(view); });
+    connect(view, &WebView::gestureDrawn, this, [this, view](MouseGestures::Action action) {
+        using Action = MouseGestures::Action;
+        switch (action) {
+        case Action::None: break;
+        case Action::Back: view->back(); break;
+        case Action::Forward: view->forward(); break;
+        case Action::Reload: view->reload(); break;
+        case Action::ScrollToTop:
+            view->page()->runJavaScript(QStringLiteral("window.scrollTo({top: 0, behavior: 'smooth'})"),
+                                        QWebEngineScript::ApplicationWorld);
+            break;
+        case Action::ScrollToBottom:
+            view->page()->runJavaScript(
+                QStringLiteral("window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'smooth'})"),
+                QWebEngineScript::ApplicationWorld);
+            break;
+        case Action::NewTab: newTab(); break;
+        case Action::CloseTab: closeTab(indexOfView(view)); break;
+        case Action::ReopenClosedTab: reopenClosedTab(); break;
+        }
+    });
     connect(view, &QWebEngineView::titleChanged, this, [this, view] {
         updateTabLabel(view);
         if (view == currentView())
@@ -3426,6 +3532,13 @@ void BrowserWindow::connectView(WebView *view)
     });
     connect(view->page(), &QWebEnginePage::fullScreenRequested, this,
             [this, view](QWebEngineFullScreenRequest request) {
+                // Picture-in-Picture: the video fills its small window, not the screen.
+                if (view == m_pipView) {
+                    request.accept();
+                    if (!request.toggleOn())
+                        QTimer::singleShot(0, this, &BrowserWindow::exitPictureInPicture);
+                    return;
+                }
                 // Only the tab in front may take the screen.
                 if (request.toggleOn() && view != currentView()) {
                     request.reject();
@@ -3560,7 +3673,8 @@ void BrowserWindow::onCurrentTabChanged(int index)
     // Another tab coming forward ends a video's full screen.
     if (m_pageFullScreen && m_fullScreenView != view)
         exitPageFullScreen();
-    m_stack->setCurrentWidget(view);
+    m_stack->setCurrentWidget(view == m_pipView && m_pipPlaceholder ? m_pipPlaceholder.data()
+                                                                     : static_cast<QWidget *>(view));
     m_linkPreview->hide();
     m_omniboxEdited = false;
     syncOmnibox(view->url());
@@ -3858,6 +3972,321 @@ void BrowserWindow::closeDockedDevTools()
         return;
     m_dockedDevTools->page()->setInspectedPage(nullptr);
     m_dockedDevTools->hide();
+}
+
+void BrowserWindow::toggleReadAloud(WebView *view)
+{
+    ReadAloud *readAloud = ReadAloud::instance();
+    if (readAloud->isSpeaking()) {
+        readAloud->stop();
+        return;
+    }
+    // The selection; else the element whose paragraphs hold the most text (the
+    // article); else the whole page. With the page's language, for the voice.
+    static const QString textOfPage = QStringLiteral(R"JS((() => {
+        const lang = document.documentElement.lang || '';
+        const selected = String(window.getSelection() || '').trim();
+        if (selected) return {text: selected, lang};
+        let best = null, bestLength = 0;
+        for (const block of document.querySelectorAll('article, main, [role=main], div, section')) {
+            let length = 0;
+            for (const p of block.querySelectorAll(':scope > p, :scope > div > p')) length += p.innerText.length;
+            if (length > bestLength) { best = block; bestLength = length; }
+        }
+        const text = bestLength > 400 ? best.innerText : document.body.innerText;
+        return {text: (document.title ? document.title + '.\n\n' : '') + text, lang};
+    })())JS");
+    view->page()->runJavaScript(textOfPage, QWebEngineScript::ApplicationWorld, [this](const QVariant &result) {
+        const QVariantMap map = result.toMap();
+        const QString text = map.value(QStringLiteral("text")).toString();
+        if (text.trimmed().isEmpty()) {
+            showToast(tr("There is no text on this page to read aloud."), 3000);
+            return;
+        }
+        ReadAloud::instance()->setRate(Preferences::instance()->readAloudRate());
+        ReadAloud::instance()->speak(text, map.value(QStringLiteral("lang")).toString());
+    });
+}
+
+void BrowserWindow::populateVpnMenu()
+{
+    m_vpnMenu->clear();
+    const Vpn::Mode active = Vpn::activeMode();
+    const Vpn::Mode chosen = Vpn::chosenMode();
+    QAction *state = m_vpnMenu->addAction(active == Vpn::Mode::Off
+                                              ? tr("VPN is off: sites see your address")
+                                              : tr("VPN is on, through %1").arg(Vpn::describeActive()));
+    state->setEnabled(false);
+    if (chosen != active)
+        m_vpnMenu->addAction(tr("Restart to apply the change"))->setEnabled(false);
+    m_vpnMenu->addSeparator();
+    auto *group = new QActionGroup(m_vpnMenu);
+    const Vpn::Server server = Vpn::chosenServer();
+    const bool serverReady = !Vpn::proxyAddress(server).isEmpty();
+    const QList<std::pair<Vpn::Mode, QString>> modes{
+        {Vpn::Mode::Off, tr("Off")},
+        {Vpn::Mode::Tor, tr("Through Tor (free, slower)")},
+        {Vpn::Mode::Proxy, serverReady ? tr("Through My Server (%1:%2)").arg(server.host).arg(server.port)
+                                       : tr("Through My Server (set it up in Settings)")}};
+    for (const auto &[mode, label] : modes) {
+        QAction *action = m_vpnMenu->addAction(label);
+        action->setCheckable(true);
+        action->setChecked(mode == chosen);
+        action->setEnabled(mode != Vpn::Mode::Proxy || serverReady);
+        if (mode == Vpn::Mode::Tor && Classroom::instance()->locked())
+            action->setEnabled(false);
+        group->addAction(action);
+        connect(action, &QAction::triggered, this, [this, mode] { chooseVpnMode(int(mode)); });
+    }
+    m_vpnMenu->addSeparator();
+    connect(m_vpnMenu->addAction(tr("VPN Settings…")), &QAction::triggered, this, &BrowserWindow::showSettings);
+}
+
+void BrowserWindow::chooseVpnMode(int value)
+{
+    const auto mode = static_cast<Vpn::Mode>(value);
+    QSettings().setValue(QStringLiteral("vpn/mode"), Vpn::modeKey(mode));
+    if (mode == Vpn::activeMode())
+        return;
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Question);
+    box.setWindowTitle(tr("VPN"));
+    box.setText(mode == Vpn::Mode::Off ? tr("Restart SpacePenguin to turn the VPN off?")
+                                       : tr("Restart SpacePenguin to turn the VPN on?"));
+    box.setInformativeText(tr("Your tabs come back after the restart."));
+    QPushButton *now = box.addButton(tr("Restart Now"), QMessageBox::AcceptRole);
+    box.addButton(tr("Later"), QMessageBox::RejectRole);
+    box.exec();
+    if (box.clickedButton() != now)
+        return;
+    Vpn::restart();
+    m_quitAction->trigger();
+}
+
+static QString translationTarget()
+{
+    const Preferences *preferences = Preferences::instance();
+    const QString chosen = preferences->translateTarget();
+    return Translator::targetLanguage(chosen.isEmpty() ? Languages::websiteLanguages(preferences->websiteLanguages()).first()
+                                                       : chosen);
+}
+
+void BrowserWindow::translateText(const QString &text)
+{
+    const Preferences *preferences = Preferences::instance();
+    const Translator::Service service = Translator::fromKey(preferences->translateService());
+    const QUrl url = Translator::textUrl(service, text, translationTarget(),
+                                         QUrl(preferences->libreTranslateServer()));
+    if (!url.isValid()) {
+        showToast(tr("Set the address of a LibreTranslate server in Settings › General."), 4000);
+        return;
+    }
+    newTab(url);
+}
+
+void BrowserWindow::translatePage(WebView *view)
+{
+    const Preferences *preferences = Preferences::instance();
+    const Translator::Service service = Translator::fromKey(preferences->translateService());
+    const QString target = translationTarget();
+    const QUrl address = view->url();
+    dropPrompts(view, QStringLiteral("translate"));
+    if ((address.scheme() != QLatin1String("http") && address.scheme() != QLatin1String("https"))
+        || Translator::isTranslatorUrl(address)) {
+        showToast(tr("Only web pages can be translated."), 3000);
+        return;
+    }
+    if (service == Translator::Service::Google) {
+        loadUrl(view, Translator::pageUrl(service, address, target));
+        return;
+    }
+    if (service == Translator::Service::LibreTranslate) {
+        // In place: the page's text goes to the chosen server and back. Not from a
+        // Tor window, whose own traffic alone goes through Tor.
+        if (Tor::isActive()) {
+            showToast(tr("LibreTranslate is not used in Tor windows, as it would not go through Tor."), 4000);
+            return;
+        }
+        const QPointer<WebView> target_view = view;
+        view->page()->runJavaScript(Translator::collectScript(), QWebEngineScript::ApplicationWorld,
+            [this, target_view, target](const QVariant &result) {
+                if (!target_view)
+                    return;
+                const QStringList texts = result.toStringList();
+                if (texts.isEmpty()) {
+                    showToast(tr("There is no text on this page to translate."), 3000);
+                    return;
+                }
+                showToast(tr("Translating with LibreTranslate…"), 2500);
+                static QNetworkAccessManager *network = new QNetworkAccessManager(qApp);
+                const Preferences *preferences = Preferences::instance();
+                Translator::translateTexts(network, QUrl(preferences->libreTranslateServer()),
+                                           preferences->libreTranslateKey(), texts, target,
+                    [this, target_view](const QStringList &translations, const QString &error) {
+                        if (!error.isEmpty()) {
+                            showToast(error, 5000);
+                            return;
+                        }
+                        if (target_view)
+                            target_view->page()->runJavaScript(Translator::applyScript(translations),
+                                                               QWebEngineScript::ApplicationWorld);
+                    });
+            });
+        return;
+    }
+    // Bing, DeepL, Yandex: the selection, or else the article, in their translator.
+    static const QString articleText = QStringLiteral(R"JS((() => {
+        const selected = String(window.getSelection() || '').trim();
+        if (selected) return selected;
+        let best = document.body, bestLength = 0;
+        for (const block of document.querySelectorAll('article, main, [role=main], div, section')) {
+            let length = 0;
+            for (const p of block.querySelectorAll(':scope > p, :scope > div > p')) length += p.innerText.length;
+            if (length > bestLength) { best = block; bestLength = length; }
+        }
+        return best.innerText;
+    })())JS");
+    view->page()->runJavaScript(articleText, QWebEngineScript::ApplicationWorld, [this, service](const QVariant &text) {
+        if (text.toString().trimmed().isEmpty()) {
+            showToast(tr("There is no text on this page to translate."), 3000);
+            return;
+        }
+        translateText(text.toString());
+        if (text.toString().size() > Translator::textLimit(service))
+            showToast(tr("%1 takes only the first part of a long page; select a part to translate it.")
+                          .arg(Translator::name(service)),
+                      5000);
+    });
+}
+
+void BrowserWindow::offerTranslation(WebView *view)
+{
+    const Preferences *preferences = Preferences::instance();
+    const QUrl address = view->url();
+    if (!preferences->offerTranslation() || m_isPrivate || Translator::isTranslatorUrl(address)
+        || (address.scheme() != QLatin1String("http") && address.scheme() != QLatin1String("https")))
+        return;
+    const QPointer<WebView> target = view;
+    view->page()->runJavaScript(QStringLiteral("document.documentElement.lang || ''"), QWebEngineScript::ApplicationWorld,
+        [this, target, address](const QVariant &result) {
+            const QString tag = Languages::normalizeTag(result.toString());
+            if (!target || tag.isEmpty() || target->url() != address)
+                return;
+            const QString language = tag.section(QLatin1Char('-'), 0, 0);
+            for (const QString &own : Languages::websiteLanguages(Preferences::instance()->websiteLanguages())) {
+                if (own.section(QLatin1Char('-'), 0, 0) == language)
+                    return;
+            }
+            Prompt prompt;
+            prompt.key = QStringLiteral("translate");
+            prompt.icon = Icons::Globe;
+            prompt.text = tr("This page is in %1. Translate it into %2?")
+                              .arg(Languages::nativeName(language), Languages::nativeName(translationTarget()));
+            prompt.buttons = {{tr("Translate"), [this, target] { if (target) translatePage(target); }},
+                              {tr("Never Offer"), [] { Preferences::instance()->setOfferTranslation(false); }}};
+            addPrompt(target, prompt);
+        });
+}
+
+void BrowserWindow::togglePictureInPicture(WebView *view)
+{
+    if (view == m_pipView) {
+        exitPictureInPicture();
+        return;
+    }
+    // The video playing (or else the largest one) is marked for the next step.
+    static const QString findVideo = QStringLiteral(R"JS((() => {
+        const videos = [...document.querySelectorAll('video')].filter(v => v.readyState > 0);
+        videos.sort((a, b) => (b.paused ? 0 : 1) - (a.paused ? 0 : 1)
+                              || b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight);
+        document.querySelectorAll('[data-spacepenguin-pip]').forEach(v => v.removeAttribute('data-spacepenguin-pip'));
+        if (!videos.length) return false;
+        videos[0].setAttribute('data-spacepenguin-pip', '');
+        return true;
+    })())JS");
+    const QPointer<WebView> target = view;
+    view->page()->runJavaScript(findVideo, QWebEngineScript::ApplicationWorld, [this, target](const QVariant &found) {
+        if (!target)
+            return;
+        if (!found.toBool()) {
+            showToast(tr("There is no video on this page to show in Picture-in-Picture."), 3000);
+            return;
+        }
+        enterPictureInPicture(target);
+    });
+}
+
+void BrowserWindow::enterPictureInPicture(WebView *view)
+{
+    if (m_pipView)
+        exitPictureInPicture();
+    if (m_pageFullScreen)
+        exitPageFullScreen();
+    m_pipView = view;
+
+    // The tab keeps its place, with a way back.
+    auto *placeholder = new QWidget;
+    auto *placeholderLayout = new QVBoxLayout(placeholder);
+    placeholderLayout->addStretch(1);
+    auto *message = new QLabel(tr("This tab's video is playing in Picture-in-Picture."));
+    message->setAlignment(Qt::AlignCenter);
+    placeholderLayout->addWidget(message);
+    auto *back = new QPushButton(tr("Bring It Back"));
+    connect(back, &QPushButton::clicked, this, &BrowserWindow::exitPictureInPicture);
+    placeholderLayout->addWidget(back, 0, Qt::AlignHCenter);
+    placeholderLayout->addStretch(1);
+    m_pipPlaceholder = placeholder;
+    const bool wasCurrent = view == currentView();
+    m_stack->insertWidget(m_stack->indexOf(view), placeholder);
+    m_stack->removeWidget(view);
+    if (wasCurrent)
+        m_stack->setCurrentWidget(placeholder);
+
+    // A small window that stays over the others; closing it brings the video back.
+    auto *window = new QWidget(this, Qt::Window | Qt::WindowStaysOnTopHint);
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    window->setWindowTitle(tr("Picture-in-Picture — %1").arg(view->title()));
+    auto *windowLayout = new QVBoxLayout(window);
+    windowLayout->setContentsMargins(0, 0, 0, 0);
+    windowLayout->addWidget(view);
+    view->show();
+    const QRect screen = (window->screen() ? window->screen() : QGuiApplication::primaryScreen())->availableGeometry();
+    window->resize(480, 270);
+    window->move(screen.right() - window->width() - 24, screen.bottom() - window->height() - 48);
+    // Closing it (its close button, Alt+F4) brings the view home before the window,
+    // and everything in it, is deleted.
+    window->installEventFilter(this);
+    auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), window);
+    connect(escape, &QShortcut::activated, this, &BrowserWindow::exitPictureInPicture);
+    m_pipWindow = window;
+    window->show();
+
+    // The marked video fills the window, the way it would fill the screen.
+    view->page()->runJavaScript(
+        QStringLiteral("document.querySelector('[data-spacepenguin-pip]')?.requestFullscreen().catch(() => {})"),
+        QWebEngineScript::ApplicationWorld);
+    m_pipAction->setText(tr("Leave Picture-in-Picture"));
+}
+
+void BrowserWindow::exitPictureInPicture()
+{
+    const QPointer<WebView> view = m_pipView;
+    m_pipView = nullptr;
+    m_pipAction->setText(tr("Picture-in-Picture"));
+    if (view) {
+        view->page()->triggerAction(QWebEnginePage::ExitFullScreen);
+        const int at = m_pipPlaceholder ? m_stack->indexOf(m_pipPlaceholder) : m_stack->count();
+        view->setParent(nullptr);
+        m_stack->insertWidget(at, view);
+        if (view == currentView())
+            m_stack->setCurrentWidget(view);
+    }
+    delete m_pipPlaceholder.data();
+    if (m_pipWindow) {
+        QWidget *window = m_pipWindow;
+        m_pipWindow = nullptr;
+        window->close();
+    }
 }
 
 void BrowserWindow::copyCitation()

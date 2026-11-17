@@ -12,7 +12,15 @@
 #include "downloadmanager.h"
 #include "historymanager.h"
 #include "icons.h"
+#include "languages.h"
+#include "translator.h"
+#include "backup.h"
+#include "primarypassword.h"
+#include "vpn.h"
+#include "mousegestures.h"
 #include "preferences.h"
+#include "shortcuts.h"
+#include "readaloud.h"
 #include "roles.h"
 #include "theme.h"
 #include "tor.h"
@@ -34,6 +42,9 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
+#include <QSlider>
+#include <QSettings>
+#include <QSpinBox>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMap>
@@ -327,6 +338,175 @@ QWidget *SettingsDialog::createGeneralTab()
 
     layout->addWidget(mutedLabel(tr("Anything typed in the address bar that is not an "
                                     "address is sent here. Switch quickly from the menu (Search With).")));
+    layout->addWidget(sectionTitle(tr("Languages")));
+    auto *appRow = new QHBoxLayout;
+    appRow->addWidget(new QLabel(tr("SpacePenguin's language:")));
+    auto *appLanguage = new QComboBox;
+    appLanguage->setAccessibleName(tr("SpacePenguin's language"));
+    appLanguage->addItem(tr("The system's (%1)").arg(Languages::nativeName(Languages::systemLanguages().first())),
+                         QString());
+    for (const QString &tag : Languages::appLanguages())
+        appLanguage->addItem(Languages::nativeName(tag), tag);
+    appLanguage->setCurrentIndex(qMax(0, appLanguage->findData(preferences->appLanguage())));
+    appRow->addWidget(appLanguage, 1);
+    layout->addLayout(appRow);
+    auto *appLanguageNote = mutedLabel(tr("Also sets how dates and numbers are written. Takes effect the next "
+                                          "time SpacePenguin starts. Translations of SpacePenguin are welcome."));
+    layout->addWidget(appLanguageNote);
+    connect(appLanguage, &QComboBox::currentIndexChanged, this, [appLanguage](int) {
+        Preferences::instance()->setAppLanguage(appLanguage->currentData().toString());
+    });
+
+    layout->addWidget(new QLabel(tr("Ask websites for pages in these languages, the first one first:")));
+    auto *websiteRow = new QHBoxLayout;
+    auto *websiteList = new QListWidget;
+    websiteList->setAccessibleName(tr("Languages for websites"));
+    websiteList->setMaximumHeight(120);
+    websiteRow->addWidget(websiteList, 1);
+    auto *websiteButtons = new QVBoxLayout;
+    auto *addLanguage = new QPushButton(tr("Add…"));
+    auto *removeLanguage = new QPushButton(tr("Remove"));
+    auto *upLanguage = new QPushButton(tr("Move Up"));
+    auto *downLanguage = new QPushButton(tr("Move Down"));
+    auto *systemLanguagesButton = new QPushButton(tr("Use the System's"));
+    for (QPushButton *button : {addLanguage, removeLanguage, upLanguage, downLanguage, systemLanguagesButton})
+        websiteButtons->addWidget(button);
+    websiteButtons->addStretch(1);
+    websiteRow->addLayout(websiteButtons);
+    layout->addLayout(websiteRow);
+    layout->addWidget(mutedLabel(tr("Sites that come in several languages show the first of these they have. "
+                                    "Spelling is checked in them too, where dictionaries are installed.")));
+    const auto fillWebsiteLanguages = [websiteList](const QStringList &tags) {
+        websiteList->clear();
+        for (const QString &tag : tags) {
+            auto *item = new QListWidgetItem(QStringLiteral("%1 — %2").arg(Languages::nativeName(tag), tag));
+            item->setData(Qt::UserRole, tag);
+            websiteList->addItem(item);
+        }
+    };
+    {
+        // The languages as chosen, or the system's, without the plain forms that
+        // are added on the way out.
+        const QStringList chosen = preferences->websiteLanguages();
+        fillWebsiteLanguages(chosen.isEmpty() ? Languages::systemLanguages() : chosen);
+    }
+    const auto saveWebsiteLanguages = [websiteList] {
+        QStringList tags;
+        for (int i = 0; i < websiteList->count(); ++i)
+            tags << websiteList->item(i)->data(Qt::UserRole).toString();
+        Preferences::instance()->setWebsiteLanguages(tags);
+    };
+    connect(addLanguage, &QPushButton::clicked, this, [this, websiteList, saveWebsiteLanguages] {
+        const QList<Languages::Language> all = Languages::allLanguages();
+        QStringList names;
+        for (const Languages::Language &language : all)
+            names << QStringLiteral("%1 — %2").arg(language.name, language.tag);
+        bool ok = false;
+        const QString picked = QInputDialog::getItem(this, tr("Add a Language"), tr("Language:"), names, 0, true, &ok);
+        if (!ok)
+            return;
+        const int index = names.indexOf(picked);
+        const QString tag = index >= 0 ? all[index].tag : Languages::normalizeTag(picked);
+        if (tag.isEmpty())
+            return;
+        for (int i = 0; i < websiteList->count(); ++i) {
+            if (websiteList->item(i)->data(Qt::UserRole).toString() == tag)
+                return;
+        }
+        auto *item = new QListWidgetItem(QStringLiteral("%1 — %2").arg(Languages::nativeName(tag), tag));
+        item->setData(Qt::UserRole, tag);
+        websiteList->addItem(item);
+        saveWebsiteLanguages();
+    });
+    connect(removeLanguage, &QPushButton::clicked, this, [websiteList, saveWebsiteLanguages] {
+        if (websiteList->count() > 1 && websiteList->currentRow() >= 0) {
+            delete websiteList->takeItem(websiteList->currentRow());
+            saveWebsiteLanguages();
+        }
+    });
+    const auto move = [websiteList, saveWebsiteLanguages](int by) {
+        const int row = websiteList->currentRow();
+        const int to = row + by;
+        if (row < 0 || to < 0 || to >= websiteList->count())
+            return;
+        QListWidgetItem *item = websiteList->takeItem(row);
+        websiteList->insertItem(to, item);
+        websiteList->setCurrentRow(to);
+        saveWebsiteLanguages();
+    };
+    connect(upLanguage, &QPushButton::clicked, this, [move] { move(-1); });
+    connect(downLanguage, &QPushButton::clicked, this, [move] { move(1); });
+    connect(systemLanguagesButton, &QPushButton::clicked, this, [fillWebsiteLanguages] {
+        Preferences::instance()->setWebsiteLanguages({});
+        fillWebsiteLanguages(Languages::systemLanguages());
+    });
+
+    layout->addWidget(sectionTitle(tr("Translation")));
+    auto *translateForm = new QFormLayout;
+    auto *service = new QComboBox;
+    service->setAccessibleName(tr("Translate with"));
+    for (const Translator::Service each : Translator::services())
+        service->addItem(Translator::name(each), Translator::key(each));
+    service->setCurrentIndex(qMax(0, service->findData(preferences->translateService())));
+    translateForm->addRow(tr("Translate with:"), service);
+    auto *into = new QComboBox;
+    into->setAccessibleName(tr("Translate into"));
+    into->addItem(tr("My first website language"), QString());
+    for (const Languages::Language &language : Languages::allLanguages()) {
+        if (!language.tag.contains(QLatin1Char('-')) || language.tag.startsWith(QLatin1String("zh-")))
+            into->addItem(language.name, language.tag);
+    }
+    into->setCurrentIndex(qMax(0, into->findData(preferences->translateTarget())));
+    translateForm->addRow(tr("Into:"), into);
+    auto *server = new QLineEdit(preferences->libreTranslateServer());
+    server->setPlaceholderText(QStringLiteral("https://libretranslate.example.org"));
+    server->setAccessibleName(tr("LibreTranslate server"));
+    auto *apiKey = new QLineEdit(preferences->libreTranslateKey());
+    apiKey->setEchoMode(QLineEdit::Password);
+    apiKey->setPlaceholderText(tr("If the server asks for one"));
+    apiKey->setAccessibleName(tr("LibreTranslate API key"));
+    translateForm->addRow(tr("LibreTranslate server:"), server);
+    translateForm->addRow(tr("API key:"), apiKey);
+    layout->addLayout(translateForm);
+    auto *offer = new QCheckBox(tr("Offer to translate pages that are not in my languages"));
+    offer->setChecked(preferences->offerTranslation());
+    connect(offer, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setOfferTranslation(on); });
+    layout->addWidget(offer);
+    auto *translateNote = mutedLabel(QString());
+    layout->addWidget(translateNote);
+    const auto updateTranslation = [service, server, apiKey, translateForm, translateNote] {
+        const Translator::Service chosen = Translator::fromKey(service->currentData().toString());
+        const bool libre = chosen == Translator::Service::LibreTranslate;
+        translateForm->setRowVisible(server, libre);
+        translateForm->setRowVisible(apiKey, libre);
+        switch (chosen) {
+        case Translator::Service::Google:
+            translateNote->setText(tr("Translate Page (%1) opens the page through Google's translation proxy, "
+                                      "which fetches it again: pages behind a sign-in are not translated, and "
+                                      "Google sees the address.").arg(Shortcuts::text(Shortcuts::TranslatePage)));
+            break;
+        case Translator::Service::LibreTranslate:
+            translateNote->setText(tr("The page is translated where it is: its text goes to this server and back. "
+                                      "Use your own server, or one you trust; public ones may ask for a key."));
+            break;
+        default:
+            translateNote->setText(tr("%1 translates text: Translate Page sends the selection, or the page's "
+                                      "article, to its translator in a new tab.").arg(Translator::name(chosen)));
+            break;
+        }
+    };
+    updateTranslation();
+    connect(service, &QComboBox::currentIndexChanged, this, [service, updateTranslation](int) {
+        Preferences::instance()->setTranslateService(service->currentData().toString());
+        updateTranslation();
+    });
+    connect(into, &QComboBox::currentIndexChanged, this,
+            [into](int) { Preferences::instance()->setTranslateTarget(into->currentData().toString()); });
+    connect(server, &QLineEdit::editingFinished, this,
+            [server] { Preferences::instance()->setLibreTranslateServer(server->text()); });
+    connect(apiKey, &QLineEdit::editingFinished, this,
+            [apiKey] { Preferences::instance()->setLibreTranslateKey(apiKey->text()); });
+
     layout->addWidget(sectionTitle(tr("Spelling")));
     auto *spelling = new QCheckBox(tr("Check spelling as you type"));
     spelling->setChecked(preferences->spellCheck());
@@ -346,6 +526,73 @@ QWidget *SettingsDialog::createGeneralTab()
                                         "one for suggestions. Checked in: %1.")
                                          .arg(SpellCheck::describe(spellLanguages))));
     }
+    if (SpellCheck::availableLanguages().size() > 1) {
+        layout->addWidget(new QLabel(tr("Or choose the dictionaries yourself (up to three):")));
+        auto *dictionaries = new QListWidget;
+        dictionaries->setAccessibleName(tr("Spelling dictionaries"));
+        dictionaries->setMaximumHeight(110);
+        const QStringList chosen = preferences->spellCheckLanguages();
+        for (const QString &dictionary : SpellCheck::availableLanguages()) {
+            auto *item = new QListWidgetItem(SpellCheck::describe({dictionary}));
+            item->setData(Qt::UserRole, dictionary);
+            item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+            item->setCheckState(chosen.contains(dictionary) ? Qt::Checked : Qt::Unchecked);
+            dictionaries->addItem(item);
+        }
+        connect(dictionaries, &QListWidget::itemChanged, this, [dictionaries](QListWidgetItem *changed) {
+            QStringList picked;
+            for (int i = 0; i < dictionaries->count(); ++i) {
+                if (dictionaries->item(i)->checkState() == Qt::Checked)
+                    picked << dictionaries->item(i)->data(Qt::UserRole).toString();
+            }
+            if (picked.size() > 3) {
+                // Chromium checks each word against every one: three is plenty.
+                const QSignalBlocker blocker(dictionaries);
+                changed->setCheckState(Qt::Unchecked);
+                picked.removeAll(changed->data(Qt::UserRole).toString());
+            }
+            Preferences::instance()->setSpellCheckLanguages(picked);
+        });
+        layout->addWidget(dictionaries);
+    }
+
+    layout->addWidget(sectionTitle(tr("Read Aloud")));
+    if (ReadAloud::isAvailable()) {
+        auto *rateRow = new QHBoxLayout;
+        rateRow->addWidget(new QLabel(tr("Speed:")));
+        auto *rate = new QSlider(Qt::Horizontal);
+        rate->setRange(-5, 5);
+        rate->setPageStep(1);
+        rate->setTickPosition(QSlider::TicksBelow);
+        rate->setValue(preferences->readAloudRate());
+        rate->setAccessibleName(tr("Read Aloud speed"));
+        connect(rate, &QSlider::valueChanged, this, [](int value) { Preferences::instance()->setReadAloudRate(value); });
+        rateRow->addWidget(new QLabel(tr("Slower")));
+        rateRow->addWidget(rate, 1);
+        rateRow->addWidget(new QLabel(tr("Faster")));
+        layout->addLayout(rateRow);
+        layout->addWidget(mutedLabel(tr("Reads the selected text, or else the page's article, with %1 (%2). "
+                                        "Nothing leaves this computer.")
+                                         .arg(ReadAloud::engineName(ReadAloud::engine()),
+                                              Shortcuts::text(Shortcuts::ReadAloud))));
+    } else {
+        layout->addWidget(mutedLabel(tr("No speech engine was found. Install speech-dispatcher (spd-say) "
+                                        "or eSpeak NG from your distribution's packages to have pages read aloud.")));
+    }
+
+    layout->addWidget(sectionTitle(tr("Mouse gestures")));
+    auto *gestures = new QCheckBox(tr("Hold the right mouse button and draw on a page to go back, close the tab…"));
+    gestures->setChecked(preferences->mouseGestures());
+    connect(gestures, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setMouseGestures(checked); });
+    layout->addWidget(gestures);
+    QStringList gestureList;
+    for (const MouseGestures::Entry &entry : MouseGestures::all())
+        gestureList << QStringLiteral("%1 %2").arg(MouseGestures::arrows(entry.directions),
+                                                   MouseGestures::label(entry.action));
+    layout->addWidget(mutedLabel(gestureList.join(QStringLiteral(" · "))
+                                 + QStringLiteral("\n")
+                                 + tr("A right click without drawing still opens the menu.")));
     layout->addStretch(1);
     return page;
 }
@@ -461,6 +708,77 @@ QWidget *SettingsDialog::createPrivacyTab()
     QVBoxLayout *layout = nullptr;
     QWidget *page = pageShell(tr("Privacy & Security"),
                               tr("Content blocking, data use and your browsing data."), &layout);
+
+    layout->addWidget(sectionTitle(tr("VPN")));
+    {
+        QSettings settings;
+        auto *vpnOff = new QRadioButton(tr("Off"));
+        auto *vpnTor = new QRadioButton(tr("Through Tor (free; slower)"));
+        vpnTor->setToolTip(tr("Free and without an account, but slower, and some sites refuse Tor."));
+        auto *vpnServer = new QRadioButton(tr("Through my VPN or proxy server:"));
+        auto *vpnGroup = new QButtonGroup(page);
+        vpnGroup->addButton(vpnOff, int(Vpn::Mode::Off));
+        vpnGroup->addButton(vpnTor, int(Vpn::Mode::Tor));
+        vpnGroup->addButton(vpnServer, int(Vpn::Mode::Proxy));
+        if (QAbstractButton *checked = vpnGroup->button(int(Vpn::chosenMode())))
+            checked->setChecked(true);
+        layout->addWidget(vpnOff);
+        layout->addWidget(vpnTor);
+        layout->addWidget(vpnServer);
+        const Vpn::Server server = Vpn::chosenServer();
+        auto *serverRow = new QHBoxLayout;
+        serverRow->setContentsMargins(24, 0, 0, 0);
+        auto *type = new QComboBox;
+        type->addItem(QStringLiteral("SOCKS5"), QStringLiteral("socks5"));
+        type->addItem(QStringLiteral("HTTP"), QStringLiteral("http"));
+        type->setCurrentIndex(qMax(0, type->findData(server.type)));
+        type->setAccessibleName(tr("Server type"));
+        auto *host = new QLineEdit(server.host);
+        host->setPlaceholderText(tr("Server, e.g. 10.64.0.1 or socks.example.com"));
+        host->setAccessibleName(tr("Server address"));
+        auto *port = new QSpinBox;
+        port->setRange(1, 65535);
+        port->setValue(server.port > 0 ? server.port : 1080);
+        port->setAccessibleName(tr("Server port"));
+        serverRow->addWidget(type);
+        serverRow->addWidget(host, 1);
+        serverRow->addWidget(port);
+        layout->addLayout(serverRow);
+        auto *vpnNote = mutedLabel(QString());
+        layout->addWidget(vpnNote);
+        const auto update = [vpnGroup, type, host, port, vpnNote] {
+            const auto mode = static_cast<Vpn::Mode>(vpnGroup->checkedId());
+            for (QWidget *widget : std::initializer_list<QWidget *>{type, host, port})
+                widget->setEnabled(mode == Vpn::Mode::Proxy);
+            QString text = tr("Everything SpacePenguin loads goes through it, its own updates and "
+                              "filter lists too. Many VPN services offer a SOCKS5 server for this "
+                              "(Mullvad, NordVPN, Private Internet Access…). A VPN app for the whole "
+                              "computer needs nothing here.");
+            if (mode == Vpn::Mode::Proxy
+                && Vpn::proxyAddress({type->currentData().toString(), host->text(), port->value()}).isEmpty())
+                text = tr("Enter the server's address and port.");
+            if (mode != Vpn::activeMode())
+                text += QLatin1Char(' ') + tr("Takes effect when SpacePenguin restarts.");
+            vpnNote->setText(text);
+        };
+        const auto save = [vpnGroup, type, host, port, update] {
+            QSettings settings;
+            settings.setValue(QStringLiteral("vpn/mode"), Vpn::modeKey(static_cast<Vpn::Mode>(vpnGroup->checkedId())));
+            settings.setValue(QStringLiteral("vpn/proxyType"), type->currentData().toString());
+            settings.setValue(QStringLiteral("vpn/proxyHost"), host->text().trimmed());
+            settings.setValue(QStringLiteral("vpn/proxyPort"), port->value());
+            update();
+        };
+        update();
+        connect(vpnGroup, &QButtonGroup::idClicked, this, [save](int) { save(); });
+        connect(type, &QComboBox::currentIndexChanged, this, [save](int) { save(); });
+        connect(host, &QLineEdit::editingFinished, this, save);
+        connect(port, &QSpinBox::valueChanged, this, [save](int) { save(); });
+        if (Classroom::instance()->locked()) {
+            vpnTor->setEnabled(false);
+            vpnTor->setToolTip(tr("Tor is off while you're in a class."));
+        }
+    }
 
     layout->addWidget(sectionTitle(tr("Secure connections")));
     auto *httpsOnly = new QCheckBox(tr("Always use secure connections (HTTPS-only mode)"));
@@ -637,6 +955,28 @@ QWidget *SettingsDialog::createPrivacyTab()
     layout->addWidget(dataSaver);
     layout->addWidget(mutedLabel(tr("Applies to open tabs straight away; reload a page to "
                                     "see the difference.")));
+
+    layout->addWidget(sectionTitle(tr("Encryption")));
+    auto *encryptionButtons = new QHBoxLayout;
+    auto *primary = new QPushButton(Icons::icon(Icons::Key), PrimaryPassword::isSet() ? tr("Change Primary Password…")
+                                                                                    : tr("Set a Primary Password…"));
+    connect(primary, &QPushButton::clicked, this, [this, primary] {
+        PrimaryPassword::change(this);
+        primary->setText(PrimaryPassword::isSet() ? tr("Change Primary Password…") : tr("Set a Primary Password…"));
+    });
+    auto *exportBackup = new QPushButton(tr("Export Encrypted Backup…"));
+    connect(exportBackup, &QPushButton::clicked, this, [this] { Backup::exportTo(this); });
+    auto *importBackup = new QPushButton(tr("Restore Backup…"));
+    connect(importBackup, &QPushButton::clicked, this, [this] { Backup::importFrom(this); });
+    encryptionButtons->addWidget(primary);
+    encryptionButtons->addWidget(exportBackup);
+    encryptionButtons->addWidget(importBackup);
+    encryptionButtons->addStretch(1);
+    layout->addLayout(encryptionButtons);
+    layout->addWidget(mutedLabel(tr("A primary password keeps other people at this computer out of your saved "
+                                    "logins. A backup holds your logins and settings (bookmarks included), "
+                                    "encrypted with AES-256-GCM and a password of your choosing, to move them "
+                                    "to another computer.")));
 
     layout->addWidget(sectionTitle(tr("Browsing data")));
     auto *dataButtons = new QHBoxLayout;

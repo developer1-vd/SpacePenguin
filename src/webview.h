@@ -1,8 +1,16 @@
 #pragma once
 
+#include "mousegestures.h"
+
+#include <QList>
+#include <QPoint>
+#include <QPointer>
 #include <QWebEngineView>
 
 #include <functional>
+#include <memory>
+
+class QMouseEvent;
 
 class QContextMenuEvent;
 class QWebEngineProfile;
@@ -23,6 +31,7 @@ public:
     using TabFactory = std::function<WebView *(bool background)>;
 
     explicit WebView(QWebEngineProfile *profile, QWidget *parent = nullptr);
+    ~WebView() override;
 
     BrowserPage *browserPage() const { return m_page; }
 
@@ -38,11 +47,22 @@ public:
 signals:
     /** Developer mode: Inspect was chosen in the page's context menu. */
     void inspectRequested();
+    /** Picture-in-Picture was chosen in a video's context menu. */
+    void pictureInPictureRequested();
+    /** Read Aloud was chosen for the selected text. */
+    void readAloudRequested();
+    /** Translate was chosen for the selected text. */
+    void translateSelectionRequested(const QString &text);
+    /** A mouse gesture was drawn on the page (Preferences::mouseGestures()). */
+    void gestureDrawn(spacepenguin::MouseGestures::Action action);
 
 protected:
     QWebEngineView *createWindow(QWebEnginePage::WebWindowType type) override;
     /** The standard menu; Inspect only for developers, opening the window's developer tools. */
     void contextMenuEvent(QContextMenuEvent *event) override;
+    /** Watches the widget Chromium draws into, which gets the mouse, for gestures. */
+    bool event(QEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     WebView *openDialog();
@@ -52,6 +72,13 @@ private:
     bool m_loading = false;
     bool m_failed = false;
     int m_progress = 100;
+
+    // A right-button stroke in progress: its points, and the press, held back
+    // from the page until it is clear whether this is a gesture or a click.
+    QList<QPoint> m_stroke;
+    std::unique_ptr<QMouseEvent> m_heldPress;
+    QPointer<QObject> m_strokeTarget;
+    bool m_replaying = false;
 };
 
 }

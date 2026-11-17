@@ -7,6 +7,26 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-11-17
+
+### Added
+
+- End-to-end encryption for classes: what teacher and students send each other (blocked sites, reasons, names, requests) is encrypted with the key from the class code before it is signed, so others on the school network see none of it. Teacher and students need this version, or a newer one, to share a class.
+- AES-256 encryption: Settings › Privacy & Security can export your saved logins and settings (bookmarks included) as an encrypted backup (AES-256-GCM, with a key from PBKDF2-SHA256 at 600,000 rounds) and restore one on another computer. The work is done by Chromium's WebCrypto, so SpacePenguin carries no cryptography of its own.
+- A primary password for saved logins: once set, they cannot be seen, filled in or exported until it is given, once per start. Only a PBKDF2 verifier of it is kept.
+- A VPN switch in the toolbar: everything SpacePenguin loads, its own updates and filter lists included, goes through Tor (free, no account) or through a SOCKS5 or HTTP server of your VPN service or your own (Settings › Privacy & Security). Names are resolved by the proxy and WebRTC cannot go around it. If the VPN cannot start, SpacePenguin connects to nothing until you choose. Changing it restarts SpacePenguin with the same tabs.
+- A translator: Translate Page (Ctrl+Shift+Y, View menu) and Translate Selection (right-click), with Google Translate, Bing Translator, DeepL, Yandex Translate or a LibreTranslate server of your choosing, which translates the page in place. SpacePenguin offers to translate pages that are not in your languages (Settings › General turns that off). Nothing is sent until you ask; LibreTranslate is not used from Tor windows, where it would not go through Tor.
+- Languages in Settings › General: SpacePenguin's own language (and so how dates and numbers are written), the languages websites are asked for, in order (Accept-Language and navigator.languages), and the spelling dictionaries, instead of only the system's. Any language and region can be added.
+- Read Aloud (text to speech): View › Read Aloud or Ctrl+Alt+S reads the selected text, or else the page's article, in the page's language, with the system's own voices: macOS speech, Windows speech, or speech-dispatcher or eSpeak on Linux. Nothing leaves the computer. Right-click selected text to read just that; the speed is in Settings › General. The text reaches the speech program on its standard input, never on its command line, where other users of the computer could see it.
+- Picture-in-Picture: a page's video plays in a small window that stays over the others (View › Picture-in-Picture, Ctrl+Alt+P, or right-click a video). The tab keeps its place and the video keeps playing; Escape, closing the window or *Bring It Back* returns it.
+- Mouse gestures: hold the right mouse button and draw on a page. ← back, → forward, ↑ to the top, ↓ to the bottom, ↑↓ reload, ↓← new tab, ↓→ close tab, ↑← reopen the closed tab. A right click without drawing still opens the menu. Settings › General turns them off.
+- A Homebrew cask for macOS (`brew install --cask spacepenguin` from the SpacePenguin tap) and winget manifests for Windows, both written for each release by `tools/update-package-manifests.sh`.
+
+### Fixed
+
+- SpacePenguin could crash on the way out: a window that was still open, or only scheduled to close, could keep its pages past the browser profile they belong to. All windows now go before the profile.
+- On Linux, playing a video (YouTube, or a tab reopened at start-up) could still close the browser, Gamer mode or not: Chromium handed decoded frames to QtWebEngine in a form it cannot take on Linux. Videos are now decoded without the GPU on Linux.
+
 ## [1.0.0-rc.3] - 2026-11-16
 
 The third release candidate for 1.0.
@@ -83,7 +103,8 @@ their store, sites installed as apps, saved logins (about:logins), crash
 recovery, roles for developers, gamers, students, workers and teachers, and
 packages for Windows, macOS, Linux, the BSDs, Chromebooks, Android and iPhone.
 
-[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.3...HEAD
+[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.4...HEAD
+[1.0.0-rc.4]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.3...v1.0.0-rc.4
 [1.0.0-rc.3]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.2...v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/developer1-vd/SpacePenguin/compare/v0.1-A...v1.0.0-rc.1

@@ -13,7 +13,11 @@
 #include "datasavermanager.h"
 #include "downloadmanager.h"
 #include "historymanager.h"
+#include "languages.h"
 #include "preferences.h"
+#include "primarypassword.h"
+
+#include <QWebEngineUrlRequestJob>
 #include "spellcheck.h"
 #include "startpageschemehandler.h"
 #include "store.h"
@@ -104,6 +108,12 @@ QString defaultFilterListPath()
     return defaultDataDirectory() + QStringLiteral("/adblock/filters.txt");
 }
 
+LoginStore *sharedLogins()
+{
+    static LoginStore *logins = new LoginStore(defaultDataDirectory(), qApp);
+    return logins;
+}
+
 ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QString &filterListPath)
 {
     ProfileServices services;
@@ -128,7 +138,7 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
         });
 
     // One store of saved logins; private windows can fill from it but do not add to it.
-    static LoginStore *logins = new LoginStore(defaultDataDirectory(), qApp);
+    LoginStore *logins = sharedLogins();
     services.logins = logins;
     if (!isPrivate) {
         QWebEngineScript capture;
@@ -142,8 +152,20 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     }
 
     // Spell checking in text boxes, in the person's languages; it follows the setting.
+    // Websites are asked for pages in the person's languages too.
     const auto applySpellCheck = [profile = services.profile] {
-        const QStringList languages = SpellCheck::languagesForThisSystem();
+        const Preferences *preferences = Preferences::instance();
+        const QString accept = Languages::acceptLanguage(preferences->websiteLanguages());
+        if (profile->httpAcceptLanguage() != accept)
+            profile->setHttpAcceptLanguage(accept);
+        QStringList languages;
+        for (const QString &dictionary : preferences->spellCheckLanguages()) {
+            if (SpellCheck::availableLanguages().contains(dictionary) && languages.size() < 3)
+                languages << dictionary;
+        }
+        if (languages.isEmpty())
+            languages = SpellCheck::chooseLanguages(Languages::websiteLanguages(preferences->websiteLanguages()),
+                                                    SpellCheck::availableLanguages());
         const bool on = Preferences::instance()->spellCheck() && !languages.isEmpty();
         if (on)
             profile->setSpellCheckLanguages(languages);
@@ -175,6 +197,11 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     });
     services.profile->installUrlSchemeHandler(QByteArrayLiteral("sp"), startPage);
     startPage->setHostHandler(QStringLiteral("logins"), [logins = services.logins](QWebEngineUrlRequestJob *job) {
+        // Behind the primary password, when there is one: the page and its API alike.
+        if (!PrimaryPassword::isUnlocked()) {
+            job->fail(QWebEngineUrlRequestJob::RequestDenied);
+            return;
+        }
         static const QByteArray page = [] {
             QFile file(QStringLiteral(":/html/logins.html"));
             return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();

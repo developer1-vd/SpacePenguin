@@ -45,6 +45,9 @@ public:
         Extensions,
         Settings,
         Print,
+        PictureInPicture,
+        ReadAloud,
+        TranslatePage,
         KeyboardShortcuts,
     };
 

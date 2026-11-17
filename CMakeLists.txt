@@ -13,7 +13,7 @@ project(SpacePenguin
 # need plain numbers and take VERSION above. It is VERSION itself, or VERSION with
 # a pre-release suffix ("-rc.1") while a release is being tried out; the release
 # tag is "v" and this name.
-set(SPACEPENGUIN_VERSION_NAME "1.0.0-rc.3")
+set(SPACEPENGUIN_VERSION_NAME "1.0.0-rc.4")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -135,6 +135,22 @@ qt_add_executable(spacepenguin
     src/httpsonly.h
     src/webview.cpp
     src/webview.h
+    src/mousegestures.cpp
+    src/mousegestures.h
+    src/readaloud.cpp
+    src/readaloud.h
+    src/languages.cpp
+    src/languages.h
+    src/translator.cpp
+    src/translator.h
+    src/vpn.cpp
+    src/vpn.h
+    src/crypto.cpp
+    src/crypto.h
+    src/primarypassword.cpp
+    src/primarypassword.h
+    src/backup.cpp
+    src/backup.h
     src/startuptrace.cpp
     src/startuptrace.h
     src/sponsorblock.cpp
@@ -439,6 +455,51 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_include_directories(tst_importer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME importer COMMAND tst_importer)
 
+        qt_add_executable(tst_mousegestures
+            tests/tst_mousegestures.cpp
+            src/mousegestures.cpp
+            src/mousegestures.h
+        )
+        target_link_libraries(tst_mousegestures PRIVATE Qt6::Test)
+        target_include_directories(tst_mousegestures PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME mousegestures COMMAND tst_mousegestures)
+
+        qt_add_executable(tst_readaloud
+            tests/tst_readaloud.cpp
+            src/readaloud.cpp
+            src/readaloud.h
+        )
+        target_link_libraries(tst_readaloud PRIVATE Qt6::Test)
+        target_include_directories(tst_readaloud PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME readaloud COMMAND tst_readaloud)
+
+        qt_add_executable(tst_languages
+            tests/tst_languages.cpp
+            src/languages.cpp
+            src/languages.h
+        )
+        target_link_libraries(tst_languages PRIVATE Qt6::Test)
+        target_include_directories(tst_languages PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME languages COMMAND tst_languages)
+
+        qt_add_executable(tst_translator
+            tests/tst_translator.cpp
+            src/translator.cpp
+            src/translator.h
+        )
+        target_link_libraries(tst_translator PRIVATE Qt6::Test Qt6::Network)
+        target_include_directories(tst_translator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME translator COMMAND tst_translator)
+
+        qt_add_executable(tst_crypto
+            tests/tst_crypto.cpp
+            src/crypto.cpp
+            src/crypto.h
+        )
+        target_link_libraries(tst_crypto PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
+        target_include_directories(tst_crypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME crypto COMMAND tst_crypto)
+
         qt_add_executable(tst_roles
             tests/tst_roles.cpp
             src/updatechecker.cpp
@@ -453,6 +514,8 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/urlresolver.h
             src/tor.cpp
             src/tor.h
+            src/vpn.cpp
+            src/vpn.h
             src/classroom.cpp
             src/classroom.h
         )
@@ -604,6 +667,10 @@ if(SPACEPENGUIN_BUILD_TESTS)
         # Tests never touch the real keyring (a test that does turns it back on).
         get_property(spacepenguin_tests DIRECTORY PROPERTY TESTS)
         set_tests_properties(${spacepenguin_tests} PROPERTIES ENVIRONMENT "SPACEPENGUIN_NO_KEYRING=1")
+        # The crypto test runs Chromium: no GPU or sandbox in CI containers, and
+        # Chromium's allocations at exit are not leaks of ours.
+        set_tests_properties(crypto PROPERTIES ENVIRONMENT
+            "SPACEPENGUIN_NO_KEYRING=1;QTWEBENGINE_CHROMIUM_FLAGS=--disable-gpu --no-sandbox;QTWEBENGINE_DISABLE_SANDBOX=1;ASAN_OPTIONS=detect_leaks=0")
     endif()
 endif()
 

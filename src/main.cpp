@@ -5,6 +5,9 @@
 #include <QFileOpenEvent>
 #include <QLoggingCategory>
 #include <QMessageBox>
+#include <QPointer>
+#include <QPushButton>
+#include <QWidget>
 #include <QSettings>
 #include <QTimer>
 #include <QLocale>
@@ -31,6 +34,7 @@
 #include "startuptrace.h"
 #include "systemscheme.h"
 #include "tor.h"
+#include "vpn.h"
 #include "theme.h"
 
 #include <functional>
@@ -81,6 +85,11 @@ int main(int argc, char *argv[])
     // The system's language: SpacePenguin's own words (translations/), else English
     // with its plural forms, and Qt's dialogs (printing, opening files) where Qt
     // has a translation installed.
+    // Or the one chosen in Settings › General, which also sets how dates and numbers
+    // are written.
+    const QString chosenLanguage = QSettings().value(QStringLiteral("languages/app")).toString();
+    if (!chosenLanguage.isEmpty())
+        QLocale::setDefault(QLocale(QString(chosenLanguage).replace(QLatin1Char('-'), QLatin1Char('_'))));
     static QTranslator qtTranslator;
     if (qtTranslator.load(QLocale(), QStringLiteral("qtbase"), QStringLiteral("_"),
                           QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
@@ -141,6 +150,9 @@ int main(int argc, char *argv[])
     const QStringList urls = parser.positionalArguments();
     const QString appId = parser.value(appOption);
 
+    // Restarted for a new VPN mode: the old process first lets go of the profile.
+    qApp->setProperty("spacepenguin.restoreOnce", spacepenguin::Vpn::waitForPreviousProcess());
+
     // One process per profile: a second launch hands its pages to the first one.
     const QString dataDirectory = parser.isSet(userDataOption)
         ? QDir(parser.value(userDataOption)).absolutePath()
@@ -182,6 +194,22 @@ int main(int argc, char *argv[])
     // Teacher and student mode talk over the school network; the Tor process never does.
     if (!torMode)
         spacepenguin::Classroom::instance()->start();
+    // The VPN, before Chromium starts. If it cannot start, nothing loads without it
+    // unless the person says so.
+    if (!torMode) {
+        QString error;
+        if (!spacepenguin::Vpn::apply(&error)) {
+            QMessageBox box(QMessageBox::Warning, QStringLiteral("SpacePenguin"),
+                            QCoreApplication::translate("Vpn", "The VPN could not start, so SpacePenguin has not "
+                                                               "connected to anything.\n\n%1").arg(error));
+            QPushButton *without = box.addButton(QCoreApplication::translate("Vpn", "Open Without the VPN"),
+                                                 QMessageBox::AcceptRole);
+            box.addButton(QCoreApplication::translate("Vpn", "Quit"), QMessageBox::RejectRole);
+            box.exec();
+            if (box.clickedButton() != without)
+                return 1;
+        }
+    }
     spacepenguin::watchSystemScheme();
     spacepenguin::ProfileServices services = spacepenguin::createProfileServices(
         &app, isPrivate, parser.value(filterListOption));
@@ -269,5 +297,20 @@ int main(int argc, char *argv[])
     };
     app.installEventFilter(new FileOpenFilter(openFromOutside, &app));
 
-    return app.exec();
+    const int status = app.exec();
+    // Every page must go before its profile, which is a child of the application
+    // and so is deleted with it: a page that outlives it crashes Chromium on the
+    // way out. Windows closed just before quitting are only scheduled for deletion,
+    // and some (a window Qt did not close, a detached developer tools window) are
+    // still here, so both go now.
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QList<QPointer<QWidget>> windows;
+    for (QWidget *window : QApplication::topLevelWidgets())
+        windows << window;
+    for (const QPointer<QWidget> &window : std::as_const(windows)) {
+        if (window && !window->parentWidget())
+            delete window.data();
+    }
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    return status;
 }

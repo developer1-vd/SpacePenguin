@@ -15,6 +15,7 @@ private slots:
     void overrideWins();
     void userFlagsWin();
     void unknownMemoryIsNotLowMemory();
+    void linuxVideosAvoidGpuBuffers();
 };
 
 static DeviceTuning::Facts facts(qint64 memoryMiB, bool chromeOS = false, bool gpu = true)
@@ -83,6 +84,21 @@ void TestDeviceTuning::unknownMemoryIsNotLowMemory()
     const auto plan = DeviceTuning::plan(facts(0));
     QVERIFY(!plan.lowMemory);
     QVERIFY(plan.device.isEmpty());
+}
+
+void TestDeviceTuning::linuxVideosAvoidGpuBuffers()
+{
+    // QtWebEngine aborts on Linux when a video frame arrives as a two-plane GBM
+    // buffer, which closed the browser on YouTube.
+    auto desktop = facts(16 * 1024);
+    desktop.onLinux = true;
+    const auto plan = DeviceTuning::plan(desktop);
+    QVERIFY(plan.flags.contains(QStringLiteral("--disable-accelerated-video-decode")));
+    QVERIFY(plan.flags.contains(QStringLiteral("--disable-gpu-memory-buffer-video-frames")));
+    QVERIFY(!plan.lowMemory);
+    // A switch the user set themselves is left to them.
+    desktop.userFlags = QStringLiteral("--disable-accelerated-video-decode=0");
+    QVERIFY(!DeviceTuning::plan(desktop).flags.contains(QStringLiteral("--disable-accelerated-video-decode")));
 }
 
 QTEST_GUILESS_MAIN(TestDeviceTuning)

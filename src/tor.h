@@ -36,6 +36,14 @@ bool requested(int argc, char *argv[]);
  */
 bool start(QString *error);
 
+/**
+ * For the VPN (vpn.h): finds or starts a Tor for the whole of this ordinary
+ * browser, and returns its SOCKS port, or 0 with a message.
+ */
+quint16 startForVpn(QString *error);
+/** Whether this ordinary process goes through Tor as its VPN. */
+bool isVpn();
+
 /** Whether @p url is an onion site. */
 bool isOnion(const QUrl &url);
 

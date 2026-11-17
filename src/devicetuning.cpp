@@ -83,6 +83,18 @@ DeviceTuning::Plan DeviceTuning::plan(const Facts &facts)
         why << QStringLiteral("software drawing (no GPU acceleration for Linux apps)");
     }
 
+    if (facts.onLinux) {
+        // On Linux, Chromium's GPU video path hands decoded frames over as
+        // two-plane GBM buffers, which QtWebEngine's Linux GPU code cannot take
+        // ("Direct allocation of multi-planar GBM buffer ... unsupported"): it
+        // aborts, and the browser closes as soon as a video plays (YouTube, or a
+        // restored tab at start-up). Videos decode on the CPU instead, as
+        // Chromium itself does on most Linux systems.
+        wanted << QStringLiteral("--disable-accelerated-video-decode")
+               << QStringLiteral("--disable-gpu-memory-buffer-video-frames");
+        why << QStringLiteral("videos decoded without the GPU");
+    }
+
     // Whatever the user passed wins: skip any switch they set themselves.
     QStringList userSwitches;
     for (const QString &flag : facts.userFlags.split(QLatin1Char(' '), Qt::SkipEmptyParts))
@@ -103,6 +115,7 @@ void DeviceTuning::prepare()
 #ifdef Q_OS_LINUX
     facts.chromeOS = isChromeOSContainer();
     facts.gpuDevice = hasGpuRenderNode();
+    facts.onLinux = true;
 #endif
     facts.memoryMiB = physicalMemoryMiB();
     const QByteArray override = qgetenv("SPACEPENGUIN_LOW_MEMORY");

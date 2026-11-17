@@ -454,7 +454,7 @@ QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target
 {
     const QByteArray path = target.left(target.indexOf('?') < 0 ? target.size() : target.indexOf('?'));
     *status = 200;
-    if (method != "POST" || (path != "/v2/class" && path != "/v2/request")) {
+    if (method != "POST" || (path != "/v3/class" && path != "/v3/request")) {
         *status = 404;
         return error("not found");
     }
@@ -463,15 +463,16 @@ QByteArray Classroom::respond(const QByteArray &method, const QByteArray &target
         *status = 403;
         return error("wrong class code");
     }
-    const QJsonObject request = QJsonDocument::fromJson(body).object();
-    const QByteArray answer = respondSigned(path, request, status);
+    // Encrypted, then signed: the signature covers what crossed the network.
+    const QJsonObject request = QJsonDocument::fromJson(seal(classKey(code()), nonce, "request", body)).object();
+    const QByteArray answer = seal(classKey(code()), nonce, "answer", respondSigned(path, request, status));
     *mac = sign(classKey(code()), answerMessage(nonce, *status, answer));
     return answer;
 }
 
 QByteArray Classroom::respondSigned(const QByteArray &path, const QJsonObject &request, int *status)
 {
-    if (path == "/v2/class") {
+    if (path == "/v3/class") {
         const QString id = clip(request.value(QStringLiteral("id")).toString(), 64);
         // A closed class, and a student the teacher let go, are told so; the student leaves.
         if (!classOpen() || m_released.remove(id)) {
@@ -680,7 +681,7 @@ void Classroom::join(const QString &text, const QString &name)
         url.setScheme(QStringLiteral("http"));
         url.setHost(address.toString());
         url.setPort(port);
-        url.setPath(QStringLiteral("/v2/class"));
+        url.setPath(QStringLiteral("/v3/class"));
         QByteArray nonce;
         QNetworkReply *reply = post(url, {{QStringLiteral("id"), id}, {QStringLiteral("name"), studentName}},
                                     code, &nonce);
@@ -738,7 +739,7 @@ void Classroom::poll()
     QSettings settings;
     const QString code = settings.value(kStudent + QStringLiteral("code")).toString();
     QByteArray nonce;
-    QNetworkReply *reply = post(teacherUrl(QStringLiteral("/v2/class")),
+    QNetworkReply *reply = post(teacherUrl(QStringLiteral("/v3/class")),
                                 {{QStringLiteral("id"), settings.value(kStudent + QStringLiteral("id")).toString()},
                                  {QStringLiteral("name"), studentName()}},
                                 code, &nonce);
@@ -850,7 +851,7 @@ void Classroom::postRequest(const QJsonObject &fields)
     body.insert(QStringLiteral("name"), studentName());
     const QString code = settings.value(kStudent + QStringLiteral("code")).toString();
     QByteArray nonce;
-    QNetworkReply *reply = post(teacherUrl(QStringLiteral("/v2/request")), body, code, &nonce);
+    QNetworkReply *reply = post(teacherUrl(QStringLiteral("/v3/request")), body, code, &nonce);
     connect(reply, &QNetworkReply::finished, this, [this, reply, code, nonce] {
         reply->deleteLater();
         QByteArray answer;
@@ -890,6 +891,27 @@ QByteArray Classroom::classKey(const QString &code)
     return key;
 }
 
+QByteArray Classroom::seal(const QByteArray &key, const QByteArray &nonce, const QByteArray &direction,
+                           const QByteArray &data)
+{
+    // A keystream from HMAC-SHA256 in counter mode, under a key of its own, for
+    // each message's nonce and direction (so a request and its answer never share
+    // one); XOR with it both encrypts and decrypts.
+    const QByteArray encryptionKey =
+        QMessageAuthenticationCode::hash(QByteArrayLiteral("SpacePenguin classroom v3 encryption"), key,
+                                         QCryptographicHash::Sha256);
+    QByteArray out = data;
+    QMessageAuthenticationCode block(QCryptographicHash::Sha256, encryptionKey);
+    for (qsizetype offset = 0, counter = 0; offset < out.size(); offset += 32, ++counter) {
+        block.reset();
+        block.addData(direction + '\n' + nonce + '\n' + QByteArray::number(counter));
+        const QByteArray stream = block.result();
+        for (qsizetype i = 0; i < 32 && offset + i < out.size(); ++i)
+            out[offset + i] = char(out[offset + i] ^ stream[i]);
+    }
+    return out;
+}
+
 QByteArray Classroom::sign(const QByteArray &key, const QByteArray &message)
 {
     return QMessageAuthenticationCode::hash(message, key, QCryptographicHash::Sha256).toHex();
@@ -897,11 +919,11 @@ QByteArray Classroom::sign(const QByteArray &key, const QByteArray &message)
 
 QNetworkReply *Classroom::post(const QUrl &url, const QJsonObject &body, const QString &code, QByteArray *nonce)
 {
-    const QByteArray data = QJsonDocument(body).toJson(QJsonDocument::Compact);
     const QByteArray time = QByteArray::number(QDateTime::currentSecsSinceEpoch());
     *nonce = randomNonce();
+    const QByteArray data = seal(classKey(code), *nonce, "request", QJsonDocument(body).toJson(QJsonDocument::Compact));
     QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/octet-stream"));
     request.setTransferTimeout(5000);
     request.setRawHeader("X-SP-Time", time);
     request.setRawHeader("X-SP-Nonce", *nonce);
@@ -913,7 +935,10 @@ bool Classroom::verifiedAnswer(QNetworkReply *reply, const QString &code, const 
 {
     *body = reply->readAll();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    return sameMac(reply->rawHeader("X-SP-Mac"), sign(classKey(code), answerMessage(nonce, status, *body)));
+    if (!sameMac(reply->rawHeader("X-SP-Mac"), sign(classKey(code), answerMessage(nonce, status, *body))))
+        return false;
+    *body = seal(classKey(code), nonce, "answer", *body);
+    return true;
 }
 
 bool Classroom::parseJoinCode(const QString &text, QString *code, QString *host, quint16 *port)

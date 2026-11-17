@@ -1,4 +1,5 @@
 #include <QtTest>
+#include <QJsonDocument>
 
 #include "classroom.h"
 #include "preferences.h"
@@ -292,19 +293,27 @@ void TestClassroom::outsidersAreRefused()
 
     // Requests: unsigned, signed with another code, stale or replayed are refused.
     const quint16 port = classroom->port();
-    QVERIFY(exchange(port, "POST /v2/class HTTP/1.1\r\nContent-Length: " + QByteArray::number(body.size())
+    QVERIFY(exchange(port, "POST /v3/class HTTP/1.1\r\nContent-Length: " + QByteArray::number(body.size())
                                + "\r\n\r\n" + body).startsWith("HTTP/1.1 403"));
-    QVERIFY(exchange(port, signedPost(QStringLiteral("AAAAAAAAAA"), "/v2/class", body, QByteArray(32, 'b')))
+    QVERIFY(exchange(port, signedPost(QStringLiteral("AAAAAAAAAA"), "/v3/class", Classroom::seal(key, QByteArray(32, 'b'), "request", body), QByteArray(32, 'b')))
                 .startsWith("HTTP/1.1 403"));
-    QVERIFY(exchange(port, signedPost(code, "/v2/class", body, QByteArray(32, 'c'),
+    QVERIFY(exchange(port, signedPost(code, "/v3/class", Classroom::seal(key, QByteArray(32, 'c'), "request", body), QByteArray(32, 'c'),
                                       QDateTime::currentSecsSinceEpoch() - 3600))
                 .startsWith("HTTP/1.1 403"));
-    const QByteArray good = signedPost(code, "/v2/class", body, QByteArray(32, 'd'));
+    const QByteArray sealed = Classroom::seal(key, QByteArray(32, 'd'), "request", body);
+    // End to end: the student's name does not cross the network as text.
+    QVERIFY(!sealed.contains("Eve"));
+    QCOMPARE(Classroom::seal(key, QByteArray(32, 'd'), "request", sealed), body);
+    QVERIFY(Classroom::seal(key, QByteArray(32, 'd'), "answer", body) != sealed);
+    const QByteArray good = signedPost(code, "/v3/class", sealed, QByteArray(32, 'd'));
     const QByteArray answer = exchange(port, good);
     QVERIFY2(answer.startsWith("HTTP/1.1 200"), answer.constData());
     // The teacher signs its answer over the request's nonce.
     const QByteArray answerBody = answer.mid(answer.indexOf("\r\n\r\n") + 4);
     QVERIFY(answer.contains("X-SP-Mac: " + Classroom::sign(key, "answer\n" + QByteArray(32, 'd') + "\n200\n" + answerBody)));
+    // Its answer is encrypted too, and opens to the class's JSON.
+    QVERIFY(!answerBody.startsWith('{'));
+    QVERIFY(QJsonDocument::fromJson(Classroom::seal(key, QByteArray(32, 'd'), "answer", answerBody)).isObject());
     QVERIFY(exchange(port, good).startsWith("HTTP/1.1 403")); // the same request again
     QVERIFY(exchange(port, "GET /v1/class?code=" + code.toUtf8() + " HTTP/1.1\r\n\r\n").startsWith("HTTP/1.1 404"));
     classroom->setClassOpen(false);
