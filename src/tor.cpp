@@ -53,10 +53,10 @@ quint16 freePort()
 }
 
 /** Starts tor on @p port and waits, with a progress dialog, until it has a circuit. */
-bool startOwnTor(const QString &program, quint16 port, QString *error)
+bool startOwnTor(const QString &program, quint16 port, const QString &dataName, QString *error)
 {
     const QString dataDirectory =
-        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/tor");
+        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QLatin1Char('/') + dataName;
     QDir().mkpath(dataDirectory);
     // Tor refuses a data folder others can read.
     QFile::setPermissions(dataDirectory, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
@@ -156,13 +156,11 @@ QString installHint()
 #endif
 }
 
-bool start(QString *error)
+namespace {
+
+/** The port of a Tor to use: one already running, or one started for this process. */
+quint16 connectToTor(const QString &dataName, QString *error)
 {
-    if (Classroom::instance()->locked()) {
-        if (error)
-            *error = QCoreApplication::translate("Tor", "Tor windows are off while you're in a class.");
-        return false;
-    }
     QString message;
     // The port can be given; otherwise the tor service's, then Tor Browser's.
     quint16 port = 0;
@@ -176,20 +174,34 @@ bool start(QString *error)
     if (!port) {
         const QString program = torProgram();
         if (program.isEmpty()) {
-            message = QCoreApplication::translate("Tor", "Tor windows need Tor, and there is none on this "
+            message = QCoreApplication::translate("Tor", "Tor is needed for this, and there is none on this "
                                                          "computer.\n\n%1")
                           .arg(installHint());
         } else if (const quint16 own = freePort(); !own) {
             message = QCoreApplication::translate("Tor", "No free port for Tor.");
-        } else if (startOwnTor(program, own, &message)) {
+        } else if (startOwnTor(program, own, dataName, &message)) {
             port = own;
         }
     }
-    if (!port) {
+    if (!port && error)
+        *error = message;
+    return port;
+}
+
+bool s_vpn = false;
+
+} // namespace
+
+bool start(QString *error)
+{
+    if (Classroom::instance()->locked()) {
         if (error)
-            *error = message;
+            *error = QCoreApplication::translate("Tor", "Tor windows are off while you're in a class.");
         return false;
     }
+    const quint16 port = connectToTor(QStringLiteral("tor"), error);
+    if (!port)
+        return false;
 
     // Everything this process loads goes through Tor, which resolves the names too;
     // WebRTC may not reach out on its own.
@@ -199,6 +211,24 @@ bool start(QString *error)
     qputenv("QTWEBENGINE_CHROMIUM_FLAGS", flags.join(QLatin1Char(' ')).toLocal8Bit());
     s_active = true;
     return true;
+}
+
+quint16 startForVpn(QString *error)
+{
+    if (Classroom::instance()->locked()) {
+        if (error)
+            *error = QCoreApplication::translate("Tor", "Tor is off while you're in a class.");
+        return 0;
+    }
+    // A data folder of its own: a Tor window's Tor may be running at the same time.
+    const quint16 port = connectToTor(QStringLiteral("tor-vpn"), error);
+    s_vpn = port != 0;
+    return port;
+}
+
+bool isVpn()
+{
+    return s_vpn;
 }
 
 bool isOnion(const QUrl &url)

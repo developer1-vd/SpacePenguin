@@ -217,6 +217,9 @@ private:
     void toggleReadAloud(WebView *view);
     /** Translates the page with the chosen service (translator.h). */
     void translatePage(WebView *view);
+    /** The VPN button's menu: its state, and Off, Tor, Your Server. */
+    void populateVpnMenu();
+    void chooseVpnMode(int mode);
     void translateText(const QString &text);
     /** After a page loads: offers a translation if it is not in the person's languages. */
     void offerTranslation(WebView *view);
@@ -333,6 +336,8 @@ private:
     QAction *m_pipAction = nullptr;
     QAction *m_readAloudAction = nullptr;
     QAction *m_translateAction = nullptr;
+    QToolButton *m_vpnButton = nullptr;
+    QMenu *m_vpnMenu = nullptr;
     QAction *m_newWindowAction = nullptr;
     QAction *m_newPrivateWindowAction = nullptr;
     QAction *m_closeTabAction = nullptr;

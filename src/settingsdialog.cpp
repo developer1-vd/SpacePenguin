@@ -14,6 +14,7 @@
 #include "icons.h"
 #include "languages.h"
 #include "translator.h"
+#include "vpn.h"
 #include "mousegestures.h"
 #include "preferences.h"
 #include "shortcuts.h"
@@ -40,6 +41,8 @@
 #include <QInputDialog>
 #include <QLabel>
 #include <QSlider>
+#include <QSettings>
+#include <QSpinBox>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMap>
@@ -703,6 +706,76 @@ QWidget *SettingsDialog::createPrivacyTab()
     QVBoxLayout *layout = nullptr;
     QWidget *page = pageShell(tr("Privacy & Security"),
                               tr("Content blocking, data use and your browsing data."), &layout);
+
+    layout->addWidget(sectionTitle(tr("VPN")));
+    {
+        QSettings settings;
+        auto *vpnOff = new QRadioButton(tr("Off"));
+        auto *vpnTor = new QRadioButton(tr("Through Tor: free, no account; slower, and some sites refuse it"));
+        auto *vpnServer = new QRadioButton(tr("Through my VPN or proxy server:"));
+        auto *vpnGroup = new QButtonGroup(page);
+        vpnGroup->addButton(vpnOff, int(Vpn::Mode::Off));
+        vpnGroup->addButton(vpnTor, int(Vpn::Mode::Tor));
+        vpnGroup->addButton(vpnServer, int(Vpn::Mode::Proxy));
+        if (QAbstractButton *checked = vpnGroup->button(int(Vpn::chosenMode())))
+            checked->setChecked(true);
+        layout->addWidget(vpnOff);
+        layout->addWidget(vpnTor);
+        layout->addWidget(vpnServer);
+        const Vpn::Server server = Vpn::chosenServer();
+        auto *serverRow = new QHBoxLayout;
+        serverRow->setContentsMargins(24, 0, 0, 0);
+        auto *type = new QComboBox;
+        type->addItem(QStringLiteral("SOCKS5"), QStringLiteral("socks5"));
+        type->addItem(QStringLiteral("HTTP"), QStringLiteral("http"));
+        type->setCurrentIndex(qMax(0, type->findData(server.type)));
+        type->setAccessibleName(tr("Server type"));
+        auto *host = new QLineEdit(server.host);
+        host->setPlaceholderText(tr("Server, e.g. 10.64.0.1 or socks.example.com"));
+        host->setAccessibleName(tr("Server address"));
+        auto *port = new QSpinBox;
+        port->setRange(1, 65535);
+        port->setValue(server.port > 0 ? server.port : 1080);
+        port->setAccessibleName(tr("Server port"));
+        serverRow->addWidget(type);
+        serverRow->addWidget(host, 1);
+        serverRow->addWidget(port);
+        layout->addLayout(serverRow);
+        auto *vpnNote = mutedLabel(QString());
+        layout->addWidget(vpnNote);
+        const auto update = [vpnGroup, type, host, port, vpnNote] {
+            const auto mode = static_cast<Vpn::Mode>(vpnGroup->checkedId());
+            for (QWidget *widget : std::initializer_list<QWidget *>{type, host, port})
+                widget->setEnabled(mode == Vpn::Mode::Proxy);
+            QString text = tr("Everything SpacePenguin loads goes through it, its own updates and "
+                              "filter lists too. Many VPN services offer a SOCKS5 server for this "
+                              "(Mullvad, NordVPN, Private Internet Access…). A VPN app for the whole "
+                              "computer needs nothing here.");
+            if (mode == Vpn::Mode::Proxy
+                && Vpn::proxyAddress({type->currentData().toString(), host->text(), port->value()}).isEmpty())
+                text = tr("Enter the server's address and port.");
+            if (mode != Vpn::activeMode())
+                text += QLatin1Char(' ') + tr("Takes effect when SpacePenguin restarts.");
+            vpnNote->setText(text);
+        };
+        const auto save = [vpnGroup, type, host, port, update] {
+            QSettings settings;
+            settings.setValue(QStringLiteral("vpn/mode"), Vpn::modeKey(static_cast<Vpn::Mode>(vpnGroup->checkedId())));
+            settings.setValue(QStringLiteral("vpn/proxyType"), type->currentData().toString());
+            settings.setValue(QStringLiteral("vpn/proxyHost"), host->text().trimmed());
+            settings.setValue(QStringLiteral("vpn/proxyPort"), port->value());
+            update();
+        };
+        update();
+        connect(vpnGroup, &QButtonGroup::idClicked, this, [save](int) { save(); });
+        connect(type, &QComboBox::currentIndexChanged, this, [save](int) { save(); });
+        connect(host, &QLineEdit::editingFinished, this, save);
+        connect(port, &QSpinBox::valueChanged, this, [save](int) { save(); });
+        if (Classroom::instance()->locked()) {
+            vpnTor->setEnabled(false);
+            vpnTor->setToolTip(tr("Tor is off while you're in a class."));
+        }
+    }
 
     layout->addWidget(sectionTitle(tr("Secure connections")));
     auto *httpsOnly = new QCheckBox(tr("Always use secure connections (HTTPS-only mode)"));

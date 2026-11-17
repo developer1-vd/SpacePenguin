@@ -3,6 +3,7 @@
 #include "languages.h"
 #include "readaloud.h"
 #include "translator.h"
+#include "vpn.h"
 #include "readerview.h"
 #include "updatechecker.h"
 
@@ -1001,6 +1002,32 @@ QWidget *BrowserWindow::createNavigationBar()
     connect(m_blockingMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateBlockingMenu);
     layout->addWidget(m_blockingButton);
 
+    // The VPN: off, through Tor, or through the person's own server (vpn.h).
+    m_vpnButton = new QToolButton;
+    m_vpnButton->setIcon(Icons::icon(Icons::Globe));
+    m_vpnButton->setIconSize(QSize(18, 18));
+    m_vpnButton->setPopupMode(QToolButton::InstantPopup);
+    m_vpnButton->setFocusPolicy(Qt::NoFocus);
+    m_vpnButton->setObjectName(QStringLiteral("vpnButton"));
+    m_vpnButton->setAccessibleName(tr("VPN"));
+    {
+        const Vpn::Mode active = Vpn::activeMode();
+        m_vpnButton->setToolTip(active == Vpn::Mode::Off ? tr("VPN: off")
+                                                         : tr("VPN: on, through %1").arg(Vpn::describeActive()));
+        if (active != Vpn::Mode::Off) {
+            m_vpnButton->setText(tr("VPN"));
+            m_vpnButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            m_vpnButton->setCheckable(true);
+            m_vpnButton->setChecked(true);
+        }
+    }
+    m_vpnMenu = new QMenu(this);
+    m_vpnButton->setMenu(m_vpnMenu);
+    connect(m_vpnMenu, &QMenu::aboutToShow, this, &BrowserWindow::populateVpnMenu);
+    // Tor windows have Tor already; a class keeps its network as it is.
+    m_vpnButton->setVisible(!Tor::isActive());
+    layout->addWidget(m_vpnButton);
+
     // Chrome extensions: their popups, and the way to manage them.
     m_extensionsButton = new QToolButton;
     m_extensionsButton->setIcon(Icons::icon(Icons::Extensions));
@@ -1797,7 +1824,10 @@ void BrowserWindow::restoreSession()
         });
     }
 
-    if (Preferences::instance()->restoreSession()) {
+    // After a restart for the VPN, the tabs come back once whatever the setting.
+    const bool restoreOnce = qApp->property("spacepenguin.restoreOnce").toBool();
+    qApp->setProperty("spacepenguin.restoreOnce", false);
+    if (Preferences::instance()->restoreSession() || restoreOnce) {
         if (!restoreTabs())
             newTab();
         else if (unclean)
@@ -3967,6 +3997,61 @@ void BrowserWindow::toggleReadAloud(WebView *view)
         ReadAloud::instance()->setRate(Preferences::instance()->readAloudRate());
         ReadAloud::instance()->speak(text, map.value(QStringLiteral("lang")).toString());
     });
+}
+
+void BrowserWindow::populateVpnMenu()
+{
+    m_vpnMenu->clear();
+    const Vpn::Mode active = Vpn::activeMode();
+    const Vpn::Mode chosen = Vpn::chosenMode();
+    QAction *state = m_vpnMenu->addAction(active == Vpn::Mode::Off
+                                              ? tr("VPN is off: sites see your address")
+                                              : tr("VPN is on, through %1").arg(Vpn::describeActive()));
+    state->setEnabled(false);
+    if (chosen != active)
+        m_vpnMenu->addAction(tr("Restart to apply the change"))->setEnabled(false);
+    m_vpnMenu->addSeparator();
+    auto *group = new QActionGroup(m_vpnMenu);
+    const Vpn::Server server = Vpn::chosenServer();
+    const bool serverReady = !Vpn::proxyAddress(server).isEmpty();
+    const QList<std::pair<Vpn::Mode, QString>> modes{
+        {Vpn::Mode::Off, tr("Off")},
+        {Vpn::Mode::Tor, tr("Through Tor (free, slower)")},
+        {Vpn::Mode::Proxy, serverReady ? tr("Through My Server (%1:%2)").arg(server.host).arg(server.port)
+                                       : tr("Through My Server (set it up in Settings)")}};
+    for (const auto &[mode, label] : modes) {
+        QAction *action = m_vpnMenu->addAction(label);
+        action->setCheckable(true);
+        action->setChecked(mode == chosen);
+        action->setEnabled(mode != Vpn::Mode::Proxy || serverReady);
+        if (mode == Vpn::Mode::Tor && Classroom::instance()->locked())
+            action->setEnabled(false);
+        group->addAction(action);
+        connect(action, &QAction::triggered, this, [this, mode] { chooseVpnMode(int(mode)); });
+    }
+    m_vpnMenu->addSeparator();
+    connect(m_vpnMenu->addAction(tr("VPN Settings…")), &QAction::triggered, this, &BrowserWindow::showSettings);
+}
+
+void BrowserWindow::chooseVpnMode(int value)
+{
+    const auto mode = static_cast<Vpn::Mode>(value);
+    QSettings().setValue(QStringLiteral("vpn/mode"), Vpn::modeKey(mode));
+    if (mode == Vpn::activeMode())
+        return;
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Question);
+    box.setWindowTitle(tr("VPN"));
+    box.setText(mode == Vpn::Mode::Off ? tr("Restart SpacePenguin to turn the VPN off?")
+                                       : tr("Restart SpacePenguin to turn the VPN on?"));
+    box.setInformativeText(tr("Your tabs come back after the restart."));
+    QPushButton *now = box.addButton(tr("Restart Now"), QMessageBox::AcceptRole);
+    box.addButton(tr("Later"), QMessageBox::RejectRole);
+    box.exec();
+    if (box.clickedButton() != now)
+        return;
+    Vpn::restart();
+    m_quitAction->trigger();
 }
 
 static QString translationTarget()

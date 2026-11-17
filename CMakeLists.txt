@@ -143,6 +143,8 @@ qt_add_executable(spacepenguin
     src/languages.h
     src/translator.cpp
     src/translator.h
+    src/vpn.cpp
+    src/vpn.h
     src/startuptrace.cpp
     src/startuptrace.h
     src/sponsorblock.cpp
@@ -497,6 +499,8 @@ if(SPACEPENGUIN_BUILD_TESTS)
             src/urlresolver.h
             src/tor.cpp
             src/tor.h
+            src/vpn.cpp
+            src/vpn.h
             src/classroom.cpp
             src/classroom.h
         )

@@ -2,6 +2,7 @@
 
 #include "preferences.h"
 #include "roles.h"
+#include "vpn.h"
 #include "tor.h"
 #include "updatechecker.h"
 #include "webapps.h"
@@ -34,6 +35,7 @@ private slots:
     void desktopEntryQuotesAndNamesTheApp();
     void searchTemplates();
     void gamerFlags();
+    void vpnServersAreChecked();
     void onions();
     void findsTorByItsAnswer();
     void webAppInstallAndRemove();
@@ -183,6 +185,25 @@ void TestRoles::onions()
              true);
     QCOMPARE(Tor::searchTemplate(QStringLiteral("https://www.bing.com/search?q={query}")),
              QStringLiteral("https://www.bing.com/search?q={query}"));
+}
+
+void TestRoles::vpnServersAreChecked()
+{
+    using Vpn::proxyAddress;
+    QCOMPARE(proxyAddress({QStringLiteral("socks5"), QStringLiteral("10.64.0.1"), 1080}),
+             QStringLiteral("socks5://10.64.0.1:1080"));
+    QCOMPARE(proxyAddress({QStringLiteral("HTTP"), QStringLiteral(" proxy.example.com "), 3128}),
+             QStringLiteral("http://proxy.example.com:3128"));
+    QCOMPARE(proxyAddress({QStringLiteral("socks5"), QStringLiteral("::1"), 9050}), QStringLiteral("socks5://[::1]:9050"));
+    // Nothing that could add a switch to Chromium's command line, and no type
+    // that Qt's own requests could not follow.
+    QVERIFY(proxyAddress({QStringLiteral("socks5"), QStringLiteral("a.com --no-sandbox"), 1080}).isEmpty());
+    QVERIFY(proxyAddress({QStringLiteral("socks5"), QStringLiteral("a.com;b"), 1080}).isEmpty());
+    QVERIFY(proxyAddress({QStringLiteral("socks4"), QStringLiteral("a.com"), 1080}).isEmpty());
+    QVERIFY(proxyAddress({QStringLiteral("socks5"), QStringLiteral("a.com"), 0}).isEmpty());
+    QVERIFY(proxyAddress({QStringLiteral("socks5"), QString(), 1080}).isEmpty());
+    QCOMPARE(Vpn::modeFromKey(Vpn::modeKey(Vpn::Mode::Tor)), Vpn::Mode::Tor);
+    QCOMPARE(Vpn::modeFromKey(QStringLiteral("nonsense")), Vpn::Mode::Off);
 }
 
 void TestRoles::gamerFlags()
