@@ -7,6 +7,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A Homebrew cask for macOS (`brew install --cask spacepenguin` from the SpacePenguin tap) and winget manifests for Windows, both written for each release by `tools/update-package-manifests.sh`.
+
 ### Fixed
 
 - On Linux, playing a video (YouTube, or a tab reopened at start-up) could still close the browser, Gamer mode or not: Chromium handed decoded frames to QtWebEngine in a form it cannot take on Linux. Videos are now decoded without the GPU on Linux.

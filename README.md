@@ -36,6 +36,25 @@ one extra step:
   try to open it once, then go to *System Settings › Privacy & Security* and click
   *Open Anyway*.
 
+### Homebrew (macOS)
+
+```sh
+brew tap developer1-vd/spacepenguin https://github.com/developer1-vd/SpacePenguin
+brew install --cask spacepenguin
+```
+
+`brew upgrade --cask spacepenguin` installs new releases. The first start still
+needs *Open Anyway*, as above.
+
+### winget (Windows)
+
+```powershell
+winget install SpacePenguin.SpacePenguin
+```
+
+This works once the package has been accepted into winget's community repository;
+until then, use the `-setup.exe` above. `--scope machine` installs for every user.
+
 ### Flatpak, with updates
 
 SpacePenguin has its own Flatpak repository. One command adds it, with Flathub for
