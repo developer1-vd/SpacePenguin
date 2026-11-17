@@ -9,6 +9,7 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- End-to-end encryption for classes: what teacher and students send each other (blocked sites, reasons, names, requests) is encrypted with the key from the class code before it is signed, so others on the school network see none of it. Teacher and students need this version, or a newer one, to share a class.
 - AES-256 encryption: Settings › Privacy & Security can export your saved logins and settings (bookmarks included) as an encrypted backup (AES-256-GCM, with a key from PBKDF2-SHA256 at 600,000 rounds) and restore one on another computer. The work is done by Chromium's WebCrypto, so SpacePenguin carries no cryptography of its own.
 - A primary password for saved logins: once set, they cannot be seen, filled in or exported until it is given, once per start. Only a PBKDF2 verifier of it is kept.
 - A VPN switch in the toolbar: everything SpacePenguin loads, its own updates and filter lists included, goes through Tor (free, no account) or through a SOCKS5 or HTTP server of your VPN service or your own (Settings › Privacy & Security). Names are resolved by the proxy and WebRTC cannot go around it. If the VPN cannot start, SpacePenguin connects to nothing until you choose. Changing it restarts SpacePenguin with the same tabs.
