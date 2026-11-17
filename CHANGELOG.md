@@ -7,6 +7,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-11-17
+
 ### Added
 
 - End-to-end encryption for classes: what teacher and students send each other (blocked sites, reasons, names, requests) is encrypted with the key from the class code before it is signed, so others on the school network see none of it. Teacher and students need this version, or a newer one, to share a class.
@@ -101,7 +103,8 @@ their store, sites installed as apps, saved logins (about:logins), crash
 recovery, roles for developers, gamers, students, workers and teachers, and
 packages for Windows, macOS, Linux, the BSDs, Chromebooks, Android and iPhone.
 
-[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.3...HEAD
+[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.4...HEAD
+[1.0.0-rc.4]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.3...v1.0.0-rc.4
 [1.0.0-rc.3]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.2...v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/developer1-vd/SpacePenguin/compare/v0.1-A...v1.0.0-rc.1
