@@ -47,6 +47,8 @@ public:
 signals:
     /** Developer mode: Inspect was chosen in the page's context menu. */
     void inspectRequested();
+    /** Picture-in-Picture was chosen in a video's context menu. */
+    void pictureInPictureRequested();
     /** A mouse gesture was drawn on the page (Preferences::mouseGestures()). */
     void gestureDrawn(spacepenguin::MouseGestures::Action action);
 

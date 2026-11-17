@@ -211,6 +211,10 @@ private:
     void fillBookmarkMenu(QMenu *menu, const QString &folderId);
     void toggleMuted(int index);
     void toggleReaderView();
+    /** The tab's video in a small window that stays on top; again brings it back. */
+    void togglePictureInPicture(WebView *view);
+    void enterPictureInPicture(WebView *view);
+    void exitPictureInPicture();
     void setPageFullScreen(bool on);
     void exitPageFullScreen();
 
@@ -253,6 +257,11 @@ private:
     bool m_wasFullScreen = false;
     bool m_wasMaximized = false;
     QPointer<WebView> m_fullScreenView;
+    // Picture-in-Picture: the tab's view moves into its own small window, and a
+    // placeholder holds its place in the stack.
+    QPointer<WebView> m_pipView;
+    QPointer<QWidget> m_pipWindow;
+    QPointer<QWidget> m_pipPlaceholder;
     QList<QPointer<QWidget>> m_hiddenForFullScreen;
     QShortcut *m_exitFullScreenShortcut = nullptr;
     UrlResolver m_resolver;
@@ -314,6 +323,7 @@ private:
     QAction *m_openFileAction = nullptr;
     QAction *m_muteTabAction = nullptr;
     QAction *m_readerAction = nullptr;
+    QAction *m_pipAction = nullptr;
     QAction *m_newWindowAction = nullptr;
     QAction *m_newPrivateWindowAction = nullptr;
     QAction *m_closeTabAction = nullptr;

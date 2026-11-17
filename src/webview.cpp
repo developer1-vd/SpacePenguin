@@ -6,6 +6,7 @@
 
 #include <QChildEvent>
 #include <QContextMenuEvent>
+#include <QWebEngineContextMenuRequest>
 #include <QMouseEvent>
 #include <QMenu>
 #include <QTimer>
@@ -39,6 +40,12 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
     menu->setAttribute(Qt::WA_DeleteOnClose);
     // Qt's own Inspect needs developer tools already attached; the window attaches them.
     menu->removeAction(pageAction(QWebEnginePage::InspectElement));
+    if (const QWebEngineContextMenuRequest *request = lastContextMenuRequest();
+        request && request->mediaType() == QWebEngineContextMenuRequest::MediaTypeVideo) {
+        menu->addSeparator();
+        QAction *pip = menu->addAction(tr("Picture-in-Picture"));
+        connect(pip, &QAction::triggered, this, &WebView::pictureInPictureRequested);
+    }
     if (Preferences::instance()->hasRole(Roles::key(Roles::Role::Developer))) {
         menu->addSeparator();
         QAction *inspect = menu->addAction(tr("Inspect"));

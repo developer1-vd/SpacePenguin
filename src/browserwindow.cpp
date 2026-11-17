@@ -437,6 +437,13 @@ void BrowserWindow::createActions()
 
     m_readerAction = makeAction(tr("Reader View"), {QKeySequence(Qt::Key_F9)}, Icons::icon(Icons::Reader));
     connect(m_readerAction, &QAction::triggered, this, &BrowserWindow::toggleReaderView);
+    m_pipAction = makeAction(tr("Picture-in-Picture"), Shortcuts::keys(Shortcuts::PictureInPicture));
+    connect(m_pipAction, &QAction::triggered, this, [this] {
+        if (m_pipView)
+            exitPictureInPicture();
+        else if (WebView *view = currentView())
+            togglePictureInPicture(view);
+    });
 
 #ifdef Q_OS_MACOS
     // ⌘M is the system's Minimize; the Control key is free.
@@ -1090,6 +1097,7 @@ QMenu *BrowserWindow::createAppMenu()
     });
 
     menu->addAction(m_readerAction);
+    menu->addAction(m_pipAction);
     menu->addAction(m_historyAction);
     menu->addAction(m_downloadsAction);
     menu->addAction(m_installAppAction);
@@ -1238,6 +1246,7 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_zoomResetAction);
     viewMenu->addAction(m_fullScreenAction);
     viewMenu->addAction(m_readerAction);
+    viewMenu->addAction(m_pipAction);
     viewMenu->addAction(m_muteTabAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_bookmarksBarAction);
@@ -2042,6 +2051,8 @@ void BrowserWindow::closeTab(int index)
         return;
     }
 
+    if (view == m_pipView)
+        exitPictureInPicture();
     m_tabBar->releaseChip(index);
     m_tabBar->removeTab(index);
     m_stack->removeWidget(view);
@@ -3288,6 +3299,10 @@ void BrowserWindow::refreshCompletions()
 
 bool BrowserWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == m_pipWindow && event->type() == QEvent::Close && m_pipView) {
+        exitPictureInPicture();
+        return false;
+    }
     if (watched == m_omnibox) {
         // The suggestions popup takes focus and gives it back while you type; that
         // is not the box being focused or left, and must not select what was typed.
@@ -3399,6 +3414,7 @@ void BrowserWindow::showToast(const QString &text, int milliseconds)
 
 void BrowserWindow::connectView(WebView *view)
 {
+    connect(view, &WebView::pictureInPictureRequested, this, [this, view] { togglePictureInPicture(view); });
     connect(view, &WebView::gestureDrawn, this, [this, view](MouseGestures::Action action) {
         using Action = MouseGestures::Action;
         switch (action) {
@@ -3447,6 +3463,13 @@ void BrowserWindow::connectView(WebView *view)
     });
     connect(view->page(), &QWebEnginePage::fullScreenRequested, this,
             [this, view](QWebEngineFullScreenRequest request) {
+                // Picture-in-Picture: the video fills its small window, not the screen.
+                if (view == m_pipView) {
+                    request.accept();
+                    if (!request.toggleOn())
+                        QTimer::singleShot(0, this, &BrowserWindow::exitPictureInPicture);
+                    return;
+                }
                 // Only the tab in front may take the screen.
                 if (request.toggleOn() && view != currentView()) {
                     request.reject();
@@ -3581,7 +3604,8 @@ void BrowserWindow::onCurrentTabChanged(int index)
     // Another tab coming forward ends a video's full screen.
     if (m_pageFullScreen && m_fullScreenView != view)
         exitPageFullScreen();
-    m_stack->setCurrentWidget(view);
+    m_stack->setCurrentWidget(view == m_pipView && m_pipPlaceholder ? m_pipPlaceholder.data()
+                                                                     : static_cast<QWidget *>(view));
     m_linkPreview->hide();
     m_omniboxEdited = false;
     syncOmnibox(view->url());
@@ -3879,6 +3903,107 @@ void BrowserWindow::closeDockedDevTools()
         return;
     m_dockedDevTools->page()->setInspectedPage(nullptr);
     m_dockedDevTools->hide();
+}
+
+void BrowserWindow::togglePictureInPicture(WebView *view)
+{
+    if (view == m_pipView) {
+        exitPictureInPicture();
+        return;
+    }
+    // The video playing (or else the largest one) is marked for the next step.
+    static const QString findVideo = QStringLiteral(R"JS((() => {
+        const videos = [...document.querySelectorAll('video')].filter(v => v.readyState > 0);
+        videos.sort((a, b) => (b.paused ? 0 : 1) - (a.paused ? 0 : 1)
+                              || b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight);
+        document.querySelectorAll('[data-spacepenguin-pip]').forEach(v => v.removeAttribute('data-spacepenguin-pip'));
+        if (!videos.length) return false;
+        videos[0].setAttribute('data-spacepenguin-pip', '');
+        return true;
+    })())JS");
+    const QPointer<WebView> target = view;
+    view->page()->runJavaScript(findVideo, QWebEngineScript::ApplicationWorld, [this, target](const QVariant &found) {
+        if (!target)
+            return;
+        if (!found.toBool()) {
+            showToast(tr("There is no video on this page to show in Picture-in-Picture."), 3000);
+            return;
+        }
+        enterPictureInPicture(target);
+    });
+}
+
+void BrowserWindow::enterPictureInPicture(WebView *view)
+{
+    if (m_pipView)
+        exitPictureInPicture();
+    if (m_pageFullScreen)
+        exitPageFullScreen();
+    m_pipView = view;
+
+    // The tab keeps its place, with a way back.
+    auto *placeholder = new QWidget;
+    auto *placeholderLayout = new QVBoxLayout(placeholder);
+    placeholderLayout->addStretch(1);
+    auto *message = new QLabel(tr("This tab's video is playing in Picture-in-Picture."));
+    message->setAlignment(Qt::AlignCenter);
+    placeholderLayout->addWidget(message);
+    auto *back = new QPushButton(tr("Bring It Back"));
+    connect(back, &QPushButton::clicked, this, &BrowserWindow::exitPictureInPicture);
+    placeholderLayout->addWidget(back, 0, Qt::AlignHCenter);
+    placeholderLayout->addStretch(1);
+    m_pipPlaceholder = placeholder;
+    const bool wasCurrent = view == currentView();
+    m_stack->insertWidget(m_stack->indexOf(view), placeholder);
+    m_stack->removeWidget(view);
+    if (wasCurrent)
+        m_stack->setCurrentWidget(placeholder);
+
+    // A small window that stays over the others; closing it brings the video back.
+    auto *window = new QWidget(this, Qt::Window | Qt::WindowStaysOnTopHint);
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    window->setWindowTitle(tr("Picture-in-Picture — %1").arg(view->title()));
+    auto *windowLayout = new QVBoxLayout(window);
+    windowLayout->setContentsMargins(0, 0, 0, 0);
+    windowLayout->addWidget(view);
+    view->show();
+    const QRect screen = (window->screen() ? window->screen() : QGuiApplication::primaryScreen())->availableGeometry();
+    window->resize(480, 270);
+    window->move(screen.right() - window->width() - 24, screen.bottom() - window->height() - 48);
+    // Closing it (its close button, Alt+F4) brings the view home before the window,
+    // and everything in it, is deleted.
+    window->installEventFilter(this);
+    auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), window);
+    connect(escape, &QShortcut::activated, this, &BrowserWindow::exitPictureInPicture);
+    m_pipWindow = window;
+    window->show();
+
+    // The marked video fills the window, the way it would fill the screen.
+    view->page()->runJavaScript(
+        QStringLiteral("document.querySelector('[data-spacepenguin-pip]')?.requestFullscreen().catch(() => {})"),
+        QWebEngineScript::ApplicationWorld);
+    m_pipAction->setText(tr("Leave Picture-in-Picture"));
+}
+
+void BrowserWindow::exitPictureInPicture()
+{
+    const QPointer<WebView> view = m_pipView;
+    m_pipView = nullptr;
+    m_pipAction->setText(tr("Picture-in-Picture"));
+    if (view) {
+        view->page()->triggerAction(QWebEnginePage::ExitFullScreen);
+        const int at = m_pipPlaceholder ? m_stack->indexOf(m_pipPlaceholder) : m_stack->count();
+        view->setParent(nullptr);
+        m_stack->insertWidget(at, view);
+        if (view == currentView())
+            m_stack->setCurrentWidget(view);
+    }
+    delete m_pipPlaceholder.data();
+    if (m_pipWindow) {
+        QWidget *window = m_pipWindow;
+        m_pipWindow = nullptr;
+        window->close();
+    }
 }
 
 void BrowserWindow::copyCitation()
