@@ -27,6 +27,8 @@ public:
         bool gpuDevice = true;
         /** SPACEPENGUIN_LOW_MEMORY: -1 unset, 0 forced off, 1 forced on. */
         int lowMemoryOverride = -1;
+        /** Running on Linux (desktop or ChromeOS's Linux environment). */
+        bool onLinux = false;
         /** QTWEBENGINE_CHROMIUM_FLAGS as the user set it. */
         QString userFlags;
     };

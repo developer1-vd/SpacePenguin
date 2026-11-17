@@ -7,6 +7,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- On Linux, playing a video (YouTube, or a tab reopened at start-up) could still close the browser, Gamer mode or not: Chromium handed decoded frames to QtWebEngine in a form it cannot take on Linux. Videos are now decoded without the GPU on Linux.
+
 ## [1.0.0-rc.3] - 2026-11-16
 
 The third release candidate for 1.0.
