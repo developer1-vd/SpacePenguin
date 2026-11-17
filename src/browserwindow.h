@@ -215,6 +215,11 @@ private:
     void togglePictureInPicture(WebView *view);
     /** Reads the selection, or else the page's article, aloud; again stops. */
     void toggleReadAloud(WebView *view);
+    /** Translates the page with the chosen service (translator.h). */
+    void translatePage(WebView *view);
+    void translateText(const QString &text);
+    /** After a page loads: offers a translation if it is not in the person's languages. */
+    void offerTranslation(WebView *view);
     void enterPictureInPicture(WebView *view);
     void exitPictureInPicture();
     void setPageFullScreen(bool on);
@@ -327,6 +332,7 @@ private:
     QAction *m_readerAction = nullptr;
     QAction *m_pipAction = nullptr;
     QAction *m_readAloudAction = nullptr;
+    QAction *m_translateAction = nullptr;
     QAction *m_newWindowAction = nullptr;
     QAction *m_newPrivateWindowAction = nullptr;
     QAction *m_closeTabAction = nullptr;

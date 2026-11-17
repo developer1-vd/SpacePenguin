@@ -48,6 +48,12 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
         connect(read, &QAction::triggered, this, &WebView::readAloudRequested);
     }
     if (const QWebEngineContextMenuRequest *request = lastContextMenuRequest();
+        request && !request->selectedText().trimmed().isEmpty()) {
+        const QString text = request->selectedText();
+        QAction *translate = menu->addAction(tr("Translate Selection"));
+        connect(translate, &QAction::triggered, this, [this, text] { emit translateSelectionRequested(text); });
+    }
+    if (const QWebEngineContextMenuRequest *request = lastContextMenuRequest();
         request && request->mediaType() == QWebEngineContextMenuRequest::MediaTypeVideo) {
         menu->addSeparator();
         QAction *pip = menu->addAction(tr("Picture-in-Picture"));

@@ -76,6 +76,9 @@ QString nativeName(const QString &tag)
     if (locale.language() == QLocale::C)
         return tag;
     QString name = locale.nativeLanguageName();
+    // Qt names plain English after the United States.
+    if (tag == QLatin1String("en"))
+        name = QStringLiteral("English");
     if (name.isEmpty())
         name = QLocale::languageToString(locale.language());
     if (!name.isEmpty())

@@ -1,6 +1,8 @@
 #include "browserwindow.h"
 
+#include "languages.h"
 #include "readaloud.h"
+#include "translator.h"
 #include "readerview.h"
 #include "updatechecker.h"
 
@@ -446,6 +448,11 @@ void BrowserWindow::createActions()
     });
     connect(ReadAloud::instance(), &ReadAloud::speakingChanged, this, [this](bool speaking) {
         m_readAloudAction->setText(speaking ? tr("Stop Reading Aloud") : tr("Read Aloud"));
+    });
+    m_translateAction = makeAction(tr("Translate Page"), Shortcuts::keys(Shortcuts::TranslatePage));
+    connect(m_translateAction, &QAction::triggered, this, [this] {
+        if (WebView *view = currentView())
+            translatePage(view);
     });
     m_pipAction = makeAction(tr("Picture-in-Picture"), Shortcuts::keys(Shortcuts::PictureInPicture));
     connect(m_pipAction, &QAction::triggered, this, [this] {
@@ -1109,6 +1116,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_readerAction);
     menu->addAction(m_pipAction);
     menu->addAction(m_readAloudAction);
+    menu->addAction(m_translateAction);
     menu->addAction(m_historyAction);
     menu->addAction(m_downloadsAction);
     menu->addAction(m_installAppAction);
@@ -1259,6 +1267,7 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_readerAction);
     viewMenu->addAction(m_pipAction);
     viewMenu->addAction(m_readAloudAction);
+    viewMenu->addAction(m_translateAction);
     viewMenu->addAction(m_muteTabAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_bookmarksBarAction);
@@ -3426,6 +3435,11 @@ void BrowserWindow::showToast(const QString &text, int milliseconds)
 
 void BrowserWindow::connectView(WebView *view)
 {
+    connect(view, &WebView::translateSelectionRequested, this, &BrowserWindow::translateText);
+    connect(view, &QWebEngineView::loadFinished, this, [this, view](bool ok) {
+        if (ok)
+            offerTranslation(view);
+    });
     connect(view, &WebView::readAloudRequested, this, [this, view] {
         ReadAloud::instance()->stop();
         toggleReadAloud(view);
@@ -3953,6 +3967,131 @@ void BrowserWindow::toggleReadAloud(WebView *view)
         ReadAloud::instance()->setRate(Preferences::instance()->readAloudRate());
         ReadAloud::instance()->speak(text, map.value(QStringLiteral("lang")).toString());
     });
+}
+
+static QString translationTarget()
+{
+    const Preferences *preferences = Preferences::instance();
+    const QString chosen = preferences->translateTarget();
+    return Translator::targetLanguage(chosen.isEmpty() ? Languages::websiteLanguages(preferences->websiteLanguages()).first()
+                                                       : chosen);
+}
+
+void BrowserWindow::translateText(const QString &text)
+{
+    const Preferences *preferences = Preferences::instance();
+    const Translator::Service service = Translator::fromKey(preferences->translateService());
+    const QUrl url = Translator::textUrl(service, text, translationTarget(),
+                                         QUrl(preferences->libreTranslateServer()));
+    if (!url.isValid()) {
+        showToast(tr("Set the address of a LibreTranslate server in Settings › General."), 4000);
+        return;
+    }
+    newTab(url);
+}
+
+void BrowserWindow::translatePage(WebView *view)
+{
+    const Preferences *preferences = Preferences::instance();
+    const Translator::Service service = Translator::fromKey(preferences->translateService());
+    const QString target = translationTarget();
+    const QUrl address = view->url();
+    dropPrompts(view, QStringLiteral("translate"));
+    if ((address.scheme() != QLatin1String("http") && address.scheme() != QLatin1String("https"))
+        || Translator::isTranslatorUrl(address)) {
+        showToast(tr("Only web pages can be translated."), 3000);
+        return;
+    }
+    if (service == Translator::Service::Google) {
+        loadUrl(view, Translator::pageUrl(service, address, target));
+        return;
+    }
+    if (service == Translator::Service::LibreTranslate) {
+        // In place: the page's text goes to the chosen server and back. Not from a
+        // Tor window, whose own traffic alone goes through Tor.
+        if (Tor::isActive()) {
+            showToast(tr("LibreTranslate is not used in Tor windows, as it would not go through Tor."), 4000);
+            return;
+        }
+        const QPointer<WebView> target_view = view;
+        view->page()->runJavaScript(Translator::collectScript(), QWebEngineScript::ApplicationWorld,
+            [this, target_view, target](const QVariant &result) {
+                if (!target_view)
+                    return;
+                const QStringList texts = result.toStringList();
+                if (texts.isEmpty()) {
+                    showToast(tr("There is no text on this page to translate."), 3000);
+                    return;
+                }
+                showToast(tr("Translating with LibreTranslate…"), 2500);
+                static QNetworkAccessManager *network = new QNetworkAccessManager(qApp);
+                const Preferences *preferences = Preferences::instance();
+                Translator::translateTexts(network, QUrl(preferences->libreTranslateServer()),
+                                           preferences->libreTranslateKey(), texts, target,
+                    [this, target_view](const QStringList &translations, const QString &error) {
+                        if (!error.isEmpty()) {
+                            showToast(error, 5000);
+                            return;
+                        }
+                        if (target_view)
+                            target_view->page()->runJavaScript(Translator::applyScript(translations),
+                                                               QWebEngineScript::ApplicationWorld);
+                    });
+            });
+        return;
+    }
+    // Bing, DeepL, Yandex: the selection, or else the article, in their translator.
+    static const QString articleText = QStringLiteral(R"JS((() => {
+        const selected = String(window.getSelection() || '').trim();
+        if (selected) return selected;
+        let best = document.body, bestLength = 0;
+        for (const block of document.querySelectorAll('article, main, [role=main], div, section')) {
+            let length = 0;
+            for (const p of block.querySelectorAll(':scope > p, :scope > div > p')) length += p.innerText.length;
+            if (length > bestLength) { best = block; bestLength = length; }
+        }
+        return best.innerText;
+    })())JS");
+    view->page()->runJavaScript(articleText, QWebEngineScript::ApplicationWorld, [this, service](const QVariant &text) {
+        if (text.toString().trimmed().isEmpty()) {
+            showToast(tr("There is no text on this page to translate."), 3000);
+            return;
+        }
+        translateText(text.toString());
+        if (text.toString().size() > Translator::textLimit(service))
+            showToast(tr("%1 takes only the first part of a long page; select a part to translate it.")
+                          .arg(Translator::name(service)),
+                      5000);
+    });
+}
+
+void BrowserWindow::offerTranslation(WebView *view)
+{
+    const Preferences *preferences = Preferences::instance();
+    const QUrl address = view->url();
+    if (!preferences->offerTranslation() || m_isPrivate || Translator::isTranslatorUrl(address)
+        || (address.scheme() != QLatin1String("http") && address.scheme() != QLatin1String("https")))
+        return;
+    const QPointer<WebView> target = view;
+    view->page()->runJavaScript(QStringLiteral("document.documentElement.lang || ''"), QWebEngineScript::ApplicationWorld,
+        [this, target, address](const QVariant &result) {
+            const QString tag = Languages::normalizeTag(result.toString());
+            if (!target || tag.isEmpty() || target->url() != address)
+                return;
+            const QString language = tag.section(QLatin1Char('-'), 0, 0);
+            for (const QString &own : Languages::websiteLanguages(Preferences::instance()->websiteLanguages())) {
+                if (own.section(QLatin1Char('-'), 0, 0) == language)
+                    return;
+            }
+            Prompt prompt;
+            prompt.key = QStringLiteral("translate");
+            prompt.icon = Icons::Globe;
+            prompt.text = tr("This page is in %1. Translate it into %2?")
+                              .arg(Languages::nativeName(language), Languages::nativeName(translationTarget()));
+            prompt.buttons = {{tr("Translate"), [this, target] { if (target) translatePage(target); }},
+                              {tr("Never Offer"), [] { Preferences::instance()->setOfferTranslation(false); }}};
+            addPrompt(target, prompt);
+        });
 }
 
 void BrowserWindow::togglePictureInPicture(WebView *view)

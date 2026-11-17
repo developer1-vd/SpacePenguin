@@ -48,6 +48,7 @@ void TestLanguages::emptyChoiceFollowsTheSystem()
 void TestLanguages::namesAreTheLanguagesOwn()
 {
     QCOMPARE(Languages::nativeName(QStringLiteral("de")), QStringLiteral("Deutsch"));
+    QCOMPARE(Languages::nativeName(QStringLiteral("en")), QStringLiteral("English"));
     QVERIFY(Languages::nativeName(QStringLiteral("pt-BR")).startsWith(QStringLiteral("Português")));
     QVERIFY(Languages::nativeName(QStringLiteral("pt-BR")).contains(QStringLiteral("Brasil")));
     // Where the name already says the region, it is not said twice.

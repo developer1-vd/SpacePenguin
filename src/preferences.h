@@ -119,6 +119,21 @@ public:
     QString appLanguage() const;
     void setAppLanguage(const QString &tag);
 
+    /** The translator (translator.h key: "google", "deepl"…). */
+    QString translateService() const;
+    void setTranslateService(const QString &key);
+    /** The language to translate into (a tag); empty: the first website language. */
+    QString translateTarget() const;
+    void setTranslateTarget(const QString &tag);
+    /** Offer to translate pages in languages not among the person's. */
+    bool offerTranslation() const;
+    void setOfferTranslation(bool offer);
+    /** LibreTranslate: the server, and its API key if it wants one. */
+    QString libreTranslateServer() const;
+    void setLibreTranslateServer(const QString &url);
+    QString libreTranslateKey() const;
+    void setLibreTranslateKey(const QString &key);
+
     /** Read Aloud's pace: -5 (slow) to 5 (fast), 0 the voice's own. */
     int readAloudRate() const;
     void setReadAloudRate(int rate);

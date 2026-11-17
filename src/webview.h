@@ -51,6 +51,8 @@ signals:
     void pictureInPictureRequested();
     /** Read Aloud was chosen for the selected text. */
     void readAloudRequested();
+    /** Translate was chosen for the selected text. */
+    void translateSelectionRequested(const QString &text);
     /** A mouse gesture was drawn on the page (Preferences::mouseGestures()). */
     void gestureDrawn(spacepenguin::MouseGestures::Action action);
 

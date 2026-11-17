@@ -141,6 +141,8 @@ qt_add_executable(spacepenguin
     src/readaloud.h
     src/languages.cpp
     src/languages.h
+    src/translator.cpp
+    src/translator.h
     src/startuptrace.cpp
     src/startuptrace.h
     src/sponsorblock.cpp
@@ -471,6 +473,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_languages PRIVATE Qt6::Test)
         target_include_directories(tst_languages PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME languages COMMAND tst_languages)
+
+        qt_add_executable(tst_translator
+            tests/tst_translator.cpp
+            src/translator.cpp
+            src/translator.h
+        )
+        target_link_libraries(tst_translator PRIVATE Qt6::Test Qt6::Network)
+        target_include_directories(tst_translator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME translator COMMAND tst_translator)
 
         qt_add_executable(tst_roles
             tests/tst_roles.cpp

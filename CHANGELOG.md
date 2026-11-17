@@ -9,6 +9,7 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A translator: Translate Page (Ctrl+Shift+Y, View menu) and Translate Selection (right-click), with Google Translate, Bing Translator, DeepL, Yandex Translate or a LibreTranslate server of your choosing, which translates the page in place. SpacePenguin offers to translate pages that are not in your languages (Settings › General turns that off). Nothing is sent until you ask; LibreTranslate is not used from Tor windows, where it would not go through Tor.
 - Languages in Settings › General: SpacePenguin's own language (and so how dates and numbers are written), the languages websites are asked for, in order (Accept-Language and navigator.languages), and the spelling dictionaries, instead of only the system's. Any language and region can be added.
 - Read Aloud (text to speech): View › Read Aloud or Ctrl+Alt+S reads the selected text, or else the page's article, in the page's language, with the system's own voices: macOS speech, Windows speech, or speech-dispatcher or eSpeak on Linux. Nothing leaves the computer. Right-click selected text to read just that; the speed is in Settings › General.
 - Picture-in-Picture: a page's video plays in a small window that stays over the others (View › Picture-in-Picture, Ctrl+Alt+P, or right-click a video). The tab keeps its place and the video keeps playing; Escape, closing the window or *Bring It Back* returns it.

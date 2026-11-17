@@ -13,6 +13,7 @@
 #include "historymanager.h"
 #include "icons.h"
 #include "languages.h"
+#include "translator.h"
 #include "mousegestures.h"
 #include "preferences.h"
 #include "shortcuts.h"
@@ -434,6 +435,72 @@ QWidget *SettingsDialog::createGeneralTab()
         Preferences::instance()->setWebsiteLanguages({});
         fillWebsiteLanguages(Languages::systemLanguages());
     });
+
+    layout->addWidget(sectionTitle(tr("Translation")));
+    auto *translateForm = new QFormLayout;
+    auto *service = new QComboBox;
+    service->setAccessibleName(tr("Translate with"));
+    for (const Translator::Service each : Translator::services())
+        service->addItem(Translator::name(each), Translator::key(each));
+    service->setCurrentIndex(qMax(0, service->findData(preferences->translateService())));
+    translateForm->addRow(tr("Translate with:"), service);
+    auto *into = new QComboBox;
+    into->setAccessibleName(tr("Translate into"));
+    into->addItem(tr("My first website language"), QString());
+    for (const Languages::Language &language : Languages::allLanguages()) {
+        if (!language.tag.contains(QLatin1Char('-')) || language.tag.startsWith(QLatin1String("zh-")))
+            into->addItem(language.name, language.tag);
+    }
+    into->setCurrentIndex(qMax(0, into->findData(preferences->translateTarget())));
+    translateForm->addRow(tr("Into:"), into);
+    auto *server = new QLineEdit(preferences->libreTranslateServer());
+    server->setPlaceholderText(QStringLiteral("https://libretranslate.example.org"));
+    server->setAccessibleName(tr("LibreTranslate server"));
+    auto *apiKey = new QLineEdit(preferences->libreTranslateKey());
+    apiKey->setEchoMode(QLineEdit::Password);
+    apiKey->setPlaceholderText(tr("If the server asks for one"));
+    apiKey->setAccessibleName(tr("LibreTranslate API key"));
+    translateForm->addRow(tr("LibreTranslate server:"), server);
+    translateForm->addRow(tr("API key:"), apiKey);
+    layout->addLayout(translateForm);
+    auto *offer = new QCheckBox(tr("Offer to translate pages that are not in my languages"));
+    offer->setChecked(preferences->offerTranslation());
+    connect(offer, &QCheckBox::toggled, this, [](bool on) { Preferences::instance()->setOfferTranslation(on); });
+    layout->addWidget(offer);
+    auto *translateNote = mutedLabel(QString());
+    layout->addWidget(translateNote);
+    const auto updateTranslation = [service, server, apiKey, translateForm, translateNote] {
+        const Translator::Service chosen = Translator::fromKey(service->currentData().toString());
+        const bool libre = chosen == Translator::Service::LibreTranslate;
+        translateForm->setRowVisible(server, libre);
+        translateForm->setRowVisible(apiKey, libre);
+        switch (chosen) {
+        case Translator::Service::Google:
+            translateNote->setText(tr("Translate Page (%1) opens the page through Google's translation proxy, "
+                                      "which fetches it again: pages behind a sign-in are not translated, and "
+                                      "Google sees the address.").arg(Shortcuts::text(Shortcuts::TranslatePage)));
+            break;
+        case Translator::Service::LibreTranslate:
+            translateNote->setText(tr("The page is translated where it is: its text goes to this server and back. "
+                                      "Use your own server, or one you trust; public ones may ask for a key."));
+            break;
+        default:
+            translateNote->setText(tr("%1 translates text: Translate Page sends the selection, or the page's "
+                                      "article, to its translator in a new tab.").arg(Translator::name(chosen)));
+            break;
+        }
+    };
+    updateTranslation();
+    connect(service, &QComboBox::currentIndexChanged, this, [service, updateTranslation](int) {
+        Preferences::instance()->setTranslateService(service->currentData().toString());
+        updateTranslation();
+    });
+    connect(into, &QComboBox::currentIndexChanged, this,
+            [into](int) { Preferences::instance()->setTranslateTarget(into->currentData().toString()); });
+    connect(server, &QLineEdit::editingFinished, this,
+            [server] { Preferences::instance()->setLibreTranslateServer(server->text()); });
+    connect(apiKey, &QLineEdit::editingFinished, this,
+            [apiKey] { Preferences::instance()->setLibreTranslateKey(apiKey->text()); });
 
     layout->addWidget(sectionTitle(tr("Spelling")));
     auto *spelling = new QCheckBox(tr("Check spelling as you type"));

@@ -36,6 +36,11 @@ const QString kDevToolsDock = QStringLiteral("roles/developer/devToolsDock");
 const QString kWebsiteLanguages = QStringLiteral("languages/websites");
 const QString kSpellCheckLanguages = QStringLiteral("languages/spelling");
 const QString kAppLanguage = QStringLiteral("languages/app");
+const QString kTranslateService = QStringLiteral("translate/service");
+const QString kTranslateTarget = QStringLiteral("translate/target");
+const QString kOfferTranslation = QStringLiteral("translate/offer");
+const QString kLibreTranslateServer = QStringLiteral("translate/libreTranslateServer");
+const QString kLibreTranslateKey = QStringLiteral("translate/libreTranslateKey");
 const QString kReadAloudRate = QStringLiteral("browsing/readAloudRate");
 const QString kMouseGestures = QStringLiteral("browsing/mouseGestures");
 const QString kGpuBoost = QStringLiteral("roles/gamer/gpuBoost");
@@ -479,6 +484,56 @@ QString Preferences::appLanguage() const
 void Preferences::setAppLanguage(const QString &tag)
 {
     write(kAppLanguage, tag);
+}
+
+QString Preferences::translateService() const
+{
+    return QSettings().value(kTranslateService, QStringLiteral("google")).toString();
+}
+
+void Preferences::setTranslateService(const QString &key)
+{
+    write(kTranslateService, key);
+}
+
+QString Preferences::translateTarget() const
+{
+    return QSettings().value(kTranslateTarget).toString();
+}
+
+void Preferences::setTranslateTarget(const QString &tag)
+{
+    write(kTranslateTarget, tag);
+}
+
+bool Preferences::offerTranslation() const
+{
+    return QSettings().value(kOfferTranslation, true).toBool();
+}
+
+void Preferences::setOfferTranslation(bool offer)
+{
+    write(kOfferTranslation, offer);
+}
+
+QString Preferences::libreTranslateServer() const
+{
+    return QSettings().value(kLibreTranslateServer).toString();
+}
+
+void Preferences::setLibreTranslateServer(const QString &url)
+{
+    write(kLibreTranslateServer, url.trimmed());
+}
+
+QString Preferences::libreTranslateKey() const
+{
+    return QSettings().value(kLibreTranslateKey).toString();
+}
+
+void Preferences::setLibreTranslateKey(const QString &key)
+{
+    write(kLibreTranslateKey, key.trimmed());
 }
 
 int Preferences::readAloudRate() const
