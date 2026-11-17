@@ -14,6 +14,8 @@
 #include "icons.h"
 #include "mousegestures.h"
 #include "preferences.h"
+#include "shortcuts.h"
+#include "readaloud.h"
 #include "roles.h"
 #include "theme.h"
 #include "tor.h"
@@ -35,6 +37,7 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
+#include <QSlider>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMap>
@@ -346,6 +349,30 @@ QWidget *SettingsDialog::createGeneralTab()
         layout->addWidget(mutedLabel(tr("Misspelt words in text boxes are underlined; right-click "
                                         "one for suggestions. Checked in: %1.")
                                          .arg(SpellCheck::describe(spellLanguages))));
+    }
+
+    layout->addWidget(sectionTitle(tr("Read Aloud")));
+    if (ReadAloud::isAvailable()) {
+        auto *rateRow = new QHBoxLayout;
+        rateRow->addWidget(new QLabel(tr("Speed:")));
+        auto *rate = new QSlider(Qt::Horizontal);
+        rate->setRange(-5, 5);
+        rate->setPageStep(1);
+        rate->setTickPosition(QSlider::TicksBelow);
+        rate->setValue(preferences->readAloudRate());
+        rate->setAccessibleName(tr("Read Aloud speed"));
+        connect(rate, &QSlider::valueChanged, this, [](int value) { Preferences::instance()->setReadAloudRate(value); });
+        rateRow->addWidget(new QLabel(tr("Slower")));
+        rateRow->addWidget(rate, 1);
+        rateRow->addWidget(new QLabel(tr("Faster")));
+        layout->addLayout(rateRow);
+        layout->addWidget(mutedLabel(tr("Reads the selected text, or else the page's article, with %1 (%2). "
+                                        "Nothing leaves this computer.")
+                                         .arg(ReadAloud::engineName(ReadAloud::engine()),
+                                              Shortcuts::text(Shortcuts::ReadAloud))));
+    } else {
+        layout->addWidget(mutedLabel(tr("No speech engine was found. Install speech-dispatcher (spd-say) "
+                                        "or eSpeak NG from your distribution's packages to have pages read aloud.")));
     }
 
     layout->addWidget(sectionTitle(tr("Mouse gestures")));

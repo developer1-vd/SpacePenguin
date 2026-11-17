@@ -137,6 +137,8 @@ qt_add_executable(spacepenguin
     src/webview.h
     src/mousegestures.cpp
     src/mousegestures.h
+    src/readaloud.cpp
+    src/readaloud.h
     src/startuptrace.cpp
     src/startuptrace.h
     src/sponsorblock.cpp
@@ -449,6 +451,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_mousegestures PRIVATE Qt6::Test)
         target_include_directories(tst_mousegestures PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME mousegestures COMMAND tst_mousegestures)
+
+        qt_add_executable(tst_readaloud
+            tests/tst_readaloud.cpp
+            src/readaloud.cpp
+            src/readaloud.h
+        )
+        target_link_libraries(tst_readaloud PRIVATE Qt6::Test)
+        target_include_directories(tst_readaloud PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME readaloud COMMAND tst_readaloud)
 
         qt_add_executable(tst_roles
             tests/tst_roles.cpp

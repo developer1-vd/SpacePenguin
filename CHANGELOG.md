@@ -9,6 +9,7 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Read Aloud (text to speech): View › Read Aloud or Ctrl+Alt+S reads the selected text, or else the page's article, in the page's language, with the system's own voices: macOS speech, Windows speech, or speech-dispatcher or eSpeak on Linux. Nothing leaves the computer. Right-click selected text to read just that; the speed is in Settings › General.
 - Picture-in-Picture: a page's video plays in a small window that stays over the others (View › Picture-in-Picture, Ctrl+Alt+P, or right-click a video). The tab keeps its place and the video keeps playing; Escape, closing the window or *Bring It Back* returns it.
 - Mouse gestures: hold the right mouse button and draw on a page. ← back, → forward, ↑ to the top, ↓ to the bottom, ↑↓ reload, ↓← new tab, ↓→ close tab, ↑← reopen the closed tab. A right click without drawing still opens the menu. Settings › General turns them off.
 - A Homebrew cask for macOS (`brew install --cask spacepenguin` from the SpacePenguin tap) and winget manifests for Windows, both written for each release by `tools/update-package-manifests.sh`.

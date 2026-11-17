@@ -213,6 +213,8 @@ private:
     void toggleReaderView();
     /** The tab's video in a small window that stays on top; again brings it back. */
     void togglePictureInPicture(WebView *view);
+    /** Reads the selection, or else the page's article, aloud; again stops. */
+    void toggleReadAloud(WebView *view);
     void enterPictureInPicture(WebView *view);
     void exitPictureInPicture();
     void setPageFullScreen(bool on);
@@ -324,6 +326,7 @@ private:
     QAction *m_muteTabAction = nullptr;
     QAction *m_readerAction = nullptr;
     QAction *m_pipAction = nullptr;
+    QAction *m_readAloudAction = nullptr;
     QAction *m_newWindowAction = nullptr;
     QAction *m_newPrivateWindowAction = nullptr;
     QAction *m_closeTabAction = nullptr;

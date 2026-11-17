@@ -1,5 +1,6 @@
 #include "browserwindow.h"
 
+#include "readaloud.h"
 #include "readerview.h"
 #include "updatechecker.h"
 
@@ -437,6 +438,15 @@ void BrowserWindow::createActions()
 
     m_readerAction = makeAction(tr("Reader View"), {QKeySequence(Qt::Key_F9)}, Icons::icon(Icons::Reader));
     connect(m_readerAction, &QAction::triggered, this, &BrowserWindow::toggleReaderView);
+    m_readAloudAction = makeAction(tr("Read Aloud"), Shortcuts::keys(Shortcuts::ReadAloud));
+    m_readAloudAction->setVisible(ReadAloud::isAvailable());
+    connect(m_readAloudAction, &QAction::triggered, this, [this] {
+        if (WebView *view = currentView())
+            toggleReadAloud(view);
+    });
+    connect(ReadAloud::instance(), &ReadAloud::speakingChanged, this, [this](bool speaking) {
+        m_readAloudAction->setText(speaking ? tr("Stop Reading Aloud") : tr("Read Aloud"));
+    });
     m_pipAction = makeAction(tr("Picture-in-Picture"), Shortcuts::keys(Shortcuts::PictureInPicture));
     connect(m_pipAction, &QAction::triggered, this, [this] {
         if (m_pipView)
@@ -1098,6 +1108,7 @@ QMenu *BrowserWindow::createAppMenu()
 
     menu->addAction(m_readerAction);
     menu->addAction(m_pipAction);
+    menu->addAction(m_readAloudAction);
     menu->addAction(m_historyAction);
     menu->addAction(m_downloadsAction);
     menu->addAction(m_installAppAction);
@@ -1247,6 +1258,7 @@ void BrowserWindow::createMenus()
     viewMenu->addAction(m_fullScreenAction);
     viewMenu->addAction(m_readerAction);
     viewMenu->addAction(m_pipAction);
+    viewMenu->addAction(m_readAloudAction);
     viewMenu->addAction(m_muteTabAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_bookmarksBarAction);
@@ -3414,6 +3426,10 @@ void BrowserWindow::showToast(const QString &text, int milliseconds)
 
 void BrowserWindow::connectView(WebView *view)
 {
+    connect(view, &WebView::readAloudRequested, this, [this, view] {
+        ReadAloud::instance()->stop();
+        toggleReadAloud(view);
+    });
     connect(view, &WebView::pictureInPictureRequested, this, [this, view] { togglePictureInPicture(view); });
     connect(view, &WebView::gestureDrawn, this, [this, view](MouseGestures::Action action) {
         using Action = MouseGestures::Action;
@@ -3903,6 +3919,40 @@ void BrowserWindow::closeDockedDevTools()
         return;
     m_dockedDevTools->page()->setInspectedPage(nullptr);
     m_dockedDevTools->hide();
+}
+
+void BrowserWindow::toggleReadAloud(WebView *view)
+{
+    ReadAloud *readAloud = ReadAloud::instance();
+    if (readAloud->isSpeaking()) {
+        readAloud->stop();
+        return;
+    }
+    // The selection; else the element whose paragraphs hold the most text (the
+    // article); else the whole page. With the page's language, for the voice.
+    static const QString textOfPage = QStringLiteral(R"JS((() => {
+        const lang = document.documentElement.lang || '';
+        const selected = String(window.getSelection() || '').trim();
+        if (selected) return {text: selected, lang};
+        let best = null, bestLength = 0;
+        for (const block of document.querySelectorAll('article, main, [role=main], div, section')) {
+            let length = 0;
+            for (const p of block.querySelectorAll(':scope > p, :scope > div > p')) length += p.innerText.length;
+            if (length > bestLength) { best = block; bestLength = length; }
+        }
+        const text = bestLength > 400 ? best.innerText : document.body.innerText;
+        return {text: (document.title ? document.title + '.\n\n' : '') + text, lang};
+    })())JS");
+    view->page()->runJavaScript(textOfPage, QWebEngineScript::ApplicationWorld, [this](const QVariant &result) {
+        const QVariantMap map = result.toMap();
+        const QString text = map.value(QStringLiteral("text")).toString();
+        if (text.trimmed().isEmpty()) {
+            showToast(tr("There is no text on this page to read aloud."), 3000);
+            return;
+        }
+        ReadAloud::instance()->setRate(Preferences::instance()->readAloudRate());
+        ReadAloud::instance()->speak(text, map.value(QStringLiteral("lang")).toString());
+    });
 }
 
 void BrowserWindow::togglePictureInPicture(WebView *view)

@@ -49,6 +49,8 @@ signals:
     void inspectRequested();
     /** Picture-in-Picture was chosen in a video's context menu. */
     void pictureInPictureRequested();
+    /** Read Aloud was chosen for the selected text. */
+    void readAloudRequested();
     /** A mouse gesture was drawn on the page (Preferences::mouseGestures()). */
     void gestureDrawn(spacepenguin::MouseGestures::Action action);
 

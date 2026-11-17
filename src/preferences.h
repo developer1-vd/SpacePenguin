@@ -109,6 +109,10 @@ public:
     QString devToolsDock() const;
     void setDevToolsDock(const QString &dock);
 
+    /** Read Aloud's pace: -5 (slow) to 5 (fast), 0 the voice's own. */
+    int readAloudRate() const;
+    void setReadAloudRate(int rate);
+
     /** Right-button strokes on pages go back, forward, close the tab… (mousegestures.h). */
     bool mouseGestures() const;
     void setMouseGestures(bool on);

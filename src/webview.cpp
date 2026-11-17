@@ -2,6 +2,7 @@
 
 #include "browserpage.h"
 #include "preferences.h"
+#include "readaloud.h"
 #include "roles.h"
 
 #include <QChildEvent>
@@ -40,6 +41,12 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
     menu->setAttribute(Qt::WA_DeleteOnClose);
     // Qt's own Inspect needs developer tools already attached; the window attaches them.
     menu->removeAction(pageAction(QWebEnginePage::InspectElement));
+    if (const QWebEngineContextMenuRequest *request = lastContextMenuRequest();
+        request && !request->selectedText().trimmed().isEmpty() && ReadAloud::isAvailable()) {
+        menu->addSeparator();
+        QAction *read = menu->addAction(tr("Read Aloud"));
+        connect(read, &QAction::triggered, this, &WebView::readAloudRequested);
+    }
     if (const QWebEngineContextMenuRequest *request = lastContextMenuRequest();
         request && request->mediaType() == QWebEngineContextMenuRequest::MediaTypeVideo) {
         menu->addSeparator();
