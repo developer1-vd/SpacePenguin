@@ -122,11 +122,12 @@ ReadAloud::Command ReadAloud::command(Engine engine, int rate, const QString &la
     }
     case Engine::SpeechDispatcher:
         command.program = QStringLiteral("spd-say");
-        // -w: return when done, so the next piece follows this one.
-        command.arguments = {QStringLiteral("-w"), QStringLiteral("-r"), QString::number(rate * 20)};
+        // -w: return when done, so the next piece follows this one. -e: the text
+        // on standard input, as command lines are visible to every user (ps).
+        command.arguments = {QStringLiteral("-w"), QStringLiteral("-e"), QStringLiteral("-r"), QString::number(rate * 20)};
         if (!tag.isEmpty())
             command.arguments << QStringLiteral("-l") << tag.section(QLatin1Char('-'), 0, 0).toLower();
-        command.arguments << QStringLiteral("--");
+        command.textOnStdin = true;
         break;
     case Engine::ESpeak:
         command.program = QStandardPaths::findExecutable(QStringLiteral("espeak-ng")).isEmpty()

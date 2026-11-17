@@ -713,7 +713,8 @@ QWidget *SettingsDialog::createPrivacyTab()
     {
         QSettings settings;
         auto *vpnOff = new QRadioButton(tr("Off"));
-        auto *vpnTor = new QRadioButton(tr("Through Tor: free, no account; slower, and some sites refuse it"));
+        auto *vpnTor = new QRadioButton(tr("Through Tor (free; slower)"));
+        vpnTor->setToolTip(tr("Free and without an account, but slower, and some sites refuse Tor."));
         auto *vpnServer = new QRadioButton(tr("Through my VPN or proxy server:"));
         auto *vpnGroup = new QButtonGroup(page);
         vpnGroup->addButton(vpnOff, int(Vpn::Mode::Off));

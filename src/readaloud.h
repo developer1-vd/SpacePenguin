@@ -15,8 +15,8 @@ namespace spacepenguin {
  * macOS speaks with `say`, Windows with its own speech engine (through
  * PowerShell's System.Speech), and Linux and the BSDs with speech-dispatcher
  * (`spd-say`, what desktop screen readers use) or eSpeak. Nothing is sent
- * anywhere: the text goes to a program on this computer, on its standard input
- * or as one argument, never through a shell.
+ * anywhere: the text goes to a program on this computer on its standard input
+ * (never on its command line, which other users can see), never through a shell.
  */
 class ReadAloud : public QObject
 {

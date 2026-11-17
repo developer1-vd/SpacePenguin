@@ -56,14 +56,13 @@ void TestReadAloud::commandsNeverUseAShell()
         QVERIFY(!command.program.isEmpty());
         QVERIFY(command.program != QLatin1String("sh") && command.program != QLatin1String("cmd"));
     }
-    // spd-say gets the text as the argument after "--", so text starting with "-"
-    // is not read as an option.
+    // Every engine reads the text from standard input: command lines are visible
+    // to other users (ps), and text cannot be taken for an option there.
     const ReadAloud::Command spd = ReadAloud::command(Engine::SpeechDispatcher, 2, QStringLiteral("pt-BR"));
-    QCOMPARE(spd.arguments.last(), QStringLiteral("--"));
     QVERIFY(spd.arguments.contains(QStringLiteral("pt")));
     QVERIFY(spd.arguments.contains(QStringLiteral("40")));
-    QVERIFY(!spd.textOnStdin);
-    QVERIFY(ReadAloud::command(Engine::MacSay, 0, QString()).textOnStdin);
+    for (const Engine engine : {Engine::MacSay, Engine::WindowsSpeech, Engine::SpeechDispatcher, Engine::ESpeak})
+        QVERIFY(ReadAloud::command(engine, 0, QString()).textOnStdin);
     QCOMPARE(ReadAloud::command(Engine::None, 0, QString()).program, QString());
 }
 
