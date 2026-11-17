@@ -12,6 +12,7 @@
 #include "downloadmanager.h"
 #include "historymanager.h"
 #include "icons.h"
+#include "mousegestures.h"
 #include "preferences.h"
 #include "roles.h"
 #include "theme.h"
@@ -346,6 +347,20 @@ QWidget *SettingsDialog::createGeneralTab()
                                         "one for suggestions. Checked in: %1.")
                                          .arg(SpellCheck::describe(spellLanguages))));
     }
+
+    layout->addWidget(sectionTitle(tr("Mouse gestures")));
+    auto *gestures = new QCheckBox(tr("Hold the right mouse button and draw on a page to go back, close the tab…"));
+    gestures->setChecked(preferences->mouseGestures());
+    connect(gestures, &QCheckBox::toggled, this,
+            [](bool checked) { Preferences::instance()->setMouseGestures(checked); });
+    layout->addWidget(gestures);
+    QStringList gestureList;
+    for (const MouseGestures::Entry &entry : MouseGestures::all())
+        gestureList << QStringLiteral("%1 %2").arg(MouseGestures::arrows(entry.directions),
+                                                   MouseGestures::label(entry.action));
+    layout->addWidget(mutedLabel(gestureList.join(QStringLiteral(" · "))
+                                 + QStringLiteral("\n")
+                                 + tr("A right click without drawing still opens the menu.")));
     layout->addStretch(1);
     return page;
 }

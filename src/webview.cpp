@@ -4,9 +4,13 @@
 #include "preferences.h"
 #include "roles.h"
 
+#include <QChildEvent>
 #include <QContextMenuEvent>
+#include <QMouseEvent>
 #include <QMenu>
 #include <QTimer>
+
+#include <utility>
 
 namespace spacepenguin {
 
@@ -41,6 +45,75 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
         connect(inspect, &QAction::triggered, this, &WebView::inspectRequested);
     }
     menu->popup(event->globalPos());
+}
+
+WebView::~WebView() = default;
+
+bool WebView::event(QEvent *event)
+{
+    if (event->type() == QEvent::ChildPolished) {
+        if (auto *child = qobject_cast<QWidget *>(static_cast<QChildEvent *>(event)->child()))
+            child->installEventFilter(this);
+    }
+    return QWebEngineView::event(event);
+}
+
+bool WebView::eventFilter(QObject *watched, QEvent *event)
+{
+    const QEvent::Type type = event->type();
+    if (m_replaying
+        || (type != QEvent::MouseButtonPress && type != QEvent::MouseMove && type != QEvent::MouseButtonRelease))
+        return QWebEngineView::eventFilter(watched, event);
+    auto *mouse = static_cast<QMouseEvent *>(event);
+    const QPoint position = mouse->position().toPoint();
+
+    if (type == QEvent::MouseButtonPress) {
+        if (mouse->button() != Qt::RightButton || mouse->buttons() != Qt::RightButton
+            || !Preferences::instance()->mouseGestures())
+            return QWebEngineView::eventFilter(watched, event);
+        // Held back: the page would open its menu on the press (Linux, macOS).
+        m_stroke = {position};
+        m_heldPress.reset(static_cast<QMouseEvent *>(mouse->clone()));
+        m_strokeTarget = watched;
+        return true;
+    }
+    if (!m_heldPress)
+        return QWebEngineView::eventFilter(watched, event);
+
+    if (type == QEvent::MouseMove) {
+        if (!(mouse->buttons() & Qt::RightButton)) {
+            // The release went elsewhere (another window took the mouse): no stroke.
+            m_heldPress.reset();
+            m_stroke.clear();
+        } else {
+            m_stroke << position;
+        }
+        return QWebEngineView::eventFilter(watched, event);
+    }
+
+    // The release.
+    if (mouse->button() != Qt::RightButton)
+        return QWebEngineView::eventFilter(watched, event);
+    std::unique_ptr<QMouseEvent> press = std::move(m_heldPress);
+    const QList<QPoint> stroke = std::exchange(m_stroke, {}) << position;
+    int farthest = 0;
+    for (const QPoint &point : stroke)
+        farthest = qMax(farthest, (point - stroke.first()).manhattanLength());
+    const QString directions = MouseGestures::directions(stroke);
+    if (farthest < MouseGestures::kClickSlop || directions.isEmpty()) {
+        // A right click after all: the page gets its press now, then this release,
+        // and shows its menu as usual.
+        if (m_strokeTarget) {
+            m_replaying = true;
+            QCoreApplication::sendEvent(m_strokeTarget, press.get());
+            m_replaying = false;
+        }
+        return QWebEngineView::eventFilter(watched, event);
+    }
+    const MouseGestures::Action action = MouseGestures::actionFor(directions);
+    if (action != MouseGestures::Action::None)
+        emit gestureDrawn(action);
+    return true;
 }
 
 WebView::WebView(QWebEngineProfile *profile, QWidget *parent)

@@ -3399,6 +3399,27 @@ void BrowserWindow::showToast(const QString &text, int milliseconds)
 
 void BrowserWindow::connectView(WebView *view)
 {
+    connect(view, &WebView::gestureDrawn, this, [this, view](MouseGestures::Action action) {
+        using Action = MouseGestures::Action;
+        switch (action) {
+        case Action::None: break;
+        case Action::Back: view->back(); break;
+        case Action::Forward: view->forward(); break;
+        case Action::Reload: view->reload(); break;
+        case Action::ScrollToTop:
+            view->page()->runJavaScript(QStringLiteral("window.scrollTo({top: 0, behavior: 'smooth'})"),
+                                        QWebEngineScript::ApplicationWorld);
+            break;
+        case Action::ScrollToBottom:
+            view->page()->runJavaScript(
+                QStringLiteral("window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'smooth'})"),
+                QWebEngineScript::ApplicationWorld);
+            break;
+        case Action::NewTab: newTab(); break;
+        case Action::CloseTab: closeTab(indexOfView(view)); break;
+        case Action::ReopenClosedTab: reopenClosedTab(); break;
+        }
+    });
     connect(view, &QWebEngineView::titleChanged, this, [this, view] {
         updateTabLabel(view);
         if (view == currentView())

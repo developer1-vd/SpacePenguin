@@ -109,6 +109,10 @@ public:
     QString devToolsDock() const;
     void setDevToolsDock(const QString &dock);
 
+    /** Right-button strokes on pages go back, forward, close the tab… (mousegestures.h). */
+    bool mouseGestures() const;
+    void setMouseGestures(bool on);
+
     /** Gamer: GPU drawing even on graphics chips Chromium distrusts (from the next start). */
     bool gpuBoost() const;
     void setGpuBoost(bool boost);

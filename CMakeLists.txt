@@ -135,6 +135,8 @@ qt_add_executable(spacepenguin
     src/httpsonly.h
     src/webview.cpp
     src/webview.h
+    src/mousegestures.cpp
+    src/mousegestures.h
     src/startuptrace.cpp
     src/startuptrace.h
     src/sponsorblock.cpp
@@ -438,6 +440,15 @@ if(SPACEPENGUIN_BUILD_TESTS)
         endif()
         target_include_directories(tst_importer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME importer COMMAND tst_importer)
+
+        qt_add_executable(tst_mousegestures
+            tests/tst_mousegestures.cpp
+            src/mousegestures.cpp
+            src/mousegestures.h
+        )
+        target_link_libraries(tst_mousegestures PRIVATE Qt6::Test)
+        target_include_directories(tst_mousegestures PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME mousegestures COMMAND tst_mousegestures)
 
         qt_add_executable(tst_roles
             tests/tst_roles.cpp

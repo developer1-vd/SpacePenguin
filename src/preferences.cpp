@@ -33,6 +33,7 @@ const QString kBypassCache = QStringLiteral("roles/developer/bypassCache");
 const QString kUserAgent = QStringLiteral("roles/developer/userAgent");
 const QString kPointerLock = QStringLiteral("roles/gamer/allowPointerLock");
 const QString kDevToolsDock = QStringLiteral("roles/developer/devToolsDock");
+const QString kMouseGestures = QStringLiteral("browsing/mouseGestures");
 const QString kGpuBoost = QStringLiteral("roles/gamer/gpuBoost");
 const QString kUncapFrameRate = QStringLiteral("roles/gamer/uncapFrameRate");
 const QString kFpsCounter = QStringLiteral("roles/gamer/fpsCounter");
@@ -444,6 +445,16 @@ QString Preferences::devToolsDock() const
 void Preferences::setDevToolsDock(const QString &dock)
 {
     write(kDevToolsDock, dock);
+}
+
+bool Preferences::mouseGestures() const
+{
+    return QSettings().value(kMouseGestures, true).toBool();
+}
+
+void Preferences::setMouseGestures(bool on)
+{
+    write(kMouseGestures, on);
 }
 
 bool Preferences::gpuBoost() const
