@@ -145,6 +145,12 @@ qt_add_executable(spacepenguin
     src/translator.h
     src/vpn.cpp
     src/vpn.h
+    src/crypto.cpp
+    src/crypto.h
+    src/primarypassword.cpp
+    src/primarypassword.h
+    src/backup.cpp
+    src/backup.h
     src/startuptrace.cpp
     src/startuptrace.h
     src/sponsorblock.cpp
@@ -484,6 +490,16 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_translator PRIVATE Qt6::Test Qt6::Network)
         target_include_directories(tst_translator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME translator COMMAND tst_translator)
+
+        qt_add_executable(tst_crypto
+            tests/tst_crypto.cpp
+            src/crypto.cpp
+            src/crypto.h
+        )
+        target_link_libraries(tst_crypto PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
+        target_include_directories(tst_crypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME crypto COMMAND tst_crypto)
+        set_tests_properties(crypto PROPERTIES ENVIRONMENT "QTWEBENGINE_CHROMIUM_FLAGS=--disable-gpu;QTWEBENGINE_DISABLE_SANDBOX=1;ASAN_OPTIONS=detect_leaks=0")
 
         qt_add_executable(tst_roles
             tests/tst_roles.cpp

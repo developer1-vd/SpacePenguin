@@ -14,6 +14,8 @@
 #include "icons.h"
 #include "languages.h"
 #include "translator.h"
+#include "backup.h"
+#include "primarypassword.h"
 #include "vpn.h"
 #include "mousegestures.h"
 #include "preferences.h"
@@ -952,6 +954,28 @@ QWidget *SettingsDialog::createPrivacyTab()
     layout->addWidget(dataSaver);
     layout->addWidget(mutedLabel(tr("Applies to open tabs straight away; reload a page to "
                                     "see the difference.")));
+
+    layout->addWidget(sectionTitle(tr("Encryption")));
+    auto *encryptionButtons = new QHBoxLayout;
+    auto *primary = new QPushButton(Icons::icon(Icons::Key), PrimaryPassword::isSet() ? tr("Change Primary Password…")
+                                                                                    : tr("Set a Primary Password…"));
+    connect(primary, &QPushButton::clicked, this, [this, primary] {
+        PrimaryPassword::change(this);
+        primary->setText(PrimaryPassword::isSet() ? tr("Change Primary Password…") : tr("Set a Primary Password…"));
+    });
+    auto *exportBackup = new QPushButton(tr("Export Encrypted Backup…"));
+    connect(exportBackup, &QPushButton::clicked, this, [this] { Backup::exportTo(this); });
+    auto *importBackup = new QPushButton(tr("Restore Backup…"));
+    connect(importBackup, &QPushButton::clicked, this, [this] { Backup::importFrom(this); });
+    encryptionButtons->addWidget(primary);
+    encryptionButtons->addWidget(exportBackup);
+    encryptionButtons->addWidget(importBackup);
+    encryptionButtons->addStretch(1);
+    layout->addLayout(encryptionButtons);
+    layout->addWidget(mutedLabel(tr("A primary password keeps other people at this computer out of your saved "
+                                    "logins. A backup holds your logins and settings (bookmarks included), "
+                                    "encrypted with AES-256-GCM and a password of your choosing, to move them "
+                                    "to another computer.")));
 
     layout->addWidget(sectionTitle(tr("Browsing data")));
     auto *dataButtons = new QHBoxLayout;

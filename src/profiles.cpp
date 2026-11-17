@@ -15,6 +15,9 @@
 #include "historymanager.h"
 #include "languages.h"
 #include "preferences.h"
+#include "primarypassword.h"
+
+#include <QWebEngineUrlRequestJob>
 #include "spellcheck.h"
 #include "startpageschemehandler.h"
 #include "store.h"
@@ -105,6 +108,12 @@ QString defaultFilterListPath()
     return defaultDataDirectory() + QStringLiteral("/adblock/filters.txt");
 }
 
+LoginStore *sharedLogins()
+{
+    static LoginStore *logins = new LoginStore(defaultDataDirectory(), qApp);
+    return logins;
+}
+
 ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QString &filterListPath)
 {
     ProfileServices services;
@@ -129,7 +138,7 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
         });
 
     // One store of saved logins; private windows can fill from it but do not add to it.
-    static LoginStore *logins = new LoginStore(defaultDataDirectory(), qApp);
+    LoginStore *logins = sharedLogins();
     services.logins = logins;
     if (!isPrivate) {
         QWebEngineScript capture;
@@ -188,6 +197,11 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     });
     services.profile->installUrlSchemeHandler(QByteArrayLiteral("sp"), startPage);
     startPage->setHostHandler(QStringLiteral("logins"), [logins = services.logins](QWebEngineUrlRequestJob *job) {
+        // Behind the primary password, when there is one: the page and its API alike.
+        if (!PrimaryPassword::isUnlocked()) {
+            job->fail(QWebEngineUrlRequestJob::RequestDenied);
+            return;
+        }
         static const QByteArray page = [] {
             QFile file(QStringLiteral(":/html/logins.html"));
             return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();

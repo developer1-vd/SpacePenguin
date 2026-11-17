@@ -31,6 +31,9 @@ struct ProfileServices {
 
 QString defaultDataDirectory();
 
+/** The one store of saved logins (created with the first profile). */
+LoginStore *sharedLogins();
+
 ProfileServices createProfileServices(QObject *parent, bool isPrivate,
                                      const QString &filterListPath = QString());
 

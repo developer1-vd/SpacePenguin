@@ -3,6 +3,7 @@
 #include "languages.h"
 #include "readaloud.h"
 #include "translator.h"
+#include "primarypassword.h"
 #include "vpn.h"
 #include "readerview.h"
 #include "updatechecker.h"
@@ -2469,6 +2470,10 @@ void BrowserWindow::showLoginsMenu()
     WebView *view = currentView();
     if (!view || !m_services.logins)
         return;
+    if (!PrimaryPassword::isUnlocked()) {
+        PrimaryPassword::unlock(this, [this] { showLoginsMenu(); });
+        return;
+    }
     const QString origin = LoginStore::originOf(view->url());
     QMenu menu(this);
     menu.addAction(tr("Fill in a saved login"))->setEnabled(false);
@@ -3079,7 +3084,11 @@ void BrowserWindow::loadAboutPage(WebView *view, const QString &id)
     const QString normalized = id.trimmed().toLower();
     // about:logins is a real page with its own API, served as sp://logins.
     if (normalized == QLatin1String("about:logins")) {
-        view->setUrl(QUrl(QStringLiteral("sp://logins/")));
+        const QPointer<WebView> target = view;
+        PrimaryPassword::unlock(this, [target] {
+            if (target)
+                target->setUrl(QUrl(QStringLiteral("sp://logins/")));
+        });
         return;
     }
     const AboutPageContext context = aboutContext();

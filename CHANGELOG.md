@@ -9,6 +9,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- AES-256 encryption: Settings › Privacy & Security can export your saved logins and settings (bookmarks included) as an encrypted backup (AES-256-GCM, with a key from PBKDF2-SHA256 at 600,000 rounds) and restore one on another computer. The work is done by Chromium's WebCrypto, so SpacePenguin carries no cryptography of its own.
+- A primary password for saved logins: once set, they cannot be seen, filled in or exported until it is given, once per start. Only a PBKDF2 verifier of it is kept.
 - A VPN switch in the toolbar: everything SpacePenguin loads, its own updates and filter lists included, goes through Tor (free, no account) or through a SOCKS5 or HTTP server of your VPN service or your own (Settings › Privacy & Security). Names are resolved by the proxy and WebRTC cannot go around it. If the VPN cannot start, SpacePenguin connects to nothing until you choose. Changing it restarts SpacePenguin with the same tabs.
 - A translator: Translate Page (Ctrl+Shift+Y, View menu) and Translate Selection (right-click), with Google Translate, Bing Translator, DeepL, Yandex Translate or a LibreTranslate server of your choosing, which translates the page in place. SpacePenguin offers to translate pages that are not in your languages (Settings › General turns that off). Nothing is sent until you ask; LibreTranslate is not used from Tor windows, where it would not go through Tor.
 - Languages in Settings › General: SpacePenguin's own language (and so how dates and numbers are written), the languages websites are asked for, in order (Accept-Language and navigator.languages), and the spelling dictionaries, instead of only the system's. Any language and region can be added.
