@@ -5,6 +5,8 @@
 #include <QFileOpenEvent>
 #include <QLoggingCategory>
 #include <QMessageBox>
+#include <QPointer>
+#include <QWidget>
 #include <QSettings>
 #include <QTimer>
 #include <QLocale>
@@ -269,5 +271,20 @@ int main(int argc, char *argv[])
     };
     app.installEventFilter(new FileOpenFilter(openFromOutside, &app));
 
-    return app.exec();
+    const int status = app.exec();
+    // Every page must go before its profile, which is a child of the application
+    // and so is deleted with it: a page that outlives it crashes Chromium on the
+    // way out. Windows closed just before quitting are only scheduled for deletion,
+    // and some (a window Qt did not close, a detached developer tools window) are
+    // still here, so both go now.
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QList<QPointer<QWidget>> windows;
+    for (QWidget *window : QApplication::topLevelWidgets())
+        windows << window;
+    for (const QPointer<QWidget> &window : std::as_const(windows)) {
+        if (window && !window->parentWidget())
+            delete window.data();
+    }
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    return status;
 }

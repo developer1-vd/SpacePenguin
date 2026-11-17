@@ -13,6 +13,7 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- SpacePenguin could crash on the way out: a window that was still open, or only scheduled to close, could keep its pages past the browser profile they belong to. All windows now go before the profile.
 - On Linux, playing a video (YouTube, or a tab reopened at start-up) could still close the browser, Gamer mode or not: Chromium handed decoded frames to QtWebEngine in a form it cannot take on Linux. Videos are now decoded without the GPU on Linux.
 
 ## [1.0.0-rc.3] - 2026-11-16
