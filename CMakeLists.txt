@@ -499,7 +499,6 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_crypto PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
         target_include_directories(tst_crypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME crypto COMMAND tst_crypto)
-        set_tests_properties(crypto PROPERTIES ENVIRONMENT "QTWEBENGINE_CHROMIUM_FLAGS=--disable-gpu;QTWEBENGINE_DISABLE_SANDBOX=1;ASAN_OPTIONS=detect_leaks=0")
 
         qt_add_executable(tst_roles
             tests/tst_roles.cpp
@@ -668,6 +667,10 @@ if(SPACEPENGUIN_BUILD_TESTS)
         # Tests never touch the real keyring (a test that does turns it back on).
         get_property(spacepenguin_tests DIRECTORY PROPERTY TESTS)
         set_tests_properties(${spacepenguin_tests} PROPERTIES ENVIRONMENT "SPACEPENGUIN_NO_KEYRING=1")
+        # The crypto test runs Chromium: no GPU or sandbox in CI containers, and
+        # Chromium's allocations at exit are not leaks of ours.
+        set_tests_properties(crypto PROPERTIES ENVIRONMENT
+            "SPACEPENGUIN_NO_KEYRING=1;QTWEBENGINE_CHROMIUM_FLAGS=--disable-gpu --no-sandbox;QTWEBENGINE_DISABLE_SANDBOX=1;ASAN_OPTIONS=detect_leaks=0")
     endif()
 endif()
 
