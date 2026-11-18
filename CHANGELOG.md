@@ -7,6 +7,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Closing SpacePenguin could still crash it (SIGSEGV) after regular, not private, windows, as seen in the Flatpak: the browser profiles were deleted only with the application, after Chromium had shut down. They now go first.
+
 ## [1.0.0-rc.4] - 2026-11-17
 
 ### Added

@@ -312,5 +312,20 @@ int main(int argc, char *argv[])
             delete window.data();
     }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    // Then the profiles, and everything of ours that uses them, while the
+    // application is still whole. As its children they would only go after
+    // QtWebEngine has shut Chromium down in ~QApplication, and a saved profile is
+    // then torn down by a static destructor at exit, after Qt's GUI is gone: a
+    // SIGSEGV on closing regular (not private) windows with Qt 6.11. Newest
+    // first, so what uses a profile goes before the profile.
+    QList<QPointer<QObject>> ours;
+    for (QObject *child : app.children()) {
+        if (qobject_cast<QWebEngineProfile *>(child)
+            || QByteArray(child->metaObject()->className()).startsWith("spacepenguin::"))
+            ours.prepend(child);
+    }
+    for (const QPointer<QObject> &object : std::as_const(ours))
+        delete object.data();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     return status;
 }
