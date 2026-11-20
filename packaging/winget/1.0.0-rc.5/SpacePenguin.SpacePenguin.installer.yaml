@@ -1,10 +1,10 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 PackageIdentifier: SpacePenguin.SpacePenguin
-PackageVersion: 1.0.0-rc.4
+PackageVersion: 1.0.0-rc.5
 InstallerType: nullsoft
 UpgradeBehavior: install
 ProductCode: SpacePenguin
-ReleaseDate: 2026-11-17
+ReleaseDate: 2026-11-20
 Commands:
 - SpacePenguin
 Protocols:
@@ -17,19 +17,19 @@ FileExtensions:
 AppsAndFeaturesEntries:
 - DisplayName: SpacePenguin
   Publisher: SpacePenguin
-  DisplayVersion: 1.0.0-rc.4
+  DisplayVersion: 1.0.0-rc.5
   ProductCode: SpacePenguin
 Installers:
 - Architecture: x64
   Scope: user
-  InstallerUrl: https://github.com/developer1-vd/SpacePenguin/releases/download/v1.0.0-rc.4/SpacePenguin-1.0.0-rc.4-windows-x64-setup.exe
-  InstallerSha256: 54DDF1AA5F20E6034D3033DA593DE367DD2F865135CD3530338EBB648611C2AB
+  InstallerUrl: https://github.com/developer1-vd/SpacePenguin/releases/download/v1.0.0-rc.5/SpacePenguin-1.0.0-rc.5-windows-x64-setup.exe
+  InstallerSha256: 084AEF81240A4A2F4B5450272FC62937B2F09CDC2285AF9814488A41F5A96B98
   InstallerSwitches:
     Custom: /CurrentUser
 - Architecture: x64
   Scope: machine
-  InstallerUrl: https://github.com/developer1-vd/SpacePenguin/releases/download/v1.0.0-rc.4/SpacePenguin-1.0.0-rc.4-windows-x64-setup.exe
-  InstallerSha256: 54DDF1AA5F20E6034D3033DA593DE367DD2F865135CD3530338EBB648611C2AB
+  InstallerUrl: https://github.com/developer1-vd/SpacePenguin/releases/download/v1.0.0-rc.5/SpacePenguin-1.0.0-rc.5-windows-x64-setup.exe
+  InstallerSha256: 084AEF81240A4A2F4B5450272FC62937B2F09CDC2285AF9814488A41F5A96B98
   InstallerSwitches:
     Custom: /AllUsers
 ManifestType: installer

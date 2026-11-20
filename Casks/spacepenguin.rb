@@ -3,8 +3,8 @@
 #   brew install --cask spacepenguin
 # Written by tools/update-package-manifests.sh; run it again for a new release.
 cask "spacepenguin" do
-  version "1.0.0-rc.4"
-  sha256 "e1b7efb046ee96fd0ee49e130b4d3d3ee57dac36bc36a98eb12158a946963794"
+  version "1.0.0-rc.5"
+  sha256 "3b83f42ecfb0bc057f4cafd6fe28f760474b329c93c1c61ad664cf198a4d96e2"
 
   url "https://github.com/developer1-vd/SpacePenguin/releases/download/v#{version}/SpacePenguin-#{version}-macos.dmg"
   name "SpacePenguin"
