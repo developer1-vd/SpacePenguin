@@ -13,7 +13,7 @@ project(SpacePenguin
 # need plain numbers and take VERSION above. It is VERSION itself, or VERSION with
 # a pre-release suffix ("-rc.1") while a release is being tried out; the release
 # tag is "v" and this name.
-set(SPACEPENGUIN_VERSION_NAME "1.0.0-rc.5")
+set(SPACEPENGUIN_VERSION_NAME "1.0.0-rc.6")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

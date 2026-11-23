@@ -7,6 +7,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-rc.6] - 2026-11-23
+
 ### Fixed
 
 - Picture-in-Picture started from Ctrl+Alt+P or the menu showed the whole page in its small window instead of the video: Chromium allows a video to go full screen only just after a click in the page. The video now fills the window either way.
@@ -117,7 +119,8 @@ their store, sites installed as apps, saved logins (about:logins), crash
 recovery, roles for developers, gamers, students, workers and teachers, and
 packages for Windows, macOS, Linux, the BSDs, Chromebooks, Android and iPhone.
 
-[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.5...HEAD
+[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.6...HEAD
+[1.0.0-rc.6]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.5...v1.0.0-rc.6
 [1.0.0-rc.5]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.4...v1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.3...v1.0.0-rc.4
 [1.0.0-rc.3]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.2...v1.0.0-rc.3
