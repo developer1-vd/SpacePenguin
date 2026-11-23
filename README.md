@@ -683,6 +683,24 @@ brings them back. On Linux, `uninstall.sh` asks whether to delete them too
 Elsewhere they are in `~/Library/Application Support/SpacePenguin` (macOS) or
 `~/.local/share/SpacePenguin` and `~/.config/SpacePenguin` (Linux packages).
 
+### Deleting your data
+
+To start again from nothing but keep SpacePenguin installed, close it and delete
+its data: bookmarks, history, saved logins, cookies, settings, the primary
+password and the cache. This cannot be undone, so export an encrypted backup
+first (Settings › Privacy & Security) if you may want any of it back.
+
+| Installed with | Delete the data |
+| -------------- | --------------- |
+| Flatpak | `flatpak kill io.github.developer1_vd.SpacePenguin; rm -rf ~/.var/app/io.github.developer1_vd.SpacePenguin` |
+| `install.sh`, `.deb` / `.rpm` / Arch, AppImage | `rm -rf ~/.local/share/SpacePenguin ~/.config/SpacePenguin ~/.cache/SpacePenguin` |
+| macOS | `rm -rf ~/Library/Application\ Support/SpacePenguin ~/Library/Caches/SpacePenguin ~/Library/Preferences/invalid.spacepenguin.SpacePenguin.plist` |
+| Windows | delete `%APPDATA%\SpacePenguin` and `%LOCALAPPDATA%\SpacePenguin`, and the registry key `HKEY_CURRENT_USER\Software\SpacePenguin` |
+
+On Linux, saved logins may also be in your keyring rather than SpacePenguin's
+own files: open *Passwords and Keys* (Seahorse), search for "SpacePenguin" and
+delete what it finds. The next start is like the first.
+
 ## Building
 
 ### 1. Install the dependencies
