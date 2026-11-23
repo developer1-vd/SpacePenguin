@@ -38,8 +38,8 @@ modules:
     sources:
       - type: git
         url: https://github.com/developer1-vd/SpacePenguin.git
-        tag: v1.0.0-rc.5
-        commit: 1835240d4ba9661e4f51a2930a29b8a9e358a958
+        tag: v1.0.0-rc.6
+        commit: d630cdca1e89421e95b586ae0af3473310ea3ffe
         x-checker-data:
           type: git
           tag-pattern: ^v([\d.]+(?:-rc\.\d+)?)$
