@@ -4261,10 +4261,25 @@ void BrowserWindow::enterPictureInPicture(WebView *view)
     m_pipWindow = window;
     window->show();
 
-    // The marked video fills the window, the way it would fill the screen.
-    view->page()->runJavaScript(
-        QStringLiteral("document.querySelector('[data-spacepenguin-pip]')?.requestFullscreen().catch(() => {})"),
-        QWebEngineScript::ApplicationWorld);
+    // The marked video fills the window, the way it would fill the screen. Chromium
+    // allows that only just after a click in the page, so from the keyboard shortcut
+    // or the menu it is refused; the video is then stretched over the page instead.
+    static const QString fillWindow = QStringLiteral(R"JS((() => {
+        const video = document.querySelector('[data-spacepenguin-pip]');
+        if (!video) return;
+        const stretch = () => {
+            if (document.getElementById('spacepenguin-pip-style')) return;
+            const style = document.createElement('style');
+            style.id = 'spacepenguin-pip-style';
+            style.textContent = '[data-spacepenguin-pip]{position:fixed!important;inset:0!important;'
+                + 'width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;'
+                + 'margin:0!important;border-radius:0!important;z-index:2147483647!important;'
+                + 'background:#000!important;object-fit:contain!important}html,body{overflow:hidden!important}';
+            document.documentElement.appendChild(style);
+        };
+        video.requestFullscreen().catch(stretch);
+    })())JS");
+    view->page()->runJavaScript(fillWindow, QWebEngineScript::ApplicationWorld);
     m_pipAction->setText(tr("Leave Picture-in-Picture"));
 }
 
@@ -4275,6 +4290,8 @@ void BrowserWindow::exitPictureInPicture()
     m_pipAction->setText(tr("Picture-in-Picture"));
     if (view) {
         view->page()->triggerAction(QWebEnginePage::ExitFullScreen);
+        view->page()->runJavaScript(QStringLiteral("document.getElementById('spacepenguin-pip-style')?.remove()"),
+                                    QWebEngineScript::ApplicationWorld);
         const int at = m_pipPlaceholder ? m_stack->indexOf(m_pipPlaceholder) : m_stack->count();
         view->setParent(nullptr);
         m_stack->insertWidget(at, view);
