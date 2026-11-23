@@ -90,6 +90,7 @@ h1 { font-size: clamp(34px, 5.5vw, 54px); line-height: 1.08; letter-spacing: -0.
 .fineprint { color: var(--muted); font-size: 14px; }
 
 .shot { display: block; margin: 56px 0 0; }
+.trailer { display: block; width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 12px; background: #071d4a; }
 .shot img { display: block; width: 100%; border: 1px solid var(--rule); border-radius: 12px; }
 
 /* ---- Sections ----------------------------------------------------------- */

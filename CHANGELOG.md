@@ -7,6 +7,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Picture-in-Picture started from Ctrl+Alt+P or the menu showed the whole page in its small window instead of the video: Chromium allows a video to go full screen only just after a click in the page. The video now fills the window either way.
+
+### Added
+
+- A 40-second trailer on the website, with music written for it (`tools/trailer/music.py`).
+
 ## [1.0.0-rc.5] - 2026-11-20
 
 ### Fixed
