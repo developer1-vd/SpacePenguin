@@ -145,6 +145,18 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
   `about:history` lists recent visits. Private windows record nothing
 - **Downloads** — downloads window (`Ctrl`+`J`) with progress, cancel, open and
   show in folder
+- **First start** — a new install opens a short setup: search engine, light or
+  dark, privacy, what you use it for, and bookmarks from another browser. Every
+  answer can be changed later in Settings
+- **Apps from links** — "Open in app" buttons, games (Roblox's *Play*) and sign-in
+  pages that send you back to an app (`discord://`, `zoommtg:`, `vscode://`…) open
+  the app after a bar asks, with *Always Open* per site. Links that run programs
+  or open files (`file:`, `javascript:`, `ms-msdt:`…) are never opened. On Linux,
+  Roblox runs with [Sober](https://flathub.org/apps/org.vinegarhq.Sober), which
+  SpacePenguin points to when nothing opens Roblox's links
+- **Flatpak apps** — a `.flatpakref` from Flathub's *Install* button is offered for
+  installing as soon as it downloads (`flatpak install --user`, no password; inside
+  the Flatpak, your software centre does it)
 - **Start page** — search box for the chosen engine and tiles for your most
   visited sites, served locally by `sp://start/`
 - **Load state** — thin progress line under the toolbar, hovered link preview,

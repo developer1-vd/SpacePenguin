@@ -30,6 +30,7 @@
 #include "profiles.h"
 #include "roles.h"
 #include "sandbox.h"
+#include "setupwizard.h"
 #include "singleinstance.h"
 #include "startuptrace.h"
 #include "systemscheme.h"
@@ -98,6 +99,8 @@ int main(int argc, char *argv[])
     if (appTranslator.load(QLocale(), QStringLiteral("spacepenguin"), QStringLiteral("_"), QStringLiteral(":/i18n"))
         || appTranslator.load(QStringLiteral(":/i18n/spacepenguin_en")))
         QCoreApplication::installTranslator(&appTranslator);
+    // A new install has no settings yet: its first start offers the setup wizard.
+    const bool settingsWereEmpty = QSettings().allKeys().isEmpty();
     // Before anything reads them: bring the settings up to this build's layout.
     {
         QSettings settings;
@@ -230,10 +233,20 @@ int main(int argc, char *argv[])
     };
     if (appId.isEmpty() || isPrivate
         || !spacepenguin::AppWindow::open(appId, appProfile, tabForOutside)) {
+        spacepenguin::BookmarkManager *bookmarks = services.bookmarkManager;
         auto *window = new spacepenguin::BrowserWindow(std::move(services));
         window->setAttribute(Qt::WA_DeleteOnClose);
         spacepenguin::StartupTrace::mark("window built");
         window->show();
+        if (spacepenguin::FirstRun::shouldShowSetup(settingsWereEmpty, isPrivate, false,
+                                                    QGuiApplication::platformName().toUtf8(),
+                                                    qEnvironmentVariableIntValue("SPACEPENGUIN_NO_SETUP") != 0)) {
+            QTimer::singleShot(0, window, [window, bookmarks] {
+                auto *wizard = new spacepenguin::SetupWizard(bookmarks, window);
+                wizard->setAttribute(Qt::WA_DeleteOnClose);
+                wizard->open();
+            });
+        }
         QTimer::singleShot(0, [] { spacepenguin::StartupTrace::mark("window shown"); });
         window->openPages(urls);
     }

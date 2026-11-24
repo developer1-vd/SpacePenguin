@@ -7,6 +7,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A setup wizard on a new install's first start: the search engine, light or dark and the colour, privacy (ad blocking, HTTPS-only, tracking in links, sponsor segments, saving logins), what SpacePenguin is for, and bookmarks from another browser. Existing installs never see it.
+- Apps open from links: "Open in app" buttons, Roblox's *Play*, and sign-in pages that send you back to an app (Discord, Zoom, Teams, Slack, Spotify, VS Code, mailto: and others) now open the app, after a bar asks; *Always Open* remembers the site and app (not in private or Tor windows). Links that run programs or open local files are never opened.
+- Roblox on Linux: when nothing on the computer opens Roblox's links, SpacePenguin points to Sober on Flathub.
+- Flatpak apps install from the browser: a .flatpakref downloaded from Flathub's Install button is offered for installing right away, for your user only, so no password is needed. Inside the Flatpak, your software centre installs it.
+
 ## [1.0.0-rc.6] - 2026-11-23
 
 ### Fixed
