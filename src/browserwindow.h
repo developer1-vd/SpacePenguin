@@ -187,6 +187,8 @@ private:
     void showExtensionPopup(const QUrl &url);
     void offerWebStoreExtension(WebView *view);
     void offerUserScript(WebView *view, const QUrl &url, bool quiet);
+    void offerAppLink(WebView *view, const QUrl &url, bool typed, bool fromFrame);
+    void offerFlatpakInstall(const QString &path);
     /** Downloads the @require libraries of a script; @p done gets an error, or nothing. */
     void fetchRequires(const QString &source, std::function<void(const QString &failure)> done);
 

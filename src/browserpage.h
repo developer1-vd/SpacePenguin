@@ -32,6 +32,11 @@ signals:
     void loginSubmitted(const QString &username, const QString &password);
     /** An onion site, outside a Tor window: it can only open in one (see tor.h). */
     void onionRequested(const QUrl &url);
+    /** A link for an app on the computer (roblox-player:, discord://, a sign-in
+     *  page sending you back to an app): the window asks before opening it,
+     *  unless @p typed (into the address bar, by the person themselves).
+     *  @p fromFrame: a frame in the page asked, not the page itself. */
+    void appLinkRequested(const QUrl &url, bool typed, bool fromFrame);
 
 protected:
     bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override;

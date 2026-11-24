@@ -1,6 +1,7 @@
 #include "browserpage.h"
 
 #include "classroom.h"
+#include "externalapps.h"
 #include "httpsonly.h"
 #include "logins.h"
 #include "preferences.h"
@@ -126,6 +127,12 @@ bool BrowserPage::isAllowedScheme(const QString &scheme)
 
 bool BrowserPage::acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame)
 {
+    // Links for apps on the computer, from the page or one of its frames (games
+    // start theirs from a hidden frame). Never opened without asking.
+    if (ExternalApps::isAppLink(url)) {
+        emit appLinkRequested(url, isMainFrame && type == NavigationTypeTyped, !isMainFrame);
+        return false;
+    }
     if (!isMainFrame) {
         // The browser's own pages (saved logins among them) stay out of websites'
         // frames, where a site could trick people into clicking on them.
