@@ -41,9 +41,11 @@ one extra step:
 ### Homebrew (macOS)
 
 ```sh
-brew tap developer1-vd/spacepenguin https://github.com/developer1-vd/SpacePenguin
-brew install --cask spacepenguin
+brew install --cask developer1-vd/spacepenguin/spacepenguin
 ```
+
+The cask lives in [developer1-vd/homebrew-spacepenguin](https://github.com/developer1-vd/homebrew-spacepenguin),
+so Homebrew finds the tap by itself.
 
 `brew upgrade --cask spacepenguin` installs new releases. The first start still
 needs *Open Anyway*, as above.

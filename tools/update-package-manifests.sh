@@ -6,6 +6,7 @@
 #
 # Writes Casks/spacepenguin.rb and packaging/winget/<version>/. Run it after the
 # release workflow has published (or re-published) that version, then commit.
+# The cask is what people install: copy it to Casks/ in developer1-vd/homebrew-spacepenguin.
 # The winget folder is what goes to microsoft/winget-pkgs (see packaging/winget/README.md).
 set -euo pipefail
 
@@ -39,9 +40,9 @@ download="https://github.com/${REPO}/releases/download/v${VERSION}"
 mkdir -p "${ROOT}/Casks"
 cat >"${ROOT}/Casks/spacepenguin.rb" <<EOF
 # Install with:
-#   brew tap developer1-vd/spacepenguin https://github.com/developer1-vd/SpacePenguin
-#   brew install --cask spacepenguin
-# Written by tools/update-package-manifests.sh; run it again for a new release.
+#   brew install --cask developer1-vd/spacepenguin/spacepenguin
+# Written by tools/update-package-manifests.sh in developer1-vd/SpacePenguin;
+# copied here for each release.
 cask "spacepenguin" do
   version "${VERSION}"
   sha256 "${dmg_sha}"
