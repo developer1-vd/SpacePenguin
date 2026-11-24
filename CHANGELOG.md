@@ -7,6 +7,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-rc.7] - 2026-11-24
+
 ### Added
 
 - A setup wizard on a new install's first start: the search engine, light or dark and the colour, privacy (ad blocking, HTTPS-only, tracking in links, sponsor segments, saving logins), what SpacePenguin is for, and bookmarks from another browser. Existing installs never see it.
@@ -126,7 +128,8 @@ their store, sites installed as apps, saved logins (about:logins), crash
 recovery, roles for developers, gamers, students, workers and teachers, and
 packages for Windows, macOS, Linux, the BSDs, Chromebooks, Android and iPhone.
 
-[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.6...HEAD
+[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.7...HEAD
+[1.0.0-rc.7]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.6...v1.0.0-rc.7
 [1.0.0-rc.6]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.5...v1.0.0-rc.6
 [1.0.0-rc.5]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.4...v1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.3...v1.0.0-rc.4
