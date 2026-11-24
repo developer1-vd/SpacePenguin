@@ -41,11 +41,14 @@ one extra step:
 ### Homebrew (macOS)
 
 ```sh
-brew install --cask developer1-vd/spacepenguin/spacepenguin
+brew tap developer1-vd/spacepenguin
+brew trust developer1-vd/spacepenguin
+brew install --cask spacepenguin
 ```
 
-The cask lives in [developer1-vd/homebrew-spacepenguin](https://github.com/developer1-vd/homebrew-spacepenguin),
-so Homebrew finds the tap by itself.
+The cask lives in [developer1-vd/homebrew-spacepenguin](https://github.com/developer1-vd/homebrew-spacepenguin).
+Homebrew installs from other people's taps only once you trust them, which
+`brew trust` does, once.
 
 `brew upgrade --cask spacepenguin` installs new releases. The first start still
 needs *Open Anyway*, as above.

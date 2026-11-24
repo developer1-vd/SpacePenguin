@@ -1,5 +1,7 @@
 # Install with:
-#   brew install --cask developer1-vd/spacepenguin/spacepenguin
+#   brew tap developer1-vd/spacepenguin
+#   brew trust developer1-vd/spacepenguin
+#   brew install --cask spacepenguin
 # Written by tools/update-package-manifests.sh in developer1-vd/SpacePenguin;
 # copied here for each release.
 cask "spacepenguin" do
