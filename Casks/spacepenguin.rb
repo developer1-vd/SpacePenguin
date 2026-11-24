@@ -11,7 +11,7 @@ cask "spacepenguin" do
   desc "Secure, lightweight browser built on Qt and Chromium"
   homepage "https://github.com/developer1-vd/SpacePenguin"
 
-  depends_on macos: ">= :monterey"
+  depends_on macos: :monterey
 
   app "SpacePenguin.app"
 
