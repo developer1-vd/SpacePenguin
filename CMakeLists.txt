@@ -137,6 +137,10 @@ qt_add_executable(spacepenguin
     src/webview.h
     src/mousegestures.cpp
     src/mousegestures.h
+    src/externalapps.cpp
+    src/externalapps.h
+    src/setupwizard.cpp
+    src/setupwizard.h
     src/readaloud.cpp
     src/readaloud.h
     src/languages.cpp
@@ -463,6 +467,22 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_mousegestures PRIVATE Qt6::Test)
         target_include_directories(tst_mousegestures PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME mousegestures COMMAND tst_mousegestures)
+
+        qt_add_executable(tst_externalapps
+            tests/tst_externalapps.cpp
+            src/externalapps.cpp
+            src/externalapps.h
+            src/sandbox.cpp
+            src/sandbox.h
+        )
+        target_link_libraries(tst_externalapps PRIVATE Qt6::Test Qt6::Gui)
+        target_include_directories(tst_externalapps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME externalapps COMMAND tst_externalapps)
+
+        qt_add_executable(tst_firstrun tests/tst_firstrun.cpp)
+        target_link_libraries(tst_firstrun PRIVATE Qt6::Test Qt6::Widgets)
+        target_include_directories(tst_firstrun PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME firstrun COMMAND tst_firstrun)
 
         qt_add_executable(tst_readaloud
             tests/tst_readaloud.cpp
