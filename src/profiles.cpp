@@ -3,6 +3,8 @@
 #include "chromeextensions.h"
 #include "logins.h"
 #include "loginspage.h"
+#include "authenticator.h"
+#include "authenticatorpage.h"
 #include "notifications.h"
 
 #include "adblocker.h"
@@ -114,6 +116,12 @@ LoginStore *sharedLogins()
     return logins;
 }
 
+AuthenticatorStore *sharedAuthenticator()
+{
+    static AuthenticatorStore *authenticator = new AuthenticatorStore(defaultDataDirectory(), qApp);
+    return authenticator;
+}
+
 ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QString &filterListPath)
 {
     ProfileServices services;
@@ -140,6 +148,8 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
     // One store of saved logins; private windows can fill from it but do not add to it.
     LoginStore *logins = sharedLogins();
     services.logins = logins;
+    // One authenticator, for private windows too: its codes are needed to sign in there.
+    services.authenticator = sharedAuthenticator();
     if (!isPrivate) {
         QWebEngineScript capture;
         // Browser-owned: the extensions loader keeps scripts with this prefix.
@@ -207,6 +217,19 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
             return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
         }();
         LoginsPage::handle(job, logins, page);
+    });
+    startPage->setHostHandler(QStringLiteral("authenticator"),
+                              [authenticator = services.authenticator](QWebEngineUrlRequestJob *job) {
+        // Behind the primary password too: the codes sign in to accounts.
+        if (!PrimaryPassword::isUnlocked()) {
+            job->fail(QWebEngineUrlRequestJob::RequestDenied);
+            return;
+        }
+        static const QByteArray page = [] {
+            QFile file(QStringLiteral(":/html/authenticator.html"));
+            return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+        }();
+        AuthenticatorPage::handle(job, authenticator, page);
     });
 
     const bool explicitList = !filterListPath.isEmpty();

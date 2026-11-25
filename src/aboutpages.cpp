@@ -41,6 +41,8 @@ const PageDefinition kPages[] = {
       "Manage your user scripts and extensions.", false },
     { "about:logins", "Saved Logins",
       "Search, add, edit and delete saved usernames and passwords.", false },
+    { "about:authenticator", "Authenticator",
+      "Two-factor sign-in codes, and the accounts they are for.", false },
     { "about:settings", "Settings",
       "Configure SpacePenguin.", false },
 };
@@ -353,6 +355,9 @@ QString AboutPages::render(const QString &id, const AboutPageContext &context)
     if (normalized == QLatin1String("about:logins"))
         return htmlShell(pageTitle(id), QStringLiteral("<h1>Saved Logins</h1>"
                                                        "<p><a href=\"sp://logins/\">Open saved logins</a></p>"));
+    if (normalized == QLatin1String("about:authenticator"))
+        return htmlShell(pageTitle(id), QStringLiteral("<h1>Authenticator</h1>"
+                                                       "<p><a href=\"sp://authenticator/\">Open the authenticator</a></p>"));
 
     return renderUnknown(id);
 }

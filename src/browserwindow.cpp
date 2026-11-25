@@ -26,6 +26,7 @@
 #include "historydialog.h"
 #include "historymanager.h"
 #include "logins.h"
+#include "authenticator.h"
 #include "notifications.h"
 #include "icons.h"
 #include "preferences.h"
@@ -179,7 +180,7 @@ bool isWebScheme(const QUrl &url)
 bool isStartPage(const QUrl &url)
 {
     return url.scheme() == QLatin1String("sp") && url.host() != QLatin1String("store")
-        && url.host() != QLatin1String("logins");
+        && url.host() != QLatin1String("logins") && url.host() != QLatin1String("authenticator");
 }
 
 const QUrl kStoreUrl(QStringLiteral("sp://store/"));
@@ -270,6 +271,8 @@ BrowserWindow::BrowserWindow(ProfileServices services, QWidget *parent)
 
     if (m_services.logins)
         connect(m_services.logins, &LoginStore::changed, this, &BrowserWindow::updateLoginsAction);
+    if (m_services.authenticator)
+        connect(m_services.authenticator, &AuthenticatorStore::changed, this, &BrowserWindow::updateLoginsAction);
 
     if (m_services.extensions) {
         connect(m_services.extensions, &ChromeExtensions::installed, this, [this](const QString &name) {
@@ -636,6 +639,10 @@ void BrowserWindow::createActions()
     m_historyAction = makeAction(tr("History…"), Shortcuts::keys(Shortcuts::History),
                                  Icons::icon(Icons::History));
     connect(m_historyAction, &QAction::triggered, this, &BrowserWindow::showHistory);
+
+    m_authenticatorAction = makeAction(tr("Authenticator…"), {}, Icons::icon(Icons::Shield));
+    m_authenticatorAction->setToolTip(tr("Two-factor sign-in codes"));
+    connect(m_authenticatorAction, &QAction::triggered, this, &BrowserWindow::showAuthenticator);
 
     m_downloadsAction = makeAction(tr("Downloads…"), Shortcuts::keys(Shortcuts::Downloads),
                                    Icons::icon(Icons::Download));
@@ -1161,6 +1168,7 @@ QMenu *BrowserWindow::createAppMenu()
     menu->addAction(m_translateAction);
     menu->addAction(m_historyAction);
     menu->addAction(m_downloadsAction);
+    menu->addAction(m_authenticatorAction);
     menu->addAction(m_installAppAction);
     menu->addSeparator();
 
@@ -1326,6 +1334,7 @@ void BrowserWindow::createMenus()
     toolsMenu->addAction(m_historyAction);
     toolsMenu->addAction(m_downloadsAction);
     toolsMenu->addAction(m_extensionsAction);
+    toolsMenu->addAction(m_authenticatorAction);
     toolsMenu->addAction(m_installAppAction);
     toolsMenu->addSeparator();
     toolsMenu->addAction(m_focusModeAction);
@@ -2475,8 +2484,13 @@ void BrowserWindow::updateLoginsAction()
         return;
     const WebView *view = currentView();
     const QString origin = view ? LoginStore::originOf(view->url()) : QString();
-    m_loginsAction->setVisible(m_services.logins && !origin.isEmpty()
-                               && !m_services.logins->loginsFor(origin).isEmpty());
+    const bool hasLogins = m_services.logins && !origin.isEmpty() && !m_services.logins->loginsFor(origin).isEmpty();
+    const bool hasCodes = m_services.authenticator && !origin.isEmpty()
+        && !m_services.authenticator->accountsFor(view->url()).isEmpty();
+    m_loginsAction->setVisible(hasLogins || hasCodes);
+    m_loginsAction->setToolTip(hasLogins && hasCodes ? tr("Fill in a saved login or sign-in code")
+                               : hasCodes            ? tr("Fill in a sign-in code")
+                                                     : tr("Fill in a saved login"));
 }
 
 void BrowserWindow::showLoginsMenu()
@@ -2490,9 +2504,12 @@ void BrowserWindow::showLoginsMenu()
     }
     const QString origin = LoginStore::originOf(view->url());
     QMenu menu(this);
-    menu.addAction(tr("Fill in a saved login"))->setEnabled(false);
-    menu.addSeparator();
-    for (const Login &login : m_services.logins->loginsFor(origin)) {
+    const QList<Login> logins = m_services.logins->loginsFor(origin);
+    if (!logins.isEmpty()) {
+        menu.addAction(tr("Fill in a saved login"))->setEnabled(false);
+        menu.addSeparator();
+    }
+    for (const Login &login : logins) {
         QAction *fill = menu.addAction(Icons::icon(Icons::Key),
                                        login.username.isEmpty() ? tr("(no username)") : login.username);
         connect(fill, &QAction::triggered, this, [this, view, login] {
@@ -2507,9 +2524,44 @@ void BrowserWindow::showLoginsMenu()
             m_services.logins->markUsed(login.origin, login.username);
         });
     }
+    // Two-factor codes for this site, from the authenticator.
+    const QList<OtpAccount> accounts = m_services.authenticator ? m_services.authenticator->accountsFor(view->url())
+                                                                : QList<OtpAccount>();
+    if (!accounts.isEmpty()) {
+        menu.addSeparator();
+        menu.addAction(tr("Fill in a sign-in code"))->setEnabled(false);
+        menu.addSeparator();
+    }
+    for (const OtpAccount &account : accounts) {
+        const QString who = account.issuer.isEmpty() ? account.name
+            : account.name.isEmpty()                 ? account.issuer
+                                                     : tr("%1 (%2)").arg(account.issuer, account.name);
+        QAction *fill = menu.addAction(Icons::icon(Icons::Shield), who);
+        const QString id = account.id;
+        connect(fill, &QAction::triggered, this, [this, view, id] {
+            if (!m_tabBar || indexOfView(view) < 0 || !m_services.authenticator)
+                return;
+            const OtpAccount account = m_services.authenticator->account(id);
+            // The page may have gone to another site while the menu was open.
+            if (!Otp::matchesSite(account, view->url()))
+                return;
+            const QString code = m_services.authenticator->takeCode(id, QDateTime::currentSecsSinceEpoch());
+            const QPointer<WebView> target = view;
+            view->page()->runJavaScript(AuthenticatorStore::fillScript(code), QWebEngineScript::ApplicationWorld,
+                                        [this, target, code](const QVariant &filled) {
+                // No code box found: copy it to paste by hand.
+                if (filled.toBool() || !target)
+                    return;
+                QGuiApplication::clipboard()->setText(code);
+                showToast(tr("Code copied: paste it into the site's code box."), 4000);
+            });
+        });
+    }
     menu.addSeparator();
-    connect(menu.addAction(tr("Manage saved logins…")), &QAction::triggered, this,
-            &BrowserWindow::showSavedLogins);
+    if (!logins.isEmpty() || accounts.isEmpty())
+        connect(menu.addAction(tr("Manage saved logins…")), &QAction::triggered, this,
+                &BrowserWindow::showSavedLogins);
+    connect(menu.addAction(tr("Authenticator…")), &QAction::triggered, this, &BrowserWindow::showAuthenticator);
     menu.exec(m_omnibox->mapToGlobal(QPoint(m_omnibox->width() - 240, m_omnibox->height())));
 }
 
@@ -2526,6 +2578,49 @@ void BrowserWindow::showSavedLogins()
         }
     }
     newTab(QUrl(QStringLiteral("about:logins")));
+}
+
+void BrowserWindow::showAuthenticator()
+{
+    // Reuse an open about:authenticator rather than opening another.
+    for (int i = 0; i < m_tabBar->count(); ++i) {
+        const WebView *view = viewAt(i);
+        if (view && view->url().scheme() == QLatin1String("sp") && view->url().host() == QLatin1String("authenticator")) {
+            m_tabBar->setCurrentIndex(i);
+            return;
+        }
+    }
+    newTab(QUrl(QStringLiteral("about:authenticator")));
+}
+
+void BrowserWindow::offerAuthenticatorAccount(WebView *view, const QUrl &url)
+{
+    QString error;
+    OtpAccount account = Otp::parseUri(ExternalApps::linkText(url), &error);
+    if (!account.isValid()) {
+        showToast(tr("This authenticator link can't be used: %1").arg(error), 6000);
+        return;
+    }
+    account.site = LoginStore::originOf(view->url());
+    const QString who = account.issuer.isEmpty() ? account.name
+        : account.name.isEmpty()                 ? account.issuer
+                                                 : tr("%1 (%2)").arg(account.issuer, account.name);
+    Prompt prompt;
+    prompt.key = QStringLiteral("authenticator");
+    prompt.icon = Icons::Shield;
+    prompt.text = tr("Add <b>%1</b> to SpacePenguin's authenticator, to make its sign-in codes?")
+                      .arg(who.toHtmlEscaped());
+    prompt.buttons = {{tr("Add"), [this, account] {
+                           PrimaryPassword::unlock(this, [this, account] {
+                               if (!m_services.authenticator)
+                                   return;
+                               m_services.authenticator->add(account);
+                               showToast(tr("Added. Enter its code on the site to finish turning on two-factor sign-in."),
+                                         6000);
+                               updateLoginsAction();
+                           });
+                       }}};
+    addPrompt(view, prompt);
 }
 
 void BrowserWindow::showSitePermissions()
@@ -2639,6 +2734,11 @@ void BrowserWindow::showExtensionPopup(const QUrl &url)
 void BrowserWindow::offerAppLink(WebView *view, const QUrl &url, bool typed, bool fromFrame)
 {
     const QString scheme = url.scheme().toLower();
+    // Two-factor setup links are for the built-in authenticator, not another app.
+    if (scheme == QLatin1String("otpauth")) {
+        offerAuthenticatorAccount(view, url);
+        return;
+    }
     if (!ExternalApps::hasHandler(scheme)) {
         Prompt prompt;
         prompt.key = QStringLiteral("app-link");
@@ -3205,6 +3305,15 @@ void BrowserWindow::loadAboutPage(WebView *view, const QString &id)
         PrimaryPassword::unlock(this, [target] {
             if (target)
                 target->setUrl(QUrl(QStringLiteral("sp://logins/")));
+        });
+        return;
+    }
+    // So is about:authenticator, as sp://authenticator, behind the primary password too.
+    if (normalized == QLatin1String("about:authenticator")) {
+        const QPointer<WebView> target = view;
+        PrimaryPassword::unlock(this, [target] {
+            if (target)
+                target->setUrl(QUrl(QStringLiteral("sp://authenticator/")));
         });
         return;
     }
@@ -3938,6 +4047,8 @@ void BrowserWindow::syncOmnibox(const QUrl &url)
     // about:logins is served as sp://logins; show the name people type.
     if (url.scheme() == QLatin1String("sp") && url.host() == QLatin1String("logins"))
         m_omnibox->setText(QStringLiteral("about:logins"));
+    else if (url.scheme() == QLatin1String("sp") && url.host() == QLatin1String("authenticator"))
+        m_omnibox->setText(QStringLiteral("about:authenticator"));
     else
         m_omnibox->setText(isStartPage(url) ? QString() : url.toDisplayString());
     m_omnibox->setCursorPosition(0);

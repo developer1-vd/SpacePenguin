@@ -137,6 +137,12 @@ missing system libraries with apt, dnf, zypper or pacman, and unpacks it into
   Keychain, and on Linux and the BSDs in the desktop's keyring (GNOME Keyring,
   KWallet or any Secret Service). Only without a keyring do they fall back to a
   file only your account can read; `about:logins` says which
+- **Authenticator** (v0.1) — two-factor sign-in codes (TOTP and HOTP) without a
+  phone app. Add an account from the setup key a site shows, or from its
+  `otpauth://` link, which opens a bar to add it; `about:authenticator` shows each
+  code with a countdown, to copy, and on a site's code box the key in the address
+  bar fills it in. The keys are kept like saved logins and behind the primary
+  password. Keep the site's recovery codes too: the keys stay on this computer
 - **Site permissions** — a site that wants your camera, microphone, location,
   notifications, clipboard or screen asks in a bar above the page; answers are kept
   per site (in private windows, until they close) and can be reset from the address
@@ -425,6 +431,7 @@ never fetched from the network.
 | `about:version`   | Version, build, Qt, platform, theme, profile, blocking rules, extension count |
 | `about:license`   | SpacePenguin and Qt licensing                              |
 | `about:logins`    | Saved logins: search, add, edit, show, copy, delete        |
+| `about:authenticator` | Two-factor sign-in codes: copy, add, rename, move, delete |
 | `about:blank`     | Handled by the rendering engine                            |
 | `about:penguin`   | 🐧                                                        |
 | `about:teapot`    | RFC 2324                                                   |
@@ -981,6 +988,9 @@ src/filterlists.*     filter list subscriptions: download, update, parse off-thr
 src/importer.*        bookmark and login import from other browsers
 src/logins.*          saved logins: the store, capture and fill scripts
 src/loginspage.*      about:logins (html/logins.html) and its API
+src/otp.*             one-time passwords: HOTP, TOTP, base32, otpauth:// links
+src/authenticator.*   the authenticator's accounts and the code-filling script
+src/authenticatorpage.* about:authenticator (html/authenticator.html) and its API
 src/readerview.*      reader view script
 src/updatechecker.*   opt-in check for a newer release
 src/cookiemanager.*   cookie list and the cookies-by-site window
@@ -992,6 +1002,7 @@ src/urlresolver.*     URL, about: or search resolution (unit tested)
 src/main.cpp          profile setup, command line, entry point
 html/start.html       built-in start page
 html/logins.html      about:logins
+html/authenticator.html about:authenticator
 filters/default.txt   built-in starter filter list
 cmake/                Info.plist and qt.conf templates
 flake.nix, package.nix, default.nix, shell.nix

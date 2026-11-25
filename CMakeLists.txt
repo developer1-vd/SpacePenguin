@@ -113,6 +113,12 @@ qt_add_executable(spacepenguin
     src/logins.h
     src/loginspage.cpp
     src/loginspage.h
+    src/otp.cpp
+    src/otp.h
+    src/authenticator.cpp
+    src/authenticator.h
+    src/authenticatorpage.cpp
+    src/authenticatorpage.h
     src/secretstore.cpp
     src/secretstore.h
     src/session.cpp
@@ -478,6 +484,37 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_externalapps PRIVATE Qt6::Test Qt6::Gui)
         target_include_directories(tst_externalapps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME externalapps COMMAND tst_externalapps)
+
+        qt_add_executable(tst_otp
+            tests/tst_otp.cpp
+            src/otp.cpp
+            src/otp.h
+        )
+        target_link_libraries(tst_otp PRIVATE Qt6::Test)
+        target_include_directories(tst_otp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME otp COMMAND tst_otp)
+
+        qt_add_executable(tst_authenticator
+            tests/tst_authenticator.cpp
+            src/authenticator.cpp
+            src/authenticator.h
+            src/authenticatorpage.cpp
+            src/authenticatorpage.h
+            src/otp.cpp
+            src/otp.h
+            src/secretstore.cpp
+            src/secretstore.h
+            src/theme.cpp
+            src/theme.h
+        )
+        target_link_libraries(tst_authenticator PRIVATE Qt6::Test Qt6::Widgets Qt6::WebEngineCore)
+        spacepenguin_link_keyring(tst_authenticator)
+        if(WIN32)
+            # The keys are encrypted with the Windows account (authenticator.cpp).
+            target_link_libraries(tst_authenticator PRIVATE crypt32)
+        endif()
+        target_include_directories(tst_authenticator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME authenticator COMMAND tst_authenticator)
 
         qt_add_executable(tst_firstrun tests/tst_firstrun.cpp)
         target_link_libraries(tst_firstrun PRIVATE Qt6::Test Qt6::Widgets)

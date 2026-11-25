@@ -7,6 +7,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A built-in authenticator (v0.1) for two-factor sign-in codes (TOTP and HOTP, as Google Authenticator, Authy and others make them). Add an account from a site's "Enter a setup key" text or its `otpauth://` link, which now opens a bar to add it; about:authenticator shows each code with its countdown, to copy. On a site's code box, the key button in the address bar fills the code in, including the rows of one-digit boxes. The keys are kept like saved logins (the system keyring, or encrypted with the Windows account) and behind the primary password. QR codes can't be scanned yet: use the setup key the site shows under them.
+
 ### Fixed
 
 - Linux packages: release candidates now have the version `1.0.0~rc.N` in the .deb and .rpm (it was `1.0.0` for every one), so apt and dnf update from one to the next and to 1.0.0.

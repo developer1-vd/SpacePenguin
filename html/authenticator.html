@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authenticator</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --card-hover: #eef0f4; --text: #1b1e25; --muted: #5f6675;
+    --line: #e1e4ea; --accent: #2f5fe0; --on-accent: #ffffff; --chip: #eceff4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      --bg: #121317; --card: #1b1d23; --card-hover: #23262d; --text: #e9ebf1; --muted: #9aa1b1;
+      --line: #2a2d35; --accent: #82a0ff; --on-accent: #10142a; --chip: #23262d;
+    }
+  }
+  :root.dark {
+    color-scheme: dark;
+    --bg: #121317; --card: #1b1d23; --card-hover: #23262d; --text: #e9ebf1; --muted: #9aa1b1;
+    --line: #2a2d35; --accent: #82a0ff; --on-accent: #10142a; --chip: #23262d;
+  }
+  :root.light { color-scheme: light; }
+  /*SP_ACCENT*/
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 56rem; margin: 0 auto; padding: 2.5rem 1.5rem 3rem; }
+  header { display: flex; align-items: center; gap: .75rem; }
+  header svg { width: 44px; height: 44px; }
+  h1 { font-size: 1.6rem; margin: 0; letter-spacing: -.02em; }
+  h2 { font-size: 1.05rem; margin: 2rem 0 .6rem; }
+  .lede { color: var(--muted); margin: .4rem 0 1.5rem; }
+  .bar { display: flex; gap: .5rem; margin-bottom: 1rem; }
+  input { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--card);
+          border: 1px solid var(--line); border-radius: 10px; padding: .55rem .8rem; outline: none; }
+  input:focus { border-color: var(--accent); }
+  .bar input { border-radius: 999px; padding: .6rem 1rem; }
+  .button { border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
+            font: 600 .9rem system-ui, sans-serif; border-radius: 999px; padding: .5rem 1rem;
+            cursor: pointer; white-space: nowrap; }
+  .button.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+  .button.small { padding: .25rem .7rem; font-size: .8rem; }
+  .button.danger { color: #d33; }
+  .list { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .item { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+          gap: .75rem; align-items: center; padding: .7rem 1rem; border-top: 1px solid var(--line); }
+  .item:first-child { border-top: 0; }
+  .item:hover { background: var(--card-hover); }
+  .site { font-weight: 600; overflow-wrap: anywhere; }
+  .site small, .meta { display: block; color: var(--muted); font-weight: 400; font-size: .78rem; }
+  .user, .pass { overflow-wrap: anywhere; }
+  .pass { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .05em; }
+  .actions { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: flex-end; }
+  .status { color: var(--muted); padding: 1.5rem; text-align: center; }
+  form.edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .5rem;
+              background: var(--card); border: 1px solid var(--accent); border-radius: 14px;
+              padding: 1rem; margin-bottom: 1rem; }
+  form.edit .row { display: flex; gap: .5rem; justify-content: flex-end; grid-column: 1 / -1; align-items: center; }
+  .error { color: #d33; margin-right: auto; font-size: .85rem; }
+  .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--text);
+           color: var(--bg); border-radius: 999px; padding: .45rem 1rem; font-size: .85rem; }
+  .note { color: var(--muted); font-size: .85rem; margin-top: 2rem; }
+  @media (max-width: 40rem) {
+    .item { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .actions { grid-column: 1 / -1; justify-content: flex-start; }
+  }
+  .code { font: 600 1.6rem/1.1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .08em;
+          background: none; border: 0; color: var(--text); padding: .2rem .3rem; border-radius: 8px; cursor: pointer; }
+  .code:hover { background: var(--chip); }
+  .code.soon { color: #d33; }
+  .acct { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: .9rem; align-items: center;
+          padding: .8rem 1rem; border-top: 1px solid var(--line); }
+  .acct:first-child { border-top: 0; }
+  .acct:hover { background: var(--card-hover); }
+  .ring { width: 28px; height: 28px; }
+  .ring circle { fill: none; stroke-width: 4; }
+  .ring .track { stroke: var(--line); }
+  .ring .left { stroke: var(--accent); transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .9s linear; }
+  .tabs { display: flex; gap: .4rem; grid-column: 1 / -1; }
+  .tabs .button { flex: none; }
+  textarea { font: .85rem ui-monospace, Menlo, Consolas, monospace; color: inherit; background: var(--bg); width: 100%;
+             border: 1px solid var(--line); border-radius: 10px; padding: .5rem .7rem; resize: vertical; grid-column: 1 / -1; }
+  .badge { display: inline-block; background: var(--chip); color: var(--muted); border-radius: 999px;
+           font-size: .72rem; padding: .05rem .5rem; margin-left: .4rem; vertical-align: middle; font-weight: 600; }
+  @media (max-width: 40rem) {
+    .acct { grid-template-columns: minmax(0, 1fr) auto; }
+    .acct .actions { grid-column: 1 / -1; justify-content: flex-start; }
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+        <clipPath id="sp-globe"><circle cx="50" cy="72" r="20"/></clipPath>
+        <g transform="translate(50 50) scale(.92) translate(-50 -53.25)">
+          <path d="M25.5 54V35a24.5 24.5 0 0 1 49 0v19" fill="none" stroke="#ff7a1a" stroke-width="7"/>
+          <path d="M32 47V35a18 18 0 0 1 36 0v12h1a14 14 0 0 1 14 14v22a14 14 0 0 1-14 14H31a14 14 0 0 1-14-14V61a14 14 0 0 1 14-14z" fill="#16171d" stroke="#fff" stroke-width="5" stroke-linejoin="round" paint-order="stroke"/>
+          <path d="M37 47V36a13 13 0 0 1 26 0v11z" fill="#fff"/>
+          <circle cx="45" cy="34" r="2.6" fill="#16171d"/>
+          <circle cx="55" cy="34" r="2.6" fill="#16171d"/>
+          <path d="M47 38.5h6l-3 4z" fill="#ffb21f" stroke="#ffb21f" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="50" cy="72" r="20" fill="#6a4fe0"/>
+          <path d="M33 64c4-3 10-3 13 0 2 3-1 5-1 8 0 4 4 6 3 10-1 5-6 7-9 5-3-2-2-7-5-10-3-3-6-6-5-9 1-2 2-3 4-4zM56 61c5-1 11 1 13 5 1 3-1 5-4 5-3 1-3 4-2 7 2 4 1 8-3 10-4 1-5-3-6-7-1-5-4-8-4-13 0-4 2-6 6-7z" fill="#2fb7a3" clip-path="url(#sp-globe)"/>
+        </g>
+      </svg>
+    <h1>Authenticator <span class="badge">v0.1</span></h1>
+  </header>
+  <p class="lede">Two-factor sign-in codes, made on this computer from the keys sites give you. Click a code to copy it.
+    <span id="storage"></span></p>
+  <div class="bar">
+    <input id="q" type="search" placeholder="Search accounts" aria-label="Search accounts" autocomplete="off">
+    <button class="button" id="add" type="button">Add account</button>
+  </div>
+  <form class="edit" id="form" hidden autocomplete="off">
+    <div class="tabs" role="tablist">
+      <button class="button small" type="button" id="t-key" role="tab">Setup key</button>
+      <button class="button ghost small" type="button" id="t-uri" role="tab">otpauth:// link</button>
+    </div>
+    <input id="f-issuer" placeholder="Site, such as GitHub" aria-label="Site">
+    <input id="f-name" placeholder="Account, such as your email" aria-label="Account">
+    <input id="f-key" placeholder="Setup key, such as JBSW Y3DP EHPK 3PXP" aria-label="Setup key" spellcheck="false">
+    <textarea id="f-uri" rows="2" placeholder="otpauth://totp/…" aria-label="otpauth link" spellcheck="false" hidden></textarea>
+    <div class="row">
+      <span class="error" id="f-error"></span>
+      <button class="button ghost" type="button" id="f-cancel">Cancel</button>
+      <button class="button" type="submit" id="f-save">Add</button>
+    </div>
+  </form>
+  <div class="list" id="list"><div class="status">Loading…</div></div>
+  <p class="note">To add an account, turn on two-factor authentication on the site. Where it shows a QR code, look for
+    “Can't scan it?” or “Enter a setup key” and paste the key here. Links that start with otpauth:// open here by
+    themselves. On a site's code box, the key button in the address bar fills in its code.</p>
+  <p class="note">Keep another way back into your accounts, such as the site's recovery codes: if this computer is lost,
+    these keys go with it. “Move” shows an account's key to set it up in another authenticator too.</p>
+</main>
+<div class="toast" id="toast" hidden></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let accounts = [];
+let mode = 'key';
+let renaming = null;
+const hotpCodes = new Map();
+const live = new Map(); // id -> {code, ring} on screen, for the codes to change in place
+let shape = '';
+
+function el(tag, props, ...children) {
+  const node = document.createElement(tag);
+  Object.assign(node, props || {});
+  for (const child of children) node.append(child);
+  return node;
+}
+function svg(tag, attrs, ...children) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  for (const child of children) node.append(child);
+  return node;
+}
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => { t.hidden = true; }, 1800);
+}
+async function api(path, data) {
+  const response = await fetch('/api/' + path, data === undefined ? {} : {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('The request was refused. Reload the page to unlock it again.');
+  return response.json();
+}
+function spaced(code) {
+  // 123 456, 1234 5678: easier to read and type.
+  if (!code) return '';
+  const half = Math.ceil(code.length / 2);
+  return code.length > 6 ? code.slice(0, 4) + ' ' + code.slice(4) : code.slice(0, half) + ' ' + code.slice(half);
+}
+function copy(code) {
+  navigator.clipboard.writeText(code).then(() => toast('Code copied'), () => toast('Could not copy'));
+}
+function title(a) { return a.issuer || a.name || 'Account'; }
+
+function ring(a) {
+  const r = 11, c = 2 * Math.PI * r;
+  const left = svg('circle', { class: 'left', cx: 14, cy: 14, r, 'stroke-dasharray': c,
+                               'stroke-dashoffset': c * (1 - a.left / a.period) });
+  return svg('svg', { class: 'ring', viewBox: '0 0 28 28', 'aria-hidden': 'true' },
+             svg('circle', { class: 'track', cx: 14, cy: 14, r }), left);
+}
+
+function shapeOf(list) {
+  return JSON.stringify(list.map(a => [a.id, a.issuer, a.name, a.site, a.type, hotpCodes.get(a.id) || '']));
+}
+// Only the codes and their timers changed: update them where they are, so a click
+// in progress or the keyboard focus is not lost.
+function tick() {
+  const query = $('q').value.trim().toLowerCase();
+  const matches = accounts.filter(a => !query || (a.issuer + ' ' + a.name + ' ' + a.site).toLowerCase().includes(query));
+  if (shapeOf(matches) !== shape) { render(); return; }
+  for (const a of matches) {
+    const shown = live.get(a.id);
+    if (!shown) continue;
+    if (shown.code.dataset.code !== a.code) {
+      shown.code.dataset.code = a.code;
+      shown.code.textContent = spaced(a.code);
+      shown.code.setAttribute('aria-label', 'Code for ' + shown.title + ': ' + a.code.split('').join(' ') + '. Copy');
+    }
+    shown.code.classList.toggle('soon', a.left <= 5);
+    const c = 2 * Math.PI * 11;
+    shown.ring.setAttribute('stroke-dashoffset', c * (1 - a.left / a.period));
+  }
+}
+
+function render() {
+  const query = $('q').value.trim().toLowerCase();
+  const list = $('list');
+  const matches = accounts.filter(a => !query || (a.issuer + ' ' + a.name + ' ' + a.site).toLowerCase().includes(query));
+  list.textContent = '';
+  live.clear();
+  shape = shapeOf(matches);
+  if (!matches.length) {
+    list.append(el('div', { className: 'status', textContent: accounts.length
+      ? 'No accounts match “' + $('q').value.trim() + '”.'
+      : 'No accounts yet. Choose Add account, or open an otpauth:// link from a site.' }));
+    return;
+  }
+  for (const a of matches) {
+    const who = el('div', { className: 'site', textContent: title(a) },
+                   el('small', { textContent: a.issuer && a.name ? a.name : (a.site || '') }));
+    let codeBox;
+    if (a.type === 'totp') {
+      codeBox = el('button', { className: 'code' + (a.left <= 5 ? ' soon' : ''), type: 'button',
+                               textContent: spaced(a.code), title: 'Copy the code' });
+      codeBox.setAttribute('aria-label', 'Code for ' + title(a) + ': ' + a.code.split('').join(' ') + '. Copy');
+      codeBox.onclick = () => copy(codeBox.dataset.code);
+      codeBox.dataset.code = a.code;
+    } else {
+      const shown = hotpCodes.get(a.id);
+      codeBox = el('button', { className: shown ? 'code' : 'button ghost small', type: 'button',
+                               textContent: shown ? spaced(shown) : 'Get code' });
+      codeBox.onclick = async () => {
+        if (shown) { copy(shown); return; }
+        const result = await api('next', { id: a.id });
+        if (result.error) { toast(result.error); return; }
+        hotpCodes.set(a.id, result.code);
+        copy(result.code);
+        render();
+      };
+    }
+    const rename = el('button', { className: 'button ghost small', type: 'button', textContent: 'Rename' });
+    rename.onclick = () => openForm(a);
+    const move = el('button', { className: 'button ghost small', type: 'button', textContent: 'Move' });
+    move.onclick = async () => {
+      if (!confirm('Show the key for ' + title(a) + '? Anyone who sees it can make its codes.')) return;
+      const result = await api('export', { id: a.id });
+      if (result.error) { toast(result.error); return; }
+      prompt('Paste this link into another authenticator app, or enter the key ' + result.key.replace(/(.{4})/g, '$1 ').trim() + ':', result.uri);
+    };
+    const remove = el('button', { className: 'button ghost small danger', type: 'button', textContent: 'Delete' });
+    remove.onclick = async () => {
+      if (!confirm('Delete ' + title(a) + (a.name && a.issuer ? ' (' + a.name + ')' : '') + ' from the authenticator?\n\n'
+                   + 'Turn off two-factor sign-in on the site first, or make sure another app has this account: '
+                   + 'without its codes you may not be able to sign in.')) return;
+      await api('remove', { id: a.id });
+      toast('Account deleted');
+      load();
+    };
+    const timer = a.type === 'totp' ? ring(a) : el('span');
+    if (a.type === 'totp') live.set(a.id, { code: codeBox, ring: timer.lastChild, title: title(a) });
+    list.append(el('div', { className: 'acct' }, who, timer, codeBox,
+                   el('div', { className: 'actions' }, rename, move, remove)));
+  }
+}
+
+async function load() {
+  try {
+    const result = await api('list');
+    accounts = result.accounts.sort((a, b) => title(a).localeCompare(title(b)) || a.name.localeCompare(b.name));
+    tick();
+  } catch (e) {
+    $('list').textContent = '';
+    $('list').append(el('div', { className: 'status', textContent: e.message }));
+  }
+}
+
+function setMode(next) {
+  mode = next;
+  $('t-key').className = 'button small' + (mode === 'key' ? '' : ' ghost');
+  $('t-uri').className = 'button small' + (mode === 'uri' ? '' : ' ghost');
+  $('t-key').setAttribute('aria-selected', mode === 'key');
+  $('t-uri').setAttribute('aria-selected', mode === 'uri');
+  const byKey = mode === 'key';
+  $('f-issuer').hidden = !byKey && !renaming;
+  $('f-name').hidden = !byKey && !renaming;
+  $('f-key').hidden = !byKey || !!renaming;
+  $('f-uri').hidden = byKey || !!renaming;
+  (byKey ? (renaming ? $('f-issuer') : $('f-key')) : $('f-uri')).focus();
+}
+function openForm(account) {
+  renaming = account || null;
+  $('f-issuer').value = account ? account.issuer : '';
+  $('f-name').value = account ? account.name : '';
+  $('f-key').value = '';
+  $('f-uri').value = '';
+  $('f-error').textContent = '';
+  $('f-save').textContent = account ? 'Rename' : 'Add';
+  $('t-key').parentNode.hidden = !!account;
+  $('form').hidden = false;
+  setMode('key');
+}
+$('add').onclick = () => openForm(null);
+$('t-key').onclick = () => setMode('key');
+$('t-uri').onclick = () => setMode('uri');
+$('f-cancel').onclick = () => { $('form').hidden = true; renaming = null; };
+$('form').onsubmit = async event => {
+  event.preventDefault();
+  try {
+    const result = renaming
+      ? await api('rename', { id: renaming.id, issuer: $('f-issuer').value, name: $('f-name').value })
+      : await api('add', mode === 'uri' ? { uri: $('f-uri').value }
+                                        : { issuer: $('f-issuer').value, name: $('f-name').value, key: $('f-key').value });
+    if (result.error) { $('f-error').textContent = result.error; return; }
+    $('form').hidden = true;
+    toast(renaming ? 'Account renamed' : 'Account added: check that its code works on the site');
+    renaming = null;
+    load();
+  } catch (e) { $('f-error').textContent = e.message; }
+};
+$('q').oninput = render;
+api('info').then(info => { $('storage').textContent = info.storage; }, () => {});
+load();
+// The codes change every 30 seconds or so: ask again each second, just here, on this computer.
+setInterval(() => { if (!document.hidden) load(); }, 1000);
+</script>
+</body>
+</html>

@@ -180,6 +180,8 @@ private:
     void updateLoginsAction();
     void showLoginsMenu();
     void showSavedLogins();
+    void showAuthenticator();
+    void offerAuthenticatorAccount(WebView *view, const QUrl &url);
     void showSitePermissions();
 
     // Chrome extensions.
@@ -295,6 +297,7 @@ private:
     QAction *m_securityAction = nullptr;
     QAction *m_bookmarkStarAction = nullptr;
     QAction *m_loginsAction = nullptr;
+    QAction *m_authenticatorAction = nullptr;
     QCompleter *m_completer = nullptr;
     QStandardItemModel *m_completionModel = nullptr;
     bool m_completionsDirty = true;
