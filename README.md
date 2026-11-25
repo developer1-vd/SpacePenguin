@@ -1,5 +1,11 @@
 # SpacePenguin
 
+[![chat: on gitter](https://img.shields.io/badge/chat-on%20gitter-46BC99?logo=gitter&logoColor=white)](https://app.gitter.im/#/room/!n3l63HRwqwXe2L9jqzIKUD6XOwhIM_-dn0T-2MOY_00)
+[![build](https://github.com/developer1-vd/SpacePenguin/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/developer1-vd/SpacePenguin/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/v/release/developer1-vd/SpacePenguin?include_prereleases&sort=semver&label=release)](https://github.com/developer1-vd/SpacePenguin/releases)
+[![Homebrew test on macOS](https://github.com/developer1-vd/homebrew-spacepenguin/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/developer1-vd/homebrew-spacepenguin/actions/workflows/test.yml)
+[![license: GPL-3.0](https://img.shields.io/github/license/developer1-vd/SpacePenguin)](LICENSE)
+
 A secure, lightweight, and usable browser written in Qt.
 
 **Website:** <https://developer1-vd.github.io/SpacePenguin/> (from [`docs/`](docs/))
