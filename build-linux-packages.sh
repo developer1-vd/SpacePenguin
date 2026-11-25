@@ -65,9 +65,35 @@ for generator in "${GENERATORS[@]}"; do
     (cd "${BUILD_DIR}" && cpack -G "${generator}" -B "${ROOT}/${OUTPUT_DIR}/_cpack")
 done
 
-# Keep the packages, drop CPack's working files.
-find "${OUTPUT_DIR}/_cpack" -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) \
-    -exec mv {} "${OUTPUT_DIR}/" \;
+# Keep the packages, drop CPack's working files. Each is named after the
+# distribution it was built for (spacepenguin-1.0.0-rc.7-debian13-amd64.deb), so
+# packages from several distributions can sit side by side in a release.
+VERSION_NAME="$(sed -n 's/^set(SPACEPENGUIN_VERSION_NAME "\(.*\)")$/\1/p' "${ROOT}/CMakeLists.txt")"
+# shellcheck disable=SC1091
+DISTRO="$(. /etc/os-release && case "${ID}" in
+    *tumbleweed*|arch|void|gentoo) echo "${ID}" ;;   # rolling: no release number
+    *) echo "${ID}${VERSION_ID:+${VERSION_ID}}" ;;
+esac)"
+for package in "${OUTPUT_DIR}"/_cpack/*.deb "${OUTPUT_DIR}"/_cpack/*.rpm "${OUTPUT_DIR}"/_cpack/*.tar.gz; do
+    [[ -f "${package}" ]] || continue
+    case "${package}" in
+        *.deb)
+            # Rewritten with dpkg-deb: CPack's .deb can carry stray bytes after its
+            # last member, which dpkg ignores but apt's own reader refuses.
+            unpacked="$(mktemp -d)"
+            dpkg-deb -R "${package}" "${unpacked}/root"
+            arch="$(dpkg-deb --field "${package}" Architecture)"
+            dpkg-deb --root-owner-group -b "${unpacked}/root" \
+                "${OUTPUT_DIR}/spacepenguin-${VERSION_NAME}-${DISTRO}-${arch}.deb" >/dev/null
+            rm -rf "${unpacked}"
+            ;;
+        *.rpm)
+            arch="$(rpm -qp --qf '%{ARCH}' "${package}")"
+            mv "${package}" "${OUTPUT_DIR}/spacepenguin-${VERSION_NAME}-${DISTRO}-${arch}.rpm"
+            ;;
+        *) mv "${package}" "${OUTPUT_DIR}/" ;;
+    esac
+done
 rm -rf "${OUTPUT_DIR}/_cpack"
 
 step "Packages"
