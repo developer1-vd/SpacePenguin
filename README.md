@@ -4,6 +4,8 @@ A secure, lightweight, and usable browser written in Qt.
 
 **Website:** <https://developer1-vd.github.io/SpacePenguin/> (from [`docs/`](docs/))
 
+**Chat:** [SpacePenguin on Gitter](https://app.gitter.im/#/room/!n3l63HRwqwXe2L9jqzIKUD6XOwhIM_-dn0T-2MOY_00): questions, ideas and help. Bugs go in [issues](https://github.com/developer1-vd/SpacePenguin/issues).
+
 ![SpacePenguin's start page, with three tabs open](docs/screenshot.png)
 
 **[Watch the 40-second trailer](https://developer1-vd.github.io/SpacePenguin/#trailer)** ([MP4](docs/assets/trailer.mp4)).
