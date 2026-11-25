@@ -54,6 +54,23 @@ cask "spacepenguin" do
   desc "Secure, lightweight browser built on Qt and Chromium"
   homepage "https://github.com/${REPO}"
 
+  # Release candidates count too: GitHub marks them pre-releases, which livecheck
+  # skips by default.
+  livecheck do
+    url :url
+    regex(/^v?(\\d+(?:\\.\\d+)+(?:-rc\\.\\d+)?)\$/i)
+    strategy :github_releases do |json, regex|
+      json.map do |release|
+        next if release["draft"]
+
+        match = release["tag_name"]&.match(regex)
+        next if match.blank?
+
+        match[1]
+      end
+    end
+  end
+
   depends_on macos: :monterey
 
   app "SpacePenguin.app"
