@@ -861,7 +861,7 @@ it is on; CI builds them all and, for a `v*` tag, attaches them to a GitHub rele
 | ------- | ------- | ------ | ------- |
 | AppImage | `./build-appimage.sh` | `SpacePenguin-<v>-x86_64.AppImage` (or `aarch64`) | any Linux distribution with glibc at least as new as the build machine's (CI: Ubuntu 22.04 and newer, Debian 12+, Fedora 36+, RHEL 9+) |
 | Flatpak | `flatpak-builder` with `packaging/flatpak/io.github.developer1_vd.SpacePenguin.yml` (the commands are at its top) | `SpacePenguin-x86_64.flatpak` and `-aarch64` | any distribution with Flatpak, x86-64 and ARM64, on the KDE 6.11 runtime |
-| `.deb` / `.rpm` | `./build-linux-packages.sh` | `spacepenguin_<v>_amd64.deb`, `spacepenguin-<v>-1.x86_64.rpm` | the distribution it was built on; needs that distribution's Qt 6.8+ (Debian 13, Ubuntu 26.04 LTS, Fedora 41, openSUSE Tumbleweed, …) |
+| `.deb` / `.rpm` | `./build-linux-packages.sh` | `spacepenguin-<v>-<distribution>-amd64.deb`, `spacepenguin-<v>-<distribution>-x86_64.rpm` | the distribution it was built on; needs that distribution's Qt 6.8+ (Debian 13, Ubuntu 26.04 LTS, Fedora 41, openSUSE Tumbleweed, …) |
 | Nix | `nix build` | `result/` (a Nix store path) | NixOS and any Linux or macOS with Nix |
 | Arch package | `makepkg -si` in `packaging/arch` | `spacepenguin-<v>-1-x86_64.pkg.tar.zst` | Arch, Manjaro, EndeavourOS, … |
 | macOS | `./build-dmg.sh --universal` | `SpacePenguin-<v>-macos.dmg` and `.zip` of the `.app` | macOS 12+, Apple silicon and Intel |

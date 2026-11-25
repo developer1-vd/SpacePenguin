@@ -35,16 +35,16 @@ case "${PACKAGE}" in
     deb)
         ./build-linux-packages.sh deb
         step "Installing the .deb"
-        apt-get install -y ./dist/spacepenguin_*.deb
+        apt-get install -y ./dist/spacepenguin*.deb
         launch /usr/bin/SpacePenguin
         ;;
     rpm)
         ./build-linux-packages.sh rpm
         step "Installing the .rpm"
         if command -v dnf >/dev/null; then
-            dnf install -y ./dist/spacepenguin-*.rpm
+            dnf install -y ./dist/spacepenguin*.rpm
         else
-            zypper --non-interactive install --allow-unsigned-rpm ./dist/spacepenguin-*.rpm
+            zypper --non-interactive install --allow-unsigned-rpm ./dist/spacepenguin*.rpm
         fi
         launch /usr/bin/SpacePenguin
         ;;
