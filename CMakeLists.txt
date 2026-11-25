@@ -746,6 +746,12 @@ if(UNIX AND NOT APPLE)
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
     set(CPACK_STRIP_FILES ON)
     set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_PROCESSOR}")
+    # The package's own version: 1.0.0-rc.7 becomes 1.0.0~rc.7, which dpkg and RPM
+    # both sort before 1.0.0, so each release candidate updates the one before it
+    # and the final version updates them all.
+    string(REPLACE "-" "~" SPACEPENGUIN_PACKAGE_VERSION "${SPACEPENGUIN_VERSION_NAME}")
+    set(CPACK_DEBIAN_PACKAGE_VERSION "${SPACEPENGUIN_PACKAGE_VERSION}")
+    set(CPACK_RPM_PACKAGE_VERSION "${SPACEPENGUIN_PACKAGE_VERSION}")
 
     # Debian / Ubuntu
     set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
