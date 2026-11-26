@@ -9,6 +9,7 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- eBay, and other sites behind the same kind of bot protection, showed "Sorry, something went wrong on our end" instead of the page: the user agent carried QtWebEngine's own `QtWebEngine/6.x` token, which they take for an automated browser. It now reads like any Chromium browser's; a user agent set in the Developer role still replaces it.
 - Linux packages: release candidates now have the version `1.0.0~rc.N` in the .deb and .rpm (it was `1.0.0` for every one), so apt and dnf update from one to the next and to 1.0.0.
 - Linux packages: each .deb and .rpm is named after the distribution it was built for (`spacepenguin-1.0.0-rc.8-debian13-amd64.deb`), so a release keeps all of them. Debian's and Ubuntu's .deb (and Fedora's and openSUSE's .rpm) had the same name, and a release kept only one: rc.7's .rpm is openSUSE's, which does not install on Fedora.
 - The .deb could carry stray bytes after its contents, which dpkg ignores but apt's own reader refuses (`apt install ./file.deb` on some systems, and package repositories). It is now rewritten with dpkg-deb.

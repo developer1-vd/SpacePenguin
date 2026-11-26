@@ -2,6 +2,7 @@
 
 #include "chromeextensions.h"
 #include "logins.h"
+#include "useragent.h"
 #include "loginspage.h"
 #include "notifications.h"
 
@@ -127,6 +128,9 @@ ProfileServices createProfileServices(QObject *parent, bool isPrivate, const QSt
         services.profile->setPersistentStoragePath(dataDirectory);
         services.profile->setCachePath(dataDirectory + QStringLiteral("/cache"));
     }
+
+    // Look like the Chromium it is: sites' bot protection refuses "QtWebEngine".
+    services.profile->setHttpUserAgent(UserAgent::withoutEngineToken(services.profile->httpUserAgent()));
 
     // Answers to "allow this site to …?" are kept; in private windows only until they close.
     services.profile->setPersistentPermissionsPolicy(

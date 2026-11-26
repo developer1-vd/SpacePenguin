@@ -111,6 +111,7 @@ qt_add_executable(spacepenguin
     src/chromeextensions.h
     src/logins.cpp
     src/logins.h
+    src/useragent.h
     src/loginspage.cpp
     src/loginspage.h
     src/secretstore.cpp
@@ -478,6 +479,11 @@ if(SPACEPENGUIN_BUILD_TESTS)
         target_link_libraries(tst_externalapps PRIVATE Qt6::Test Qt6::Gui)
         target_include_directories(tst_externalapps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         add_test(NAME externalapps COMMAND tst_externalapps)
+
+        qt_add_executable(tst_useragent tests/tst_useragent.cpp src/useragent.h)
+        target_link_libraries(tst_useragent PRIVATE Qt6::Test)
+        target_include_directories(tst_useragent PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        add_test(NAME useragent COMMAND tst_useragent)
 
         qt_add_executable(tst_firstrun tests/tst_firstrun.cpp)
         target_link_libraries(tst_firstrun PRIVATE Qt6::Test Qt6::Widgets)
