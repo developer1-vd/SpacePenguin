@@ -702,6 +702,7 @@ desktop.
 | macOS DMG | drag SpacePenguin from Applications to the Bin |
 | `.deb` / `.rpm` / Arch | `sudo apt remove spacepenguin`, `sudo dnf remove spacepenguin`, `sudo pacman -R spacepenguin` |
 | Flatpak | `flatpak uninstall io.github.developer1_vd.SpacePenguin` |
+| AppImage you downloaded yourself | delete the `.AppImage` file (and its menu entry, if Gear Lever or AppImageLauncher added one) |
 | Android, iPhone | as any app: touch and hold its icon, then remove it |
 
 Your bookmarks, history, saved logins and settings are kept, so installing again
@@ -943,6 +944,9 @@ printed by default, since they come from the sites themselves; set
   storage) is removed with everything else, as Qt has no per-site API for it
 - The theme applies to application chrome and internal pages only; website
   colours follow each site's own CSS
+- eBay answers every page with "Sorry, something went wrong on our end": its bot
+  protection refuses QtWebEngine browsers, whatever the user agent, the blocker
+  or the Qt version. Use another browser for eBay
 - Internal `about:` pages do not create a back/forward history entry
 - `Ctrl+F` uses the renderer's find pass, one tab at a time
 - Packages are not code signed. Unsigned Windows installers trigger SmartScreen,
