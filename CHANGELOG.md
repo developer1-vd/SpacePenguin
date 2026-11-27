@@ -7,6 +7,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- The AppImage, Windows, macOS, Android and iOS builds now use Qt 6.11.3, whose web engine is Chromium 140 with its security fixes. They were on Qt 6.8.3, with Chromium 122 from early 2024. The Flatpak and Linux distribution packages already used their own newer Qt.
+
+### Changed
+
+- macOS 13 Ventura or newer and iOS 17 or newer are needed, as Qt 6.11 needs; macOS 12 Monterey and iOS 16 stay on 1.0.0-rc.7.
+
 ### Fixed
 
 - Linux packages: release candidates now have the version `1.0.0~rc.N` in the .deb and .rpm (it was `1.0.0` for every one), so apt and dnf update from one to the next and to 1.0.0.

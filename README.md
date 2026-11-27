@@ -527,10 +527,10 @@ on each of them for every push.
 | Linux (X11 and Wayland), any distribution, x86-64 and ARM64 | GCC, Qt 6.8+ | AppImage, Flatpak, `.deb`, `.rpm`, Arch package, Nix flake | desktop entry, AppStream metadata and icons installed under `share/` |
 | FreeBSD 14+, OpenBSD, NetBSD (X11 and Wayland) | Clang or GCC, the system's Qt 6.8+ from packages | build from source (`./install-deps.sh`, then CMake) | same desktop entry and icons as Linux; no AppArmor profile |
 | ChromeOS (Linux development environment), Intel/AMD and ARM | — | the AppImage, through `install.sh` (or `packaging/chromeos/install.sh`) | appears in the ChromeOS launcher; tuned for 4 GB machines — see [Chromebooks](#chromebooks) |
-| Android 9+ (ARM64) | Qt Quick + QtWebView, Qt 6.8 | APK | a separate, smaller app on the phone's own web engine — see [Phones](#phones-android-and-ios) |
-| iOS and iPadOS 16+ | Qt Quick + QtWebView, Qt 6.8 | unsigned `.ipa` to sideload; signed `.ipa` with your Apple team | as Android |
-| Windows 10 and 11 x64 | MSVC 2022, Qt 6.8 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
-| macOS 12 Monterey to 26 Tahoe, Apple silicon and Intel | Apple Clang, Qt 6.8 | universal `.app` (zip) and DMG | Tahoe-style icon, registered for `http`/`https`; ready to notarise |
+| Android 9+ (ARM64) | Qt Quick + QtWebView, Qt 6.11 | APK | a separate, smaller app on the phone's own web engine — see [Phones](#phones-android-and-ios) |
+| iOS and iPadOS 17+ | Qt Quick + QtWebView, Qt 6.11 | unsigned `.ipa` to sideload; signed `.ipa` with your Apple team | as Android |
+| Windows 10 and 11 x64 | MSVC 2022, Qt 6.11 | installer (per-user or all users) and portable zip | icon and version info embedded; MSVC runtime included; no console window |
+| macOS 13 Ventura to 26 Tahoe, Apple silicon and Intel | Apple Clang, Qt 6.11 | universal `.app` (zip) and DMG | Tahoe-style icon, registered for `http`/`https`; ready to notarise |
 
 Tested in CI on every push: Ubuntu 22.04 (AppImage), Ubuntu 24.04 and **Ubuntu
 26.04 LTS "Resolute Raccoon"** (native `.deb` against its Qt 6.10), Debian 13,
@@ -817,7 +817,7 @@ Windows, use `--parallel 2` on machines with 8 GB or less. With Ninja
 (`cmake -B build -G Ninja`) the limit is built in.
 
 Qt from `.qt/` or the system is found automatically; to use another Qt, pass
-`-DCMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/<gcc_64|msvc2022_64|macos>`. The toolchain
+`-DCMAKE_PREFIX_PATH=/path/to/Qt/6.11.3/<gcc_64|msvc2022_64|macos>`. The toolchain
 needs CMake 3.21+ and a C++20 compiler: GCC 11+ or Clang 14+ on Linux, MSVC 2022
 on Windows, Xcode 14+ on macOS.
 
@@ -872,10 +872,10 @@ it is on; CI builds them all and, for a `v*` tag, attaches them to a GitHub rele
 | `.deb` / `.rpm` | `./build-linux-packages.sh` | `spacepenguin-<v>-<distribution>-amd64.deb`, `spacepenguin-<v>-<distribution>-x86_64.rpm` | the distribution it was built on; needs that distribution's Qt 6.8+ (Debian 13, Ubuntu 26.04 LTS, Fedora 41, openSUSE Tumbleweed, …) |
 | Nix | `nix build` | `result/` (a Nix store path) | NixOS and any Linux or macOS with Nix |
 | Arch package | `makepkg -si` in `packaging/arch` | `spacepenguin-<v>-1-x86_64.pkg.tar.zst` | Arch, Manjaro, EndeavourOS, … |
-| macOS | `./build-dmg.sh --universal` | `SpacePenguin-<v>-macos.dmg` and `.zip` of the `.app` | macOS 12+, Apple silicon and Intel |
+| macOS | `./build-dmg.sh --universal` | `SpacePenguin-<v>-macos.dmg` and `.zip` of the `.app` | macOS 13+, Apple silicon and Intel |
 | Windows | `powershell -ExecutionPolicy Bypass -File build-windows.ps1` | `SpacePenguin-<v>-windows-x64-setup.exe` and `-windows-x64.zip` | Windows 10/11 x64, nothing else needed |
 | Android | `./build-android.sh` (`--release` to sign with your key) | `SpacePenguin-<v>-android-arm64.apk` | Android 9+ on ARM64 |
-| iPhone and iPad | `./build-ios.sh --unsigned` (macOS with Xcode; `--team <ID>` to sign) | `SpacePenguin-<v>-ios-unsigned.ipa` | iOS 16+, sideloaded |
+| iPhone and iPad | `./build-ios.sh --unsigned` (macOS with Xcode; `--team <ID>` to sign) | `SpacePenguin-<v>-ios-unsigned.ipa` | iOS 17+, sideloaded |
 
 Every script takes `--help` (`-Help` on Windows). Signing is optional:
 `build-appimage.sh --sign` (GPG), `build-dmg.sh --sign "Developer ID Application: …"

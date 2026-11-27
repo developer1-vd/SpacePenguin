@@ -9,7 +9,7 @@
 #   - Qt 6.8 with QtWebEngine for MSVC 2022, through aqtinstall, into .qt\ in the
 #     repository, where CMake finds it without any extra flags
 param(
-    [string]$QtVersion = "6.8.3",
+    [string]$QtVersion = "6.11.3",
     [string]$QtDir = (Join-Path $PSScriptRoot ".qt"),
     [switch]$SkipVisualStudio,
     [switch]$NoPackaging,
