@@ -9,6 +9,7 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Turning blocking off for a site now lets through everything its pages load. It used to cover only requests to the site's own address, so a shop's images and scripts from its other domains (ebaystatic.com for eBay) were still blocked, and turning it off didn't fix a broken page.
 - Linux packages: release candidates now have the version `1.0.0~rc.N` in the .deb and .rpm (it was `1.0.0` for every one), so apt and dnf update from one to the next and to 1.0.0.
 - Linux packages: each .deb and .rpm is named after the distribution it was built for (`spacepenguin-1.0.0-rc.8-debian13-amd64.deb`), so a release keeps all of them. Debian's and Ubuntu's .deb (and Fedora's and openSUSE's .rpm) had the same name, and a release kept only one: rc.7's .rpm is openSUSE's, which does not install on Fedora.
 - The .deb could carry stray bytes after its contents, which dpkg ignores but apt's own reader refuses (`apt install ./file.deb` on some systems, and package repositories). It is now rewritten with dpkg-deb.

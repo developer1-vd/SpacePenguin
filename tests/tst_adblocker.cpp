@@ -23,6 +23,7 @@ private slots:
     void emptyFileRejected();
     void pauseForHost();
     void pauseCoversSubdomains();
+    void pauseCoversWhatThePageLoads();
     void hostCaseAndPortIgnored();
     void enableToggle();
     void countsRulesAndExceptions();
@@ -207,6 +208,22 @@ void TestAdBlocker::pauseCoversSubdomains()
     QVERIFY(blocker.isPausedFor(QStringLiteral("example.com")));
     QVERIFY(blocker.isPausedFor(QStringLiteral("cdn.example.com")));
     QVERIFY(!blocker.isPausedFor(QStringLiteral("notexample.com")));
+}
+
+void TestAdBlocker::pauseCoversWhatThePageLoads()
+{
+    // Turned off on ebay.com: what its pages load from elsewhere is let through
+    // too, while other sites still have it blocked.
+    AdBlocker blocker;
+    blocker.loadFiltersFromText(QStringLiteral("||ebaystatic.com^\n||tracker.example^"));
+    blocker.setPausedHosts({QStringLiteral("ebay.com")});
+    const QUrl script(QStringLiteral("https://ir.ebaystatic.com/rs/c/app.js"));
+    QVERIFY(!blocker.wouldBlock(script, RequestType::Script, QStringLiteral("www.ebay.com")));
+    QVERIFY(!blocker.wouldBlock(QUrl(QStringLiteral("https://tracker.example/p.gif")), RequestType::Image,
+                                QStringLiteral("www.ebay.com")));
+    QVERIFY(blocker.wouldBlock(script, RequestType::Script, QStringLiteral("news.example")));
+    QVERIFY(blocker.wouldBlock(QUrl(QStringLiteral("https://tracker.example/p.gif")), RequestType::Image,
+                               QStringLiteral("news.example")));
 }
 
 void TestAdBlocker::hostCaseAndPortIgnored()
