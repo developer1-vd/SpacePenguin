@@ -13,7 +13,7 @@
 # distributions that cannot run Qt's prebuilt glibc binaries, use the system Qt.
 set -euo pipefail
 
-QT_VERSION="6.8.3"
+QT_VERSION="6.11.3"
 QT_MODULES=(qtwebengine qtwebchannel qtpositioning qtpdf qtserialport)
 MIN_QT="6.8.0"
 MIN_CMAKE="3.21"

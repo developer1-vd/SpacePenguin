@@ -38,7 +38,7 @@ checksum next to the package. All of them take `--help` (`-Help` on Windows).
    pointed at `shell.nix`.
 2. With `--qt auto` (the default), asks the package manager which QtWebEngine it
    offers. 6.8 or newer: the system Qt is installed and used. Older, or none: Qt
-   6.8.3 comes from the Qt mirrors instead. musl systems (Alpine, Void musl) and
+   6.11.3 comes from the Qt mirrors instead. musl systems (Alpine, Void musl) and
    CPUs Qt does not build for always use the system Qt.
 3. Installs the compiler, CMake, Ninja, Git, Python, the OpenGL, xkbcommon,
    xcb-util, NSS, ALSA and fontconfig libraries QtWebEngine needs, and the
@@ -62,7 +62,7 @@ They build the phone app in `mobile/` (Qt Quick and QtWebView; see the README's
 aqtinstall into `.qt/` — the phone kit with QtWebView, and the desktop kit its
 build tools run from. `build-android.sh` also fetches the Android command-line
 tools (checked against their SHA-256), then the SDK platform, build tools and
-NDK 26.1 that Qt 6.8 is built with, into `.cache/android-sdk` unless
+NDK r27c that Qt 6.11 is built with, into `.cache/android-sdk` unless
 `ANDROID_SDK_ROOT` points at an SDK; it needs a JDK 17 or newer. Without
 `--release` the APK is signed with a debug key, which installs fine but is not
 accepted by Google Play. `build-ios.sh` generates an Xcode project; without
@@ -80,7 +80,7 @@ start a job per file and freeze a laptop.
 ## install-deps.ps1
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File install-deps.ps1 [-QtVersion 6.8.3] [-SkipVisualStudio] [-NoPackaging] [-DryRun]
+powershell -ExecutionPolicy Bypass -File install-deps.ps1 [-QtVersion 6.11.3] [-SkipVisualStudio] [-NoPackaging] [-DryRun]
 ```
 
 Uses winget, or Chocolatey where winget is missing (Windows Server). Installs Visual

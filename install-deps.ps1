@@ -6,10 +6,11 @@
 # Installs, with winget (or Chocolatey when winget is missing):
 #   - Visual Studio 2022 Build Tools with the C++ workload, unless MSVC is present
 #   - CMake, Ninja, Python 3 and NSIS (for the installer)
-#   - Qt 6.8 with QtWebEngine for MSVC 2022, through aqtinstall, into .qt\ in the
+#   - Qt 6.11 with QtWebEngine for MSVC 2022, through aqtinstall, into .qt\ in the
 #     repository, where CMake finds it without any extra flags
+# It needs git on PATH (Git for Windows): aqtinstall is fetched with it.
 param(
-    [string]$QtVersion = "6.8.3",
+    [string]$QtVersion = "6.11.3",
     [string]$QtDir = (Join-Path $PSScriptRoot ".qt"),
     [switch]$SkipVisualStudio,
     [switch]$NoPackaging,
@@ -123,7 +124,11 @@ if ($QtPrefix) {
     $venv = Join-Path $QtDir ".venv"
     $pythonArgs = if ($python -eq "py") { @("-3", "-m", "venv", $venv) } else { @("-m", "venv", $venv) }
     Run $python $pythonArgs
-    Run (Join-Path $venv "Scripts\python.exe") @("-m", "pip", "install", "--quiet", "--upgrade", "pip", "aqtinstall")
+    # Qt 6.11 for Windows is laid out per compiler on the mirrors (qt6_6113\qt6_6113_msvc2022_64),
+    # which aqtinstall 3.3.0 can't read; this commit of it can. Back to a release once one has it.
+    $aqtinstall = "aqtinstall @ git+https://github.com/miurahr/aqtinstall.git@4c759852b1108cc801d8e24979136b895b5155d4"
+    $env:SETUPTOOLS_SCM_PRETEND_VERSION_FOR_AQTINSTALL = "3.3.1.dev180"
+    Run (Join-Path $venv "Scripts\python.exe") @("-m", "pip", "install", "--quiet", "--upgrade", "pip", $aqtinstall)
     Run (Join-Path $venv "Scripts\aqt.exe") (@("install-qt", "windows", "desktop", $QtVersion, $QtArch,
                                                "--outputdir", $QtDir, "--modules") + $QtModules)
     if (-not $DryRun) { $QtPrefix = Find-QtPrefix }

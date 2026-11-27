@@ -18,13 +18,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${ROOT}"
 
 VERSION="$(sed -n 's/^set(SPACEPENGUIN_VERSION_NAME "\(.*\)")$/\1/p' CMakeLists.txt | head -n1)"
-QT_VERSION="${QT_VERSION:-6.8.3}"
+QT_VERSION="${QT_VERSION:-6.11.3}"
 ABI="arm64-v8a"
 QT_ANDROID_ARCH="android_arm64_v8a"
-# What Qt 6.8 is built and tested with.
-NDK_VERSION="26.1.10909125"
-PLATFORM="android-34"
-BUILD_TOOLS="34.0.0"
+# What Qt 6.11 is built with: NDK r27c, targeting Android 16 (API 36).
+NDK_VERSION="27.2.12479018"
+PLATFORM="android-36"
+BUILD_TOOLS="36.0.0"
 CMDLINE_TOOLS_ZIP="commandlinetools-linux-11076708_latest.zip"
 CMDLINE_TOOLS_SHA256="2d2d50857e4eb553af5a6dc3ad507a17adf43d115264b1afc116f95c92e5e258"
 
