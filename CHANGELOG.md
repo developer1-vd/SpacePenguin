@@ -7,6 +7,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-rc.8] - 2026-11-27
+
 ### Security
 
 - The AppImage, Windows, macOS, Android and iOS builds now use Qt 6.11.3, whose web engine is Chromium 140 with its security fixes. They were on Qt 6.8.3, with Chromium 122 from early 2024. The Flatpak and Linux distribution packages already used their own newer Qt.
@@ -143,7 +145,8 @@ their store, sites installed as apps, saved logins (about:logins), crash
 recovery, roles for developers, gamers, students, workers and teachers, and
 packages for Windows, macOS, Linux, the BSDs, Chromebooks, Android and iPhone.
 
-[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.7...HEAD
+[Unreleased]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.8...HEAD
+[1.0.0-rc.8]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.7...v1.0.0-rc.8
 [1.0.0-rc.7]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.6...v1.0.0-rc.7
 [1.0.0-rc.6]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.5...v1.0.0-rc.6
 [1.0.0-rc.5]: https://github.com/developer1-vd/SpacePenguin/compare/v1.0.0-rc.4...v1.0.0-rc.5
