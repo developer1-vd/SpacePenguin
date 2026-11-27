@@ -741,11 +741,14 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info)
     }
 
     const QString host = url.host();
-    if (isPausedFor(host))
+    const QString documentHost = info.initiator().host();
+    // Blocking turned off for a site covers everything its pages load, from
+    // other addresses too (a shop's images and scripts on its own CDN), not
+    // only the requests to the site itself.
+    if (isPausedFor(host) || isPausedFor(documentHost))
         return;
 
     const RequestType type = requestTypeFor(info.resourceType());
-    const QString documentHost = info.initiator().host();
 
     if (!wouldBlock(url, type, documentHost)) {
         if (m_stripTracking && url.hasQuery()) {
@@ -812,7 +815,7 @@ bool AdBlocker::wouldBlock(const QUrl &url, RequestType type, const QString &doc
     if (host.isEmpty())
         return false;
 
-    if (isPausedFor(host))
+    if (isPausedFor(host) || isPausedFor(documentHost))
         return false;
 
     const QString domain = documentHost.toLower();
